@@ -10,7 +10,7 @@ Compose UI
   ▼
 ViewModel
   │
-  ├──────────────► Places / Favorites / Settings repositories
+  ├──────────────► Search / Favorites / Settings repositories
   │
   ▼
 MockLocationServiceController
@@ -36,7 +36,7 @@ MockLocationCoordinator
 ├── service/             foreground service、notification、commands
 ├── feature/setup/       Developer Options 引導
 ├── feature/map/         MapScreen、MapViewModel、搜尋
-├── feature/places/      Places adapter
+├── feature/search/      可替換的地點搜尋 adapter
 ├── feature/saved/       收藏與最近位置
 ├── feature/settings/    DataStore settings
 └── data/local/          Room entities、DAO、database
@@ -44,7 +44,7 @@ MockLocationCoordinator
 
 ## 3. 核心資料模型
 
-避免讓 Google Maps `LatLng` 滲入 domain/service：
+避免讓 MapLibre `Position` 或其他地圖 SDK 型別滲入 domain/service：
 
 ```kotlin
 data class Coordinate(
@@ -115,7 +115,7 @@ Mock 注入本身是否能以更窄的 `specialUse` type 通過實際 Play Conso
 
 | 權限／能力 | 用途 | MVP 行為 |
 |---|---|---|
-| `INTERNET` | Maps/Places | Manifest normal permission |
+| `INTERNET` | OpenFreeMap 圖磚與未來地點搜尋 | Manifest normal permission |
 | `ACCESS_COARSE_LOCATION` / `ACCESS_FINE_LOCATION` | Current-location shortcut、location FGS prerequisite | 首次使用相關功能時請求 |
 | `FOREGROUND_SERVICE` | 長時間執行 | Manifest |
 | `FOREGROUND_SERVICE_LOCATION` | location FGS type | Manifest，API 34+ |
@@ -139,20 +139,20 @@ Idle → Starting → Active → Stopping → Idle
 
 ## 8. 地圖與搜尋
 
-- Maps Compose 以 `CameraPositionState` 取得 camera center
+- MapLibre Compose 以 `CameraState` 取得 camera center
 - 只在 camera idle 時更新選定座標，拖曳中不高頻觸發 reverse lookup
 - MVP 不需要 reverse geocoding camera center；無 place name 時顯示座標，避免額外 API 成本與延遲
-- 搜尋使用 Places SDK for Android Autocomplete (New)，選取結果只請求 MVP 需要的 display name、formatted address、location 欄位
-- 搜尋 session token 必須依官方 session 規則管理，並對文字輸入做 debounce/cancellation
-- 透過介面包裝 Places SDK，unit test 使用 fake repository
+- 地圖使用 OpenFreeMap 的 Positron／Dark 樣式，保留 MapLibre、OpenFreeMap 與 OpenStreetMap attribution
+- 搜尋透過可替換介面包裝 OSM 相容服務，只保留名稱、格式化地址與座標
+- 搜尋必須遵守供應商的 rate limit，並對文字輸入做 debounce/cancellation；unit test 使用 fake repository
 
-## 9. API key 與設定
+## 9. 地圖供應與設定
 
-- 使用 Secrets Gradle Plugin，從不進版控的 `local.properties` 或 secrets file 注入
-- 提供 `.properties.example`，只放 placeholder
-- Cloud Console 設 Android app restriction：永久 applicationId + debug/release SHA-1
-- API restriction 僅開 Maps SDK for Android 與 Places API (New)
-- debug 與 release 最好使用不同 key，分開 quota 與撤銷範圍
+- MapLibre Compose 負責 Android 地圖渲染，OpenFreeMap 提供 OSM 向量圖磚與樣式
+- 目前不需要 Google Cloud、Billing、Secrets Plugin 或 API key
+- style URL 集中定義，不硬散落在畫面邏輯，方便切換相容供應商或自架
+- OpenFreeMap 為無 SLA 的公共服務；Release 前需記錄可用性風險與替代策略
+- 未來搜尋服務若需要 token，必須從不進版控的本機設定注入，且不得與其他服務共用
 
 ## 10. 本機資料
 
@@ -212,7 +212,7 @@ Mock Location App selection 與跨 App 觀察必須在 emulator/實體裝置手�
 |---|---|
 | API 26 emulator/device | minSdk 舊 overload 與通知行為 |
 | API 34 | FGS type、notification/location permission |
-| API 36 Google APIs image | target 行為、FLP、Maps |
+| API 36 Google APIs image | target 行為、FLP、MapLibre |
 | 一台非 Pixel 實體裝置 | OEM 省電與背景穩定性 |
 
 ## 12. 主要風險與處理
@@ -222,7 +222,7 @@ Mock Location App selection 與跨 App 觀察必須在 emulator/實體裝置手�
 | OEM 或 client 對 provider 行為不同 | 某些 App 不收到位置 | 先做 GPS+FLP spike；以裝置矩陣記錄，不承諾繞過拒絕 |
 | FGS 啟動／權限限制 | 背景啟動 crash | 只從可見 Activity 啟動；完整捕捉與 rollback |
 | Stop 未完整 cleanup | 裝置殘留 mock mode | 單一冪等 cleanup path、重複啟停與 force-stop 測試 |
-| Maps/Places key 外洩或超額 | 費用與服務中斷 | Secrets plugin、Android/SHA-1/API restrictions、quota alerts |
+| 公共圖磚服務中斷或政策改變 | 地圖無法載入 | error/retry、集中 style URL、保留相容供應商與自架選項 |
 | 把 UI boolean 當服務狀態 | Zombie UI | ServiceState 為唯一真相，不持久化 Active |
 | Play policy/FGS declaration 不符 | 無法上架 | Release 前做 Play Console policy spike；內部 APK 不等同已核准上架 |
 
@@ -232,10 +232,10 @@ Mock Location App selection 與跨 App 觀察必須在 emulator/實體裝置手�
 - [FusedLocationProviderClient mock mode](https://developers.google.com/android/reference/com/google/android/gms/location/FusedLocationProviderClient)
 - [Android foreground service types](https://developer.android.com/develop/background-work/services/fgs/service-types)
 - [Android foreground service changes](https://developer.android.com/develop/background-work/services/fgs/changes)
-- [Google Maps Compose](https://developers.google.com/maps/documentation/android-sdk/maps-compose)
-- [Places Autocomplete (New) for Android](https://developers.google.com/maps/documentation/places/android-sdk/place-autocomplete)
-- [Google Maps Platform API key security](https://developers.google.com/maps/api-security-best-practices)
+- [MapLibre Compose](https://maplibre.org/maplibre-compose/)
+- [MapLibre Compose interaction](https://maplibre.org/maplibre-compose/interaction/)
+- [OpenFreeMap Quick Start](https://openfreemap.org/quick_start/)
+- [OpenStreetMap attribution](https://www.openstreetmap.org/copyright)
 - [Google Play target API requirements](https://support.google.com/googleplay/android-developer/answer/11926878?hl=en-GB_ALL)
 
-查核日期為 2026-08-23。依當日官方文件，Maps Compose 範例版本為 8.4.0；2026-08-31 起 Google Play 新 App／更新需 target Android 16（API 36）或以上。實作時仍以 version catalog 鎖版並在升級 PR 重新驗證。
-
+查核日期為 2026-08-23。MapLibre Compose 版本由 version catalog 鎖定，OpenFreeMap 樣式 URL 集中管理；2026-08-31 起 Google Play 新 App／更新需 target Android 16（API 36）或以上。依賴與圖磚供應政策在升級 PR 重新驗證。

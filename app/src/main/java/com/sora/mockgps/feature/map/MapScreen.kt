@@ -12,6 +12,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,6 +24,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -36,23 +38,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.maps.android.compose.CameraPositionState
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.MapProperties
-import com.google.maps.android.compose.MapType
-import com.google.maps.android.compose.rememberCameraPositionState
-import com.sora.mockgps.BuildConfig
 import com.sora.mockgps.R
 import com.sora.mockgps.core.model.Coordinate
 import com.sora.mockgps.service.MockLocationForegroundService
 import com.sora.mockgps.service.MockServiceState
 import java.util.Locale
+import org.maplibre.compose.camera.CameraPosition
+import org.maplibre.compose.camera.CameraState
+import org.maplibre.compose.camera.rememberCameraState
+import org.maplibre.compose.map.MaplibreMap
+import org.maplibre.compose.style.BaseStyle
+import org.maplibre.spatialk.geojson.Position
 
 /**
  * Lets the user move the map beneath a fixed centre reticle. The coordinate is committed only
@@ -63,8 +64,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val serviceState by MockLocationForegroundService.state.collectAsState()
-    val cameraPositionState = rememberMapCameraState(uiState.camera)
-    val mapsConfigured = BuildConfig.MAPS_API_KEY.isConfiguredMapsKey()
+    val cameraState = rememberMapCameraState(uiState.camera)
     var permissionMessage by remember { mutableStateOf<String?>(null) }
     var notificationPermissionHandled by rememberSaveable { mutableStateOf(false) }
 
@@ -105,9 +105,9 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
 
         MapPicker(
             uiState = uiState,
-            mapsConfigured = mapsConfigured,
-            cameraPositionState = cameraPositionState,
+            cameraState = cameraState,
             onMapLoaded = viewModel::onMapLoaded,
+            onMapLoadFailed = viewModel::onMapLoadFailed,
             onCameraIdle = viewModel::onCameraIdle,
             onRetry = viewModel::retryMap,
         )
@@ -135,8 +135,8 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             OutlinedButton(onClick = viewModel::toggleMapType, modifier = Modifier.weight(1f)) {
                 Text(
                     stringResource(
-                        if (uiState.mapType == MapDisplayType.Normal) R.string.action_satellite_map
-                        else R.string.action_normal_map,
+                        if (uiState.mapType == MapDisplayType.Light) R.string.action_dark_map
+                        else R.string.action_light_map,
                     ),
                 )
             }
@@ -189,36 +189,42 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
 @Composable
 private fun MapPicker(
     uiState: MapUiState,
-    mapsConfigured: Boolean,
-    cameraPositionState: CameraPositionState,
+    cameraState: CameraState,
     onMapLoaded: () -> Unit,
+    onMapLoadFailed: () -> Unit,
     onCameraIdle: (CameraPosition) -> Unit,
     onRetry: () -> Unit,
 ) {
+    val uriHandler = LocalUriHandler.current
     Box(modifier = Modifier.fillMaxWidth().height(320.dp)) {
-        if (mapsConfigured) {
-            key(uiState.mapRenderKey) {
-                GoogleMap(
-                    modifier = Modifier.fillMaxSize(),
-                    cameraPositionState = cameraPositionState,
-                    properties = MapProperties(
-                        mapType = if (uiState.mapType == MapDisplayType.Normal) MapType.NORMAL else MapType.SATELLITE,
-                    ),
-                    onMapLoaded = onMapLoaded,
-                )
+        key(uiState.mapRenderKey) {
+            MaplibreMap(
+                modifier = Modifier.fillMaxSize(),
+                baseStyle = BaseStyle.Uri(uiState.mapType.styleUrl),
+                cameraState = cameraState,
+                onMapLoadFinished = onMapLoaded,
+                onMapLoadFailed = { onMapLoadFailed() },
+            )
+        }
+        CenterReticle(modifier = Modifier.align(Alignment.Center))
+        Row(modifier = Modifier.align(Alignment.BottomStart)) {
+            TextButton(
+                onClick = { uriHandler.openUri("https://openfreemap.org/") },
+                contentPadding = PaddingValues(horizontal = 4.dp),
+            ) {
+                Text(stringResource(R.string.attribution_openfreemap), style = MaterialTheme.typography.labelSmall)
             }
-            CenterReticle(modifier = Modifier.align(Alignment.Center))
+            TextButton(
+                onClick = { uriHandler.openUri("https://www.openstreetmap.org/copyright") },
+                contentPadding = PaddingValues(horizontal = 4.dp),
+            ) {
+                Text(stringResource(R.string.attribution_openstreetmap), style = MaterialTheme.typography.labelSmall)
+            }
         }
 
-        when {
-            !mapsConfigured -> Text(
-                stringResource(R.string.map_api_key_missing),
-                modifier = Modifier.align(Alignment.Center).padding(24.dp),
-                color = MaterialTheme.colorScheme.error,
-            )
-            uiState.loadingState == MapLoadingState.Loading ->
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-            uiState.loadingState == MapLoadingState.Error -> Column(
+        when (uiState.loadingState) {
+            MapLoadingState.Loading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            MapLoadingState.Error -> Column(
                 modifier = Modifier.align(Alignment.Center).padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -226,15 +232,15 @@ private fun MapPicker(
                 Text(stringResource(R.string.map_load_failed), color = MaterialTheme.colorScheme.error)
                 Button(onClick = onRetry) { Text(stringResource(R.string.action_retry)) }
             }
-            else -> Unit
+            MapLoadingState.Ready -> Unit
         }
     }
 
-    // CameraPositionState is held across recomposition; this callback occurs after a pan, zoom,
+    // CameraState is held across recomposition; this callback occurs after a pan, zoom,
     // or programmatic move has settled rather than on every drag frame.
-    androidx.compose.runtime.LaunchedEffect(cameraPositionState.isMoving) {
-        if (!cameraPositionState.isMoving) {
-            onCameraIdle(cameraPositionState.position)
+    androidx.compose.runtime.LaunchedEffect(cameraState.isCameraMoving) {
+        if (!cameraState.isCameraMoving) {
+            onCameraIdle(cameraState.position)
         }
     }
 }
@@ -251,22 +257,24 @@ private fun CenterReticle(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun rememberMapCameraState(camera: MapCamera): CameraPositionState =
-    rememberCameraPositionState {
-        position = CameraPosition(
-            camera.coordinate.toLatLng(),
-            camera.zoom,
-            camera.tilt,
-            camera.bearing,
-        )
-    }
+private fun rememberMapCameraState(camera: MapCamera): CameraState = rememberCameraState(
+    firstPosition = CameraPosition(
+        target = camera.coordinate.toPosition(),
+        zoom = camera.zoom.toDouble(),
+        tilt = camera.tilt.toDouble(),
+        bearing = camera.bearing.toDouble(),
+    ),
+)
 
-private fun Coordinate.toLatLng(): LatLng = LatLng(latitude, longitude)
+private fun Coordinate.toPosition(): Position = Position(latitude = latitude, longitude = longitude)
 
 private fun Double.formatCoordinate(): String = String.format(Locale.US, "%.6f", this)
 
-private fun String.isConfiguredMapsKey(): Boolean =
-    isNotBlank() && this != "DEFAULT_API_KEY" && this != "YOUR_ANDROID_RESTRICTED_MAPS_API_KEY"
+private val MapDisplayType.styleUrl: String
+    get() = when (this) {
+        MapDisplayType.Light -> "https://tiles.openfreemap.org/styles/positron"
+        MapDisplayType.Dark -> "https://tiles.openfreemap.org/styles/dark"
+    }
 
 private fun Context.requiredRuntimePermissions(notificationPermissionHandled: Boolean): List<String> = buildList {
     if (!hasLocationPermission()) {

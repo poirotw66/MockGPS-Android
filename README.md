@@ -8,7 +8,7 @@ Android Mock Location 工具。Milestone 1 核心 Spike 已完成程式碼、單
 - SDK：min 26、compile/target 36
 - 已完成：LocationManager GPS test provider、Fused Location mock mode、原子化 coordinator、前景服務、持續通知與 Stop action
 - Map UI：Taipei 101 預設位置、中央準星選點、權限流程、開發人員選項入口、繁中／英文資源
-- 地圖切片：中央準星選點、Normal/Satellite、完整 camera state、loading/error/retry、Active 明確套用新位置
+- 地圖切片：MapLibre + OpenFreeMap、中央準星、明亮／深色樣式、完整 camera state、loading/error/retry、Active 明確套用新位置
 - 自動驗證：12 個 unit tests、`assembleDebug`、`lintDebug`（0 errors）
 - 實機驗證：Sony XQ-BC72（Android 13 / API 33）GPS + FLP 注入、背景持續、通知 Stop、20/20 次啟停與完整清理均通過
 - 待驗證：API 26/34/36 裝置矩陣與獨立 LocationManager/FLP client 的跨 App 讀值
@@ -25,7 +25,7 @@ Debug APK：`app/build/outputs/apk/debug/app-debug.apk`
 
 - Kotlin、Jetpack Compose、單一 Android `app` module 起步
 - `minSdk 26`、`compileSdk 36`、`targetSdk 36`
-- Google Maps Compose 顯示地圖；Places SDK for Android 提供地點搜尋
+- MapLibre Compose 顯示 OpenFreeMap 向量地圖，不需要 Google Cloud、Billing 或 API key
 - Android `LocationManager` 與 Google Play services Fused Location Provider 組成 Mock Location coordinator
 - 使用前景服務維持模擬，通知提供立即停止操作
 - Room 儲存收藏與最近使用地點，DataStore 儲存偏好設定
@@ -33,27 +33,19 @@ Debug APK：`app/build/outputs/apk/debug/app-debug.apk`
 
 ## 開工前需確定
 
-以下選項不妨礙規劃，但在建立 Google Cloud API key 前必須定案：
+以下選項不妨礙規劃，但在 Release Candidate 前必須定案：
 
 1. App 顯示名稱
 2. 永久 `applicationId`（目前：`com.sora.mockgps`）
-3. Google Cloud 專案與帳務設定
-4. Maps SDK for Android、Places API (New) 的受限 API key
+3. 地點搜尋服務的供應商與使用政策
+4. OpenFreeMap 可用性監控與未來自架策略
 5. 至少一台可開啟「開發人員選項 → 選取模擬位置應用程式」的測試裝置
 
-API key 不進版控；Android key 必須限制到正式 package name、簽章 SHA-1，以及實際使用的 Maps/Places API。
+目前地圖不需要 API key。畫面保留 MapLibre／OpenStreetMap attribution；若未來搜尋服務需要 token，仍必須放在未追蹤的本機設定並限制使用範圍。
 
-## Google Maps API key 設定
+## 地圖服務
 
-Maps Compose 與 Secrets Gradle Plugin 已就緒；專案不含可用的 API key。複製範本後，僅在本機填入受限 key：
-
-```powershell
-Copy-Item secrets.properties.example secrets.properties
-```
-
-在 `secrets.properties` 設定 `MAPS_API_KEY`。此檔案已被 Git 忽略；`secrets.defaults.properties` 只有無法載入地圖的安全預設值，讓 CI 或未設定 key 的機器仍可完成 Gradle 設定與編譯。
-
-在 Google Cloud Console 對 key 套用 Android application restriction：package name `com.sora.mockgps`、各簽章（debug／release）的 SHA-1，並只啟用 Maps SDK for Android（啟用 Places 功能時再一併限制 Places API (New)）。請勿把 key 放入 `local.properties.example`、原始碼、Manifest 或任何已追蹤檔案；APK 中的 key 仍可被擷取，因此 API 限制與配額警示同樣必要。
+專案使用 MapLibre Compose 與 OpenFreeMap 的 OpenStreetMap 向量圖磚，預設提供 Positron 明亮樣式與 Dark 深色樣式。不需要帳號、信用卡或 API key。OpenFreeMap 是公共服務且沒有 SLA；若產品流量增長，應評估自架或可提供 SLA 的相容供應商。
 
 ## 第一個可交付切片
 
@@ -69,7 +61,7 @@ Copy-Item secrets.properties.example secrets.properties
   → Mock mode 與 test provider 被完整清除
 ```
 
-這條鏈完成後，再接 Google Map、搜尋、收藏與設定。
+這條鏈完成後，再接地點搜尋、收藏與設定。
 
 ## 本機建置
 

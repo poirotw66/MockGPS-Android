@@ -2,7 +2,6 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.google.maps.secrets)
 }
 
 android {
@@ -40,7 +39,6 @@ android {
 
     buildFeatures {
         compose = true
-        buildConfig = true
     }
 }
 
@@ -55,7 +53,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.play.services.location)
-    implementation(libs.google.maps.compose)
+    implementation(libs.maplibre.compose)
     implementation(libs.kotlinx.coroutines.android)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
@@ -66,11 +64,4 @@ dependencies {
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui)
     androidTestImplementation(libs.androidx.compose.ui.tooling)
-}
-
-// `secrets.properties` is deliberately ignored by Git. The checked-in defaults
-// keep local and CI builds configurable without embedding a usable API key.
-secrets {
-    propertiesFileName = "secrets.properties"
-    defaultPropertiesFileName = "secrets.defaults.properties"
 }

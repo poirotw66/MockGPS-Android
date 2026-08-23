@@ -1,18 +1,18 @@
 # 開發里程碑與任務清單
 
-估算以一位熟悉 Kotlin/Android 的工程師為基準，只表示相對工作量；Google Cloud、Play 審查與 OEM 相容性等待時間不包含在內。
+估算以一位熟悉 Kotlin/Android 的工程師為基準，只表示相對工作量；Play 審查、外部地圖服務與 OEM 相容性等待時間不包含在內。
 
 ## Gate 0：產品識別與外部資源（0.5–1 天）
 
 - [x] 決定 App 顯示名稱：Mock GPS（繁中：模擬定位）
 - [x] 決定不可隨意更改的 `applicationId`：`com.sora.mockgps`
 - [x] 決定最低支援語言：繁中、英文
-- [ ] 建立 Google Cloud project 與 billing/quota alert
-- [ ] 啟用 Maps SDK for Android、Places API (New)
-- [ ] 建立 debug key，限制 applicationId、debug SHA-1 與上述 API
+- [x] 選定 MapLibre + OpenFreeMap，不需要 Billing 或 API key
+- [x] 確認 OpenFreeMap 樣式 URL 與 OpenStreetMap attribution
+- [ ] 決定地點搜尋供應商、使用政策與流量限制
 - [ ] 準備 API 26、34、36 測試裝置；至少一台使用 Google APIs image
 
-出口條件：package name、API key、測試矩陣可用。
+出口條件：package name、地圖供應策略、測試矩陣可用。
 
 ## Milestone 1：核心可行性 Spike（1–2 天）
 
@@ -38,18 +38,18 @@
 
 ## Milestone 2：地圖垂直切片（2–3 天）
 
-- [x] 安裝 Maps Compose 與 Secrets Gradle Plugin
-- [x] 加入不含真實 key 的 secrets example 與 `.gitignore`
+- [x] 安裝 MapLibre Compose 並接入 OpenFreeMap
+- [x] 移除 Google Maps、Secrets Plugin 與 API key 設定
 - [x] 建立 `MapScreen`、`MapViewModel`、immutable `MapUiState`
-- [x] 顯示 Google Map 與中央準星
+- [x] 顯示 OpenFreeMap 向量地圖與中央準星
 - [x] camera idle 時同步選定座標
 - [x] 顯示座標與 loading/error/retry
-- [x] Normal/Satellite 切換
+- [x] 明亮／深色地圖樣式切換
 - [x] 將固定座標 Start/Stop 換成地圖選定座標
 - [x] Active 中更換選點時要求明確「套用新位置」
 - [x] Activity 重建與旋轉後恢復 camera/selection，並重新觀察 service state
 
-實作進度（2026-08-23）：地圖垂直切片、Active 明確套用與完整 camera state 已完成；12 個 JVM tests、`assembleDebug`、`lintDebug`（0 errors）通過。未設定 key 時不初始化 Google Maps SDK，改顯示明確設定訊息，避免 OEM 裝置黑畫面／ANR。仍需填入受限 Maps API key 後，在實機完成拖曳、地圖圖磚、旋轉與跨 App 出口驗證。
+實作進度（2026-08-23）：地圖垂直切片、Active 明確套用與完整 camera state 已完成，並改用不需要帳號或 API key 的 MapLibre + OpenFreeMap。仍需在實機完成圖磚載入、拖曳、樣式切換、旋轉與跨 App 出口驗證。
 
 出口條件：拖地圖選點 → Start → 跨 App 驗證 → 通知 Stop 的完整流程通過。
 
@@ -60,7 +60,7 @@
 - [ ] API 33+ notification permission 說明
 - [ ] FGS 啟動例外與 rollback
 - [ ] Google Play services unavailable 狀態
-- [ ] Map/Places/API key 錯誤分類
+- [ ] 地圖／搜尋服務的網路與供應商錯誤分類
 - [ ] DataStore：map type、interval、accuracy、show coordinates、last coordinate
 - [ ] 通知內容跟隨座標與設定更新
 - [ ] 繁中／英文 string resources
@@ -70,12 +70,12 @@
 ## Milestone 4：地點搜尋（1–2 天）
 
 - [ ] 建立 `PlaceSearchRepository` 與 fake implementation
-- [ ] 整合 Places Autocomplete (New)
-- [ ] 管理 session token、debounce 與取消過期請求
+- [ ] 整合選定的 OSM 相容搜尋服務
+- [ ] 管理 debounce、流量限制與取消過期請求
 - [ ] 只要求名稱、地址、座標所需欄位
 - [ ] 搜尋建議 UI、鍵盤操作、loading/empty/error
 - [ ] 點結果後 animate camera 並更新 selection
-- [ ] 測試快速輸入、清空、離線、quota/error
+- [ ] 測試快速輸入、清空、離線、rate-limit/error
 
 出口條件：可搜尋 Tokyo Station 並成功開始該座標的靜態模擬。
 
@@ -98,8 +98,8 @@
 - [ ] 8 小時 static mock soak test
 - [ ] Start/Stop 20 次、鎖屏、Activity swipe-away、force-stop 測試
 - [ ] lint、dependency/license review、release build
-- [ ] release signing key 與 release API key restriction
-- [ ] README：安裝、Cloud key、Developer Options、疑難排解
+- [ ] release signing key 與第三方服務設定審查
+- [ ] README：安裝、地圖供應、Developer Options、疑難排解
 - [ ] Privacy/Data safety 草稿
 - [ ] Play Console foreground-service declaration/policy spike
 - [ ] 關閉所有 P0/P1 問題並完成 MVP AC-01 至 AC-09

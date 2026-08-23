@@ -9,7 +9,7 @@ data class MapUiState(
     val pendingCoordinate: Coordinate = MockLocationForegroundService.DEFAULT_COORDINATE,
     /** Full camera state is retained by the ViewModel across Activity recreation. */
     val camera: MapCamera = MapCamera.from(MockLocationForegroundService.DEFAULT_COORDINATE),
-    val mapType: MapDisplayType = MapDisplayType.Normal,
+    val mapType: MapDisplayType = MapDisplayType.Light,
     val loadingState: MapLoadingState = MapLoadingState.Loading,
     // Changes when Retry is pressed so the Maps composable is recreated.
     val mapRenderKey: Int = 0,
@@ -27,8 +27,8 @@ data class MapCamera(
 }
 
 enum class MapDisplayType {
-    Normal,
-    Satellite,
+    Light,
+    Dark,
 }
 
 enum class MapLoadingState {

@@ -26,7 +26,7 @@
 
 ### 3.1 地圖與選點
 
-- Google Map 一般／衛星圖切換
+- MapLibre + OpenFreeMap 明亮／深色樣式切換
 - 地圖中央固定準星；拖曳地圖，以 camera center 作為選定座標
 - 顯示緯度、經度；至少保留小數點後 6 位
 - 定位到裝置目前位置（只有在尚未模擬時作為真實定位快捷操作）
@@ -34,10 +34,10 @@
 
 ### 3.2 搜尋
 
-- 以 Places SDK for Android 的 Autocomplete (New) 搜尋地點
+- 以可替換的 `PlaceSearchRepository` 串接 OSM 相容地點搜尋服務
 - 結果顯示名稱與格式化地址
 - 選取後移動 camera，並更新選定座標
-- 搜尋失敗、無結果、離線與 quota 錯誤有各自可理解的 UI 狀態
+- 搜尋失敗、無結果、離線與服務限制錯誤有各自可理解的 UI 狀態
 
 ### 3.3 靜態 Mock Location
 
@@ -140,9 +140,9 @@ App 未被選為 Mock Location App 時，按 Start 不 crash、不留下 ongoing
 
 重啟 App 後收藏仍存在；只有成功開始的座標會加入最近位置；第 51 筆會淘汰最舊資料。
 
-### AC-09 API key 安全
+### AC-09 地圖供應與授權
 
-版本庫不包含真實 API key；Cloud key 限制於 applicationId、debug/release SHA-1、Maps SDK for Android 與 Places API (New)。
+地圖可在沒有帳號或 API key 的狀態載入；畫面保留 MapLibre、OpenFreeMap 與 OpenStreetMap 所要求的 attribution。若未來搜尋服務需要 token，版本庫不得包含真實 token。
 
 ## 8. 非功能需求
 
@@ -150,7 +150,7 @@ App 未被選為 Mock Location App 時，按 Start 不 crash、不留下 ongoing
 - 非地圖網路載入造成的 cold start 目標低於 2 秒
 - 不在主執行緒執行長時間工作；location loop 使用 structured coroutine
 - 所有引擎 cleanup 都可安全重複呼叫
-- 日誌不得記錄 API key；座標診斷 log 僅存在 debug build
+- 日誌不得記錄 token 或敏感設定；座標診斷 log 僅存在 debug build
 - 介面至少支援繁體中文與英文，文字不得硬編碼於 Composable
 
 ## 9. MVP Definition of Done
@@ -159,6 +159,5 @@ App 未被選為 Mock Location App 時，按 Start 不 crash、不留下 ongoing
 - `assembleDebug`、unit tests、lint 通過
 - API 26、API 34、API 36 完成啟停 smoke test
 - 至少一台實體 Android 裝置完成 8 小時穩定測試
-- 安裝、API key、Mock Location 設定與疑難排解寫入 README
+- 安裝、地圖供應、Mock Location 設定與疑難排解寫入 README
 - 沒有 P0/P1 crash 或會讓裝置持續殘留 mock mode 的已知問題
-

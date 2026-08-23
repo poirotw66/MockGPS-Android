@@ -2,7 +2,6 @@ package com.sora.mockgps.feature.map
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.android.gms.maps.model.CameraPosition
 import com.sora.mockgps.core.model.Coordinate
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -11,6 +10,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.maplibre.compose.camera.CameraPosition
 
 class MapViewModel : ViewModel() {
     private val mutableUiState = MutableStateFlow(MapUiState())
@@ -29,6 +29,11 @@ class MapViewModel : ViewModel() {
     fun onMapLoaded() {
         mapLoadTimeout?.cancel()
         mutableUiState.update(MapStateReducer::mapLoaded)
+    }
+
+    fun onMapLoadFailed() {
+        mapLoadTimeout?.cancel()
+        mutableUiState.update { it.copy(loadingState = MapLoadingState.Error) }
     }
 
     fun retryMap() {
@@ -73,9 +78,9 @@ internal object MapStateReducer {
             pendingCoordinate = coordinate,
             camera = MapCamera(
                 coordinate = coordinate,
-                zoom = position.zoom,
-                bearing = position.bearing,
-                tilt = position.tilt,
+                zoom = position.zoom.toFloat(),
+                bearing = position.bearing.toFloat(),
+                tilt = position.tilt.toFloat(),
             ),
         )
     }
@@ -90,8 +95,8 @@ internal object MapStateReducer {
 
     fun toggleMapType(state: MapUiState): MapUiState = state.copy(
         mapType = when (state.mapType) {
-            MapDisplayType.Normal -> MapDisplayType.Satellite
-            MapDisplayType.Satellite -> MapDisplayType.Normal
+            MapDisplayType.Light -> MapDisplayType.Dark
+            MapDisplayType.Dark -> MapDisplayType.Light
         },
     )
 

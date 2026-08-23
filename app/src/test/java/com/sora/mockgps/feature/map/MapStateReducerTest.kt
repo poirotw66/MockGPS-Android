@@ -1,14 +1,19 @@
 package com.sora.mockgps.feature.map
 
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
+import org.maplibre.compose.camera.CameraPosition
+import org.maplibre.spatialk.geojson.Position
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class MapStateReducerTest {
     @Test
     fun `camera idle saves coordinate and full camera position`() {
-        val position = CameraPosition(LatLng(35.681236, 139.767125), 17.5f, 32f, 91f)
+        val position = CameraPosition(
+            target = Position(latitude = 35.681236, longitude = 139.767125),
+            zoom = 17.5,
+            tilt = 32.0,
+            bearing = 91.0,
+        )
 
         val result = MapStateReducer.cameraIdle(MapUiState(), position)
 
@@ -28,11 +33,11 @@ class MapStateReducerTest {
 
     @Test
     fun `map type toggles in both directions`() {
-        val satellite = MapStateReducer.toggleMapType(MapUiState())
-        val normal = MapStateReducer.toggleMapType(satellite)
+        val dark = MapStateReducer.toggleMapType(MapUiState())
+        val light = MapStateReducer.toggleMapType(dark)
 
-        assertEquals(MapDisplayType.Satellite, satellite.mapType)
-        assertEquals(MapDisplayType.Normal, normal.mapType)
+        assertEquals(MapDisplayType.Dark, dark.mapType)
+        assertEquals(MapDisplayType.Light, light.mapType)
     }
 
     @Test
