@@ -83,12 +83,16 @@ UX／效能更新（2026-08-24）：改為 edge-to-edge 滿版地圖與安全區
 
 ## Milestone 5：收藏與最近位置（1–2 天）
 
-- [ ] Room database、entities、DAO、repository
-- [ ] 收藏新增、命名、重新命名、刪除、選取
+- [x] Room database、entities、DAO、repository
+- [x] 收藏新增、命名、重新命名、刪除、選取
 - [ ] 成功 Active 後才 upsert recent
 - [ ] 最近位置排序、去重、最多 50 筆
-- [ ] 清除收藏／歷史確認流程
-- [ ] 重啟 persistence 與第 51 筆裁切測試
+- [x] 刪除單一收藏確認流程
+- [ ] 清除全部收藏／歷史確認流程
+- [x] 收藏重啟 persistence 測試
+- [ ] 最近位置第 51 筆裁切測試
+
+實作進度（2026-08-24）：喜愛地點以 Room 完成本機持久化，支援新增、命名、重新命名、地圖選取與二次確認刪除；相同六位小數座標會更新既有項目。Sony 實機已通過儲存、force-stop 後保留與刪除確認。最近位置尚未實作，因此本 Milestone 尚未關閉。
 
 出口條件：AC-08 通過，資料完全 local-only。
 
@@ -110,12 +114,16 @@ UX／效能更新（2026-08-24）：改為 edge-to-edge 滿版地圖與安全區
 
 ## 後續 Phase 2
 
-- [ ] `GeoCalculator`：distance/bearing/destination/interpolation
+- [x] `GeoCalculator`：distance/bearing/interpolation
 - [ ] Joystick UI 與 500 ms movement loop
-- [ ] Walking/Running/Cycling/Driving/custom speed
-- [ ] Routes API 或替代路徑來源的產品／成本決策
-- [ ] Route polyline、進度、Pause/Resume、變速、Stop
-- [ ] 背景 route state 與通知控制
+- [x] Cycling 固定 18 km/h
+- [x] FOSSGIS OpenStreetMap bicycle demo router 作為無 API key 的 MVP 路徑來源
+- [x] Route polyline、移動進度、Pause/Resume、Stop
+- [x] 背景 route movement 與通知 Stop
+- [ ] Walking/Running/Driving/custom speed 與執行中變速
+- [ ] 通知 Pause/Resume 與跨行程完整 route state 還原
+
+自行車路線切片（2026-08-24）：使用者設定起點與終點後，App 明確提示座標會送往 FOSSGIS，取得道路幾何並以 5.0 m/s（18 km/h）沿線注入 GPS + FLP。Sony 實機已驗證開始、持續移動、暫停座標不變、繼續移動、停止後移除服務／通知／mock provider；公共 demo router 沒有 SLA，正式流量仍需替換或自架。
 
 ## 後續 Phase 3
 

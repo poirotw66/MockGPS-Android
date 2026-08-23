@@ -2,6 +2,7 @@ package com.sora.mockgps.feature.map
 
 import com.sora.mockgps.core.model.Coordinate
 import com.sora.mockgps.service.MockLocationForegroundService
+import com.sora.mockgps.route.PlannedRoute
 
 /** Immutable state rendered by the map selection screen. */
 data class MapUiState(
@@ -13,6 +14,11 @@ data class MapUiState(
     val loadingState: MapLoadingState = MapLoadingState.Loading,
     // Changes when Retry is pressed so the Maps composable is recreated.
     val mapRenderKey: Int = 0,
+    val routeOrigin: Coordinate? = null,
+    val plannedRoute: PlannedRoute? = null,
+    val isPlanningRoute: Boolean = false,
+    val routeError: String? = null,
+    val favoriteMessage: String? = null,
 )
 
 data class MapCamera(
