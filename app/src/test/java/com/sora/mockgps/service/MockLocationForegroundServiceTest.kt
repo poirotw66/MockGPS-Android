@@ -10,6 +10,7 @@ class MockLocationForegroundServiceTest {
         assertEquals(121.564468, MockLocationForegroundService.DEFAULT_COORDINATE.longitude, 0.0)
         assertEquals("com.sora.mockgps.action.START", MockLocationForegroundService.ACTION_START)
         assertEquals("com.sora.mockgps.action.STOP", MockLocationForegroundService.ACTION_STOP)
+        assertEquals("com.sora.mockgps.action.UPDATE", MockLocationForegroundService.ACTION_UPDATE)
         assertEquals(1_000L, MockLocationForegroundService.UPDATE_INTERVAL_MILLIS)
     }
 }

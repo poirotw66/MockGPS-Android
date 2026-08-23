@@ -1,6 +1,15 @@
 <resources>
     <string name="app_name">Mock GPS</string>
     <string name="spike_title">Mock GPS spike</string>
+    <string name="map_title">Choose mock location</string>
+    <string name="selected_coordinate">Selected: %1$s, %2$s</string>
+    <string name="active_coordinate">Mocking: %1$s, %2$s</string>
+    <string name="action_satellite_map">Satellite</string>
+    <string name="action_normal_map">Normal map</string>
+    <string name="map_load_failed">The map could not be loaded. Check your connection and Maps API key.</string>
+    <string name="map_api_key_missing">Google Maps API key is not configured. Add it to secrets.properties, then rebuild the app.</string>
+    <string name="action_retry">Retry</string>
+    <string name="action_apply_new_location">Apply new location</string>
     <string name="service_state">Service state: %1$s</string>
     <string name="state_idle">Idle</string>
     <string name="state_starting">Starting</string>

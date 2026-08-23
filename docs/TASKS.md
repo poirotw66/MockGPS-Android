@@ -38,16 +38,18 @@
 
 ## Milestone 2：地圖垂直切片（2–3 天）
 
-- [ ] 安裝 Maps Compose 與 Secrets Gradle Plugin
-- [ ] 加入不含真實 key 的 secrets example 與 `.gitignore`
-- [ ] 建立 `MapScreen`、`MapViewModel`、immutable `MapUiState`
-- [ ] 顯示 Google Map 與中央準星
-- [ ] camera idle 時同步選定座標
-- [ ] 顯示座標與 loading/error/retry
-- [ ] Normal/Satellite 切換
-- [ ] 將固定座標 Start/Stop 換成地圖選定座標
-- [ ] Active 中更換選點時要求明確「套用新位置」
-- [ ] Activity 重建與旋轉後恢復 camera/selection，並重新觀察 service state
+- [x] 安裝 Maps Compose 與 Secrets Gradle Plugin
+- [x] 加入不含真實 key 的 secrets example 與 `.gitignore`
+- [x] 建立 `MapScreen`、`MapViewModel`、immutable `MapUiState`
+- [x] 顯示 Google Map 與中央準星
+- [x] camera idle 時同步選定座標
+- [x] 顯示座標與 loading/error/retry
+- [x] Normal/Satellite 切換
+- [x] 將固定座標 Start/Stop 換成地圖選定座標
+- [x] Active 中更換選點時要求明確「套用新位置」
+- [x] Activity 重建與旋轉後恢復 camera/selection，並重新觀察 service state
+
+實作進度（2026-08-23）：地圖垂直切片、Active 明確套用與完整 camera state 已完成；12 個 JVM tests、`assembleDebug`、`lintDebug`（0 errors）通過。未設定 key 時不初始化 Google Maps SDK，改顯示明確設定訊息，避免 OEM 裝置黑畫面／ANR。仍需填入受限 Maps API key 後，在實機完成拖曳、地圖圖磚、旋轉與跨 App 出口驗證。
 
 出口條件：拖地圖選點 → Start → 跨 App 驗證 → 通知 Stop 的完整流程通過。
 

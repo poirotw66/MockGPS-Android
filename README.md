@@ -7,8 +7,9 @@ Android Mock Location 工具。Milestone 1 核心 Spike 已完成程式碼、單
 - Android 專案：Kotlin、Jetpack Compose、`com.sora.mockgps`
 - SDK：min 26、compile/target 36
 - 已完成：LocationManager GPS test provider、Fused Location mock mode、原子化 coordinator、前景服務、持續通知與 Stop action
-- Spike UI：Taipei 101 預設座標、自訂經緯度、權限流程、開發人員選項入口、繁中／英文資源
-- 自動驗證：8 個 unit tests、`assembleDebug`、`lintDebug`（0 errors）
+- Map UI：Taipei 101 預設位置、中央準星選點、權限流程、開發人員選項入口、繁中／英文資源
+- 地圖切片：中央準星選點、Normal/Satellite、完整 camera state、loading/error/retry、Active 明確套用新位置
+- 自動驗證：12 個 unit tests、`assembleDebug`、`lintDebug`（0 errors）
 - 實機驗證：Sony XQ-BC72（Android 13 / API 33）GPS + FLP 注入、背景持續、通知 Stop、20/20 次啟停與完整清理均通過
 - 待驗證：API 26/34/36 裝置矩陣與獨立 LocationManager/FLP client 的跨 App 讀值
 
@@ -41,6 +42,18 @@ Debug APK：`app/build/outputs/apk/debug/app-debug.apk`
 5. 至少一台可開啟「開發人員選項 → 選取模擬位置應用程式」的測試裝置
 
 API key 不進版控；Android key 必須限制到正式 package name、簽章 SHA-1，以及實際使用的 Maps/Places API。
+
+## Google Maps API key 設定
+
+Maps Compose 與 Secrets Gradle Plugin 已就緒；專案不含可用的 API key。複製範本後，僅在本機填入受限 key：
+
+```powershell
+Copy-Item secrets.properties.example secrets.properties
+```
+
+在 `secrets.properties` 設定 `MAPS_API_KEY`。此檔案已被 Git 忽略；`secrets.defaults.properties` 只有無法載入地圖的安全預設值，讓 CI 或未設定 key 的機器仍可完成 Gradle 設定與編譯。
+
+在 Google Cloud Console 對 key 套用 Android application restriction：package name `com.sora.mockgps`、各簽章（debug／release）的 SHA-1，並只啟用 Maps SDK for Android（啟用 Places 功能時再一併限制 Places API (New)）。請勿把 key 放入 `local.properties.example`、原始碼、Manifest 或任何已追蹤檔案；APK 中的 key 仍可被擷取，因此 API 限制與配額警示同樣必要。
 
 ## 第一個可交付切片
 

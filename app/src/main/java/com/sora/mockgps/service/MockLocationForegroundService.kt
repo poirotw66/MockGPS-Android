@@ -44,6 +44,8 @@ class MockLocationForegroundService : Service() {
     private val sessionMutex = Mutex()
     private val cleanupMutex = Mutex()
     private var sessionJob: Job? = null
+    @Volatile
+    private var sessionCoordinate: Coordinate? = null
     private var cleanedUp = true
 
     private val coordinator by lazy {
@@ -62,6 +64,7 @@ class MockLocationForegroundService : Service() {
         when (intent?.action) {
             ACTION_STOP -> requestStop()
             ACTION_START -> startSession(intent.coordinateOrDefault())
+            ACTION_UPDATE -> updateSession(intent.coordinateOrDefault())
             else -> requestStop()
         }
         return START_NOT_STICKY
@@ -80,6 +83,7 @@ class MockLocationForegroundService : Service() {
             return
         }
 
+        sessionCoordinate = coordinate
         sessionJob = serviceScope.launch {
             sessionMutex.withLock {
                 cleanedUp = false
@@ -93,7 +97,7 @@ class MockLocationForegroundService : Service() {
                     publishState(MockServiceState.Active(coordinate))
 
                     while (isActive) {
-                        val payload = when (val result = payloadFactory.create(coordinate)) {
+                        val payload = when (val result = payloadFactory.create(sessionCoordinate ?: coordinate)) {
                             is MockResult.Success -> result.value
                             is MockResult.Failure -> throw MockSessionException(result.error.toString())
                         }
@@ -112,6 +116,14 @@ class MockLocationForegroundService : Service() {
                 }
             }
         }
+    }
+
+    /** Updates an existing session only after an explicit UI confirmation. */
+    private fun updateSession(coordinate: Coordinate) {
+        if (sessionJob?.isActive != true) return
+        sessionCoordinate = coordinate
+        publishState(MockServiceState.Active(coordinate))
+        runCatching { promoteToForeground(coordinate) }
     }
 
     private fun requestStop() {
@@ -159,6 +171,7 @@ class MockLocationForegroundService : Service() {
 
         val finalError = listOfNotNull(terminalError, cleanupError).joinToString(separator = "\n").ifBlank { null }
         publishState(finalError?.let(MockServiceState::Error) ?: MockServiceState.Idle)
+        sessionCoordinate = null
         demoteAndStop()
         cancellation?.let { throw it }
     }
@@ -203,6 +216,7 @@ class MockLocationForegroundService : Service() {
     companion object {
         const val ACTION_START = "com.sora.mockgps.action.START"
         const val ACTION_STOP = "com.sora.mockgps.action.STOP"
+        const val ACTION_UPDATE = "com.sora.mockgps.action.UPDATE"
         const val EXTRA_LATITUDE = "com.sora.mockgps.extra.LATITUDE"
         const val EXTRA_LONGITUDE = "com.sora.mockgps.extra.LONGITUDE"
         const val UPDATE_INTERVAL_MILLIS = 1_000L
@@ -221,6 +235,13 @@ class MockLocationForegroundService : Service() {
 
         fun stopIntent(context: Context): Intent =
             Intent(context, MockLocationForegroundService::class.java).apply { action = ACTION_STOP }
+
+        fun updateIntent(context: Context, coordinate: Coordinate): Intent =
+            Intent(context, MockLocationForegroundService::class.java).apply {
+                action = ACTION_UPDATE
+                putExtra(EXTRA_LATITUDE, coordinate.latitude)
+                putExtra(EXTRA_LONGITUDE, coordinate.longitude)
+            }
 
         private fun publishState(state: MockServiceState) {
             mutableState.value = state

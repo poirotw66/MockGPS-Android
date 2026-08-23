@@ -1,6 +1,15 @@
 <resources>
     <string name="app_name">模擬定位</string>
     <string name="spike_title">Mock GPS 核心驗證</string>
+    <string name="map_title">選擇模擬位置</string>
+    <string name="selected_coordinate">選定座標：%1$s, %2$s</string>
+    <string name="active_coordinate">模擬中的座標：%1$s, %2$s</string>
+    <string name="action_satellite_map">衛星圖</string>
+    <string name="action_normal_map">一般地圖</string>
+    <string name="map_load_failed">地圖無法載入。請檢查網路連線與 Maps API 金鑰。</string>
+    <string name="map_api_key_missing">尚未設定 Google Maps API 金鑰。請加入 secrets.properties 後重新建置 App。</string>
+    <string name="action_retry">重試</string>
+    <string name="action_apply_new_location">套用新位置</string>
     <string name="service_state">服務狀態：%1$s</string>
     <string name="state_idle">閒置</string>
     <string name="state_starting">啟動中</string>

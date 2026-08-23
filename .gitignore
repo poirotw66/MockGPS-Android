@@ -1,5 +1,6 @@
 # Android / Gradle
 .gradle/
+.kotlin/
 build/
 **/build/
 *.apk
@@ -9,6 +10,7 @@ build/
 
 # Local machine configuration
 local.properties
+secrets.properties
 .tools/
 .idea/
 *.iml
