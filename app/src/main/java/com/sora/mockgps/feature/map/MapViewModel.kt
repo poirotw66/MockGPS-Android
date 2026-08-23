@@ -43,6 +43,7 @@ class MapViewModel : ViewModel() {
 
     fun toggleMapType() {
         mutableUiState.update(MapStateReducer::toggleMapType)
+        awaitMapLoad()
     }
 
     private fun awaitMapLoad() {
@@ -74,6 +75,12 @@ internal object MapStateReducer {
     fun cameraIdle(state: MapUiState, position: CameraPosition): MapUiState {
         val coordinate = Coordinate(position.target.latitude, position.target.longitude)
         if (!coordinate.isValid()) return state
+        if (
+            coordinate == state.pendingCoordinate &&
+            position.zoom.toFloat() == state.camera.zoom &&
+            position.bearing.toFloat() == state.camera.bearing &&
+            position.tilt.toFloat() == state.camera.tilt
+        ) return state
         return state.copy(
             pendingCoordinate = coordinate,
             camera = MapCamera(
@@ -98,6 +105,7 @@ internal object MapStateReducer {
             MapDisplayType.Light -> MapDisplayType.Dark
             MapDisplayType.Dark -> MapDisplayType.Light
         },
+        loadingState = MapLoadingState.Loading,
     )
 
     private fun Coordinate.isValid(): Boolean =

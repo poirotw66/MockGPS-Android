@@ -3,6 +3,7 @@ package com.sora.mockgps.feature.map
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.spatialk.geojson.Position
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Test
 
 class MapStateReducerTest {
@@ -33,11 +34,29 @@ class MapStateReducerTest {
 
     @Test
     fun `map type toggles in both directions`() {
-        val dark = MapStateReducer.toggleMapType(MapUiState())
+        val dark = MapStateReducer.toggleMapType(MapUiState(loadingState = MapLoadingState.Ready))
         val light = MapStateReducer.toggleMapType(dark)
 
         assertEquals(MapDisplayType.Dark, dark.mapType)
         assertEquals(MapDisplayType.Light, light.mapType)
+        assertEquals(MapLoadingState.Loading, dark.loadingState)
+        assertEquals(MapLoadingState.Loading, light.loadingState)
+    }
+
+    @Test
+    fun `camera idle ignores an unchanged camera`() {
+        val state = MapUiState()
+        val position = CameraPosition(
+            target = Position(
+                latitude = state.camera.coordinate.latitude,
+                longitude = state.camera.coordinate.longitude,
+            ),
+            zoom = state.camera.zoom.toDouble(),
+            tilt = state.camera.tilt.toDouble(),
+            bearing = state.camera.bearing.toDouble(),
+        )
+
+        assertSame(state, MapStateReducer.cameraIdle(state, position))
     }
 
     @Test

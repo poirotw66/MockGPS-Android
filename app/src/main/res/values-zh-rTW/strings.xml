@@ -2,6 +2,8 @@
     <string name="app_name">模擬定位</string>
     <string name="spike_title">Mock GPS 核心驗證</string>
     <string name="map_title">選擇模擬位置</string>
+    <string name="map_picker_description">互動式地圖。拖曳或縮放地圖，以選擇中央準星下的位置。</string>
+    <string name="map_reticle_description">選定位置準星</string>
     <string name="selected_coordinate">選定座標：%1$s, %2$s</string>
     <string name="active_coordinate">模擬中的座標：%1$s, %2$s</string>
     <string name="action_dark_map">深色地圖</string>
@@ -26,6 +28,7 @@
     <string name="action_start_mock">開始模擬定位</string>
     <string name="action_stop">停止</string>
     <string name="action_open_developer_options">開啟開發人員選項</string>
+    <string name="action_developer_settings">設定</string>
     <string name="developer_options_unavailable">此裝置無法開啟開發人員選項。</string>
     <string name="mock_app_setup_hint">開始前，請在開發人員選項中將本 App 選為模擬位置資訊應用程式。</string>
     <string name="notification_channel_name">模擬定位服務</string>

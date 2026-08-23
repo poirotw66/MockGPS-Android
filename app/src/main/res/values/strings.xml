@@ -2,6 +2,8 @@
     <string name="app_name">Mock GPS</string>
     <string name="spike_title">Mock GPS spike</string>
     <string name="map_title">Choose mock location</string>
+    <string name="map_picker_description">Interactive map. Drag or zoom to select the location beneath the centre target.</string>
+    <string name="map_reticle_description">Selected map location target</string>
     <string name="selected_coordinate">Selected: %1$s, %2$s</string>
     <string name="active_coordinate">Mocking: %1$s, %2$s</string>
     <string name="action_dark_map">Dark map</string>
@@ -26,6 +28,7 @@
     <string name="action_start_mock">Start mock location</string>
     <string name="action_stop">Stop</string>
     <string name="action_open_developer_options">Open Developer options</string>
+    <string name="action_developer_settings">Settings</string>
     <string name="developer_options_unavailable">Developer options are unavailable on this device.</string>
     <string name="mock_app_setup_hint">In Developer options, select this app as the mock location app before starting.</string>
     <string name="notification_channel_name">Mock location simulation</string>
