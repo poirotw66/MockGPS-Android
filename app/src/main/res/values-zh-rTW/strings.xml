@@ -63,4 +63,23 @@
     <string name="route_provider_notice">規劃時會將起點與終點傳送至 FOSSGIS OpenStreetMap 路線服務。</string>
     <string name="route_fix_map">修正地圖</string>
     <string name="route_error_same_point">請選擇不同的終點。</string>
+    <string name="route_error_unavailable">目前無法取得自行車路線。請檢查網路，或變更起點與終點後重試。</string>
+    <string name="route_panel_title">自行車路線</string>
+    <string name="route_panel_subtitle">18 km/h · 依序選擇起點與終點</string>
+    <string name="route_choose_start">選擇起點</string>
+    <string name="route_choose_destination">選擇終點</string>
+    <string name="route_start_label">起點</string>
+    <string name="route_destination_label">終點</string>
+    <string name="route_move_reticle_start">移動地圖，讓準星對準行程起點。</string>
+    <string name="route_move_reticle_destination">起點已設定。現在移動地圖選擇終點。</string>
+    <string name="action_use_as_route_start">將準星位置設為起點</string>
+    <string name="action_use_as_route_destination">將準星位置設為終點</string>
+    <string name="action_choose_start_favorite">從收藏選擇起點</string>
+    <string name="action_choose_destination_favorite">從收藏選擇終點</string>
+    <string name="action_preview_bicycle_route">預覽自行車路線</string>
+    <string name="action_reset_route_start">重選起點</string>
+    <string name="action_change_destination">變更終點</string>
+    <string name="action_start_route_simulation">開始模擬</string>
+    <string name="route_provider_attribution">路線：FOSSGIS / OpenStreetMap · 修正地圖</string>
+    <string name="map_provider_attribution">© OpenFreeMap / OpenStreetMap 貢獻者</string>
 </resources>

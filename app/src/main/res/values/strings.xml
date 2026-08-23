@@ -63,4 +63,23 @@
     <string name="route_provider_notice">Planning sends the start and destination to the FOSSGIS OpenStreetMap routing service.</string>
     <string name="route_fix_map">Fix the map</string>
     <string name="route_error_same_point">Choose a different destination.</string>
+    <string name="route_error_unavailable">A bicycle route is unavailable right now. Check your connection or change the endpoints and try again.</string>
+    <string name="route_panel_title">Bicycle route</string>
+    <string name="route_panel_subtitle">18 km/h · Choose the start and destination</string>
+    <string name="route_choose_start">Choose the start</string>
+    <string name="route_choose_destination">Choose the destination</string>
+    <string name="route_start_label">Start</string>
+    <string name="route_destination_label">Destination</string>
+    <string name="route_move_reticle_start">Move the map until the target is over the route start.</string>
+    <string name="route_move_reticle_destination">Start selected. Now move the map to choose the destination.</string>
+    <string name="action_use_as_route_start">Use target as start</string>
+    <string name="action_use_as_route_destination">Use target as destination</string>
+    <string name="action_choose_start_favorite">Choose start from favorites</string>
+    <string name="action_choose_destination_favorite">Choose destination from favorites</string>
+    <string name="action_preview_bicycle_route">Preview bicycle route</string>
+    <string name="action_reset_route_start">Choose new start</string>
+    <string name="action_change_destination">Change destination</string>
+    <string name="action_start_route_simulation">Start simulation</string>
+    <string name="route_provider_attribution">Route: FOSSGIS / OpenStreetMap · Fix the map</string>
+    <string name="map_provider_attribution">© OpenFreeMap / OpenStreetMap contributors</string>
 </resources>

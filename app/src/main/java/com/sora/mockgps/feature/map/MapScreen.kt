@@ -7,9 +7,12 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -53,6 +56,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sora.mockgps.R
@@ -62,6 +66,8 @@ import com.sora.mockgps.route.PlannedRoute
 import com.sora.mockgps.service.MockLocationForegroundService
 import com.sora.mockgps.service.MockServiceState
 import java.util.Locale
+import kotlin.math.cos
+import kotlin.math.log2
 import kotlinx.coroutines.launch
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.camera.CameraState
@@ -86,7 +92,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     var permissionMessage by remember { mutableStateOf<String?>(null) }
     var notificationPermissionHandled by rememberSaveable { mutableStateOf(false) }
     var routePaused by rememberSaveable { mutableStateOf(false) }
-    var pendingRouteStart by remember { mutableStateOf<List<Coordinate>?>(null) }
+    var pendingRouteStart by rememberSaveable { mutableStateOf(false) }
     var saveFavoriteCoordinate by remember { mutableStateOf<Coordinate?>(null) }
     var showFavorites by remember { mutableStateOf(false) }
     var renameFavorite by remember { mutableStateOf<FavoriteLocation?>(null) }
@@ -99,6 +105,8 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) {
+        val shouldStartRoute = pendingRouteStart
+        pendingRouteStart = false
         notificationPermissionHandled = true
         if (!context.hasLocationPermission()) {
             permissionMessage = locationPermissionRequired
@@ -107,12 +115,15 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                 !context.isGranted(Manifest.permission.POST_NOTIFICATIONS)
             ) notificationPermissionDenied else null
-            val route = pendingRouteStart
-            if (route == null) {
+            if (!shouldStartRoute) {
                 context.startMockService(uiState.pendingCoordinate) { permissionMessage = serviceStartFailed }
             } else {
-                context.startRouteService(route) { permissionMessage = serviceStartFailed }
-                pendingRouteStart = null
+                val route = uiState.plannedRoute?.points
+                if (route == null) {
+                    permissionMessage = serviceStartFailed
+                } else {
+                    context.startRouteService(route) { permissionMessage = serviceStartFailed }
+                }
             }
         }
     }
@@ -139,6 +150,12 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
         }
     }
 
+    LaunchedEffect(uiState.plannedRoute) {
+        uiState.plannedRoute?.points?.let { points ->
+            cameraState.animateTo(points.previewCameraPosition(cameraState.position))
+        }
+    }
+
     saveFavoriteCoordinate?.let { coordinate ->
         FavoriteNameDialog(
             title = stringResource(R.string.favorite_new_title),
@@ -155,6 +172,12 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             favorites = favorites,
             onSelect = { favorite ->
                 showFavorites = false
+                val favoriteCoordinate = Coordinate(favorite.latitude, favorite.longitude)
+                when (uiState.routePlanningStep) {
+                    RoutePlanningStep.SelectStart -> viewModel.setRouteOrigin(favoriteCoordinate)
+                    RoutePlanningStep.SelectDestination -> viewModel.setRouteDestination(favoriteCoordinate)
+                    else -> Unit
+                }
                 coroutineScope.launch {
                     cameraState.animateTo(
                         cameraState.position.copy(
@@ -168,6 +191,12 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             onDismiss = { showFavorites = false },
         )
     }
+
+    BackHandler(
+        enabled = uiState.isRoutePlanningMode &&
+            !isRouteSession && !showFavorites && renameFavorite == null && deleteFavorite == null,
+        onBack = viewModel::navigateBackRoutePlanning,
+    )
     renameFavorite?.let { favorite ->
         FavoriteNameDialog(
             title = stringResource(R.string.favorite_rename_title),
@@ -192,6 +221,11 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val compactLayout = maxWidth > maxHeight
+        val panelMaxWidth = if (compactLayout) {
+            (maxWidth / 2 - 16.dp).coerceAtMost(360.dp)
+        } else {
+            560.dp
+        }
         MapPicker(
             modifier = Modifier.fillMaxSize(),
             mapType = uiState.mapType,
@@ -225,23 +259,30 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             activeCoordinate = activeCoordinate,
             permissionMessage = permissionMessage,
             compactLayout = compactLayout,
+            panelMaxWidth = panelMaxWidth,
             isMapReady = isMapReady,
             isStarting = isStarting,
             isActive = isActive,
             isRouteSession = isRouteSession,
             routePaused = routePaused,
             favoritesCount = favorites.size,
+            routePlanningStep = uiState.routePlanningStep,
             routeOrigin = uiState.routeOrigin,
+            routeDestination = uiState.routeDestination,
             plannedRoute = uiState.plannedRoute,
             isPlanningRoute = uiState.isPlanningRoute,
             routeError = uiState.routeError,
             onSaveFavorite = { saveFavoriteCoordinate = uiState.pendingCoordinate },
             onShowFavorites = { showFavorites = true },
+            onBeginRoutePlanning = viewModel::beginRoutePlanning,
             onSetRouteOrigin = { viewModel.setRouteOrigin(uiState.pendingCoordinate) },
-            onPlanRoute = { viewModel.planBicycleRoute(uiState.pendingCoordinate) },
+            onSetRouteDestination = { viewModel.setRouteDestination(uiState.pendingCoordinate) },
+            onPlanRoute = viewModel::planBicycleRoute,
+            onEditRouteOrigin = viewModel::editRouteOrigin,
+            onEditRouteDestination = viewModel::editRouteDestination,
             onClearRoute = viewModel::clearRoute,
             onStart = {
-                pendingRouteStart = null
+                pendingRouteStart = false
                 val permissions = context.requiredRuntimePermissions(notificationPermissionHandled)
                 if (permissions.isEmpty()) {
                     context.startMockService(uiState.pendingCoordinate) { permissionMessage = serviceStartFailed }
@@ -255,7 +296,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     if (permissions.isEmpty()) {
                         context.startRouteService(points) { permissionMessage = serviceStartFailed }
                     } else {
-                        pendingRouteStart = points
+                        pendingRouteStart = true
                         permissionLauncher.launch(permissions.toTypedArray())
                     }
                     routePaused = false
@@ -278,7 +319,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 routePaused = false
             },
             modifier = Modifier
-                .align(Alignment.BottomCenter)
+                .align(if (compactLayout) Alignment.CenterEnd else Alignment.BottomCenter)
                 .navigationBarsPadding()
                 .padding(horizontal = 12.dp, vertical = 8.dp),
         )
@@ -342,20 +383,27 @@ private fun MapControlPanel(
     activeCoordinate: Coordinate?,
     permissionMessage: String?,
     compactLayout: Boolean,
+    panelMaxWidth: Dp,
     isMapReady: Boolean,
     isStarting: Boolean,
     isActive: Boolean,
     isRouteSession: Boolean,
     routePaused: Boolean,
     favoritesCount: Int,
+    routePlanningStep: RoutePlanningStep,
     routeOrigin: Coordinate?,
+    routeDestination: Coordinate?,
     plannedRoute: PlannedRoute?,
     isPlanningRoute: Boolean,
     routeError: String?,
     onSaveFavorite: () -> Unit,
     onShowFavorites: () -> Unit,
+    onBeginRoutePlanning: () -> Unit,
     onSetRouteOrigin: () -> Unit,
+    onSetRouteDestination: () -> Unit,
     onPlanRoute: () -> Unit,
+    onEditRouteOrigin: () -> Unit,
+    onEditRouteDestination: () -> Unit,
     onClearRoute: () -> Unit,
     onStart: () -> Unit,
     onStartRoute: () -> Unit,
@@ -367,26 +415,19 @@ private fun MapControlPanel(
     val uriHandler = LocalUriHandler.current
     Surface(
         modifier = modifier
-            .widthIn(max = if (compactLayout) 440.dp else 560.dp)
+            .widthIn(max = panelMaxWidth)
             .fillMaxWidth()
             .shadow(10.dp, MaterialTheme.shapes.large),
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier
+                .heightIn(max = if (compactLayout) 360.dp else 520.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(
-                stringResource(
-                    R.string.selected_coordinate,
-                    pendingCoordinate.latitude.formatCoordinate(),
-                    pendingCoordinate.longitude.formatCoordinate(),
-                ),
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
             activeCoordinate?.let {
                 Text(
                     stringResource(R.string.active_coordinate, it.latitude.formatCoordinate(), it.longitude.formatCoordinate()),
@@ -402,139 +443,233 @@ private fun MapControlPanel(
             routeError?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                TextButton(onClick = onSaveFavorite, enabled = !isRouteSession, modifier = Modifier.weight(1f)) {
-                    Text(stringResource(R.string.action_save_place), maxLines = 1)
-                }
-                TextButton(onClick = onShowFavorites, modifier = Modifier.weight(1f)) {
-                    Text(stringResource(R.string.action_favorites, favoritesCount), maxLines = 1)
-                }
-                TextButton(
-                    onClick = when {
-                        plannedRoute != null -> onClearRoute
-                        routeOrigin == null -> onSetRouteOrigin
-                        else -> onPlanRoute
-                    },
-                    enabled = !isStarting && !isActive && !isPlanningRoute,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(
-                        stringResource(
-                            when {
-                                plannedRoute != null -> R.string.action_clear_route
-                                routeOrigin == null -> R.string.action_set_route_start
-                                else -> R.string.action_plan_bicycle_route
-                            },
-                        ),
-                        maxLines = 1,
-                    )
-                }
-            }
-            routeOrigin?.takeIf { plannedRoute == null }?.let { origin ->
+            if (routePlanningStep == RoutePlanningStep.Inactive) {
                 Text(
                     stringResource(
-                        R.string.route_start_selected,
-                        origin.latitude.formatCoordinate(),
-                        origin.longitude.formatCoordinate(),
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            if (isPlanningRoute) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                    Text(stringResource(R.string.route_planning), style = MaterialTheme.typography.bodySmall)
-                }
-            }
-            plannedRoute?.let { route ->
-                Text(
-                    stringResource(
-                        R.string.route_summary,
-                        String.format(Locale.US, "%.2f", route.distanceMeters / 1_000.0),
-                        route.simulatedDurationSeconds.formatDuration(),
+                        R.string.selected_coordinate,
+                        pendingCoordinate.latitude.formatCoordinate(),
+                        pendingCoordinate.longitude.formatCoordinate(),
                     ),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                if (!isActive) {
-                    Button(
-                        onClick = if (plannedRoute == null) onStart else onStartRoute,
-                        enabled = isMapReady && !isStarting,
-                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                    ) {
-                        Text(
-                            stringResource(
-                                if (plannedRoute == null) R.string.action_start_mock
-                                else R.string.action_start_bicycle_route,
-                            ),
-                            maxLines = 1,
-                        )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    TextButton(onClick = onSaveFavorite, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                        Text(stringResource(R.string.action_save_place), maxLines = 1)
+                    }
+                    TextButton(onClick = onShowFavorites, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                        Text(stringResource(R.string.action_favorites, favoritesCount), maxLines = 1)
                     }
                 }
-                if (isActive && isRouteSession) {
+                if (!isStarting && !isActive) {
                     Button(
-                        onClick = onPauseResumeRoute,
-                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                    ) {
-                        Text(
-                            stringResource(
-                                if (routePaused) R.string.action_resume_route else R.string.action_pause_route,
-                            ),
-                        )
-                    }
+                        onClick = onStart,
+                        enabled = isMapReady,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    ) { Text(stringResource(R.string.action_start_mock), maxLines = 1) }
+                    OutlinedButton(
+                        onClick = onBeginRoutePlanning,
+                        enabled = isMapReady,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    ) { Text(stringResource(R.string.action_plan_bicycle_route), maxLines = 1) }
                 }
                 if (isActive && !isRouteSession && activeCoordinate != pendingCoordinate) {
-                    Button(onClick = onApply, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                    Button(onClick = onApply, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                         Text(stringResource(R.string.action_apply_new_location), maxLines = 1)
                     }
                 }
                 if (isStarting || isActive) {
-                    OutlinedButton(onClick = onStop, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                    OutlinedButton(onClick = onStop, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                         Text(stringResource(R.string.action_stop), maxLines = 1)
                     }
                 }
+                if (!compactLayout) {
+                    Text(
+                        stringResource(R.string.mock_app_setup_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(stringResource(R.string.route_panel_title), style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            stringResource(R.string.route_panel_subtitle),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (!isStarting && !isActive) {
+                        TextButton(onClick = onClearRoute, modifier = Modifier.heightIn(min = 48.dp)) {
+                            Text(stringResource(R.string.action_cancel))
+                        }
+                    }
+                }
+
+                when (routePlanningStep) {
+                    RoutePlanningStep.SelectStart -> {
+                        RouteEndpointSummary(
+                            label = stringResource(R.string.route_choose_start),
+                            coordinate = pendingCoordinate,
+                            supportingText = stringResource(R.string.route_move_reticle_start),
+                        )
+                        Button(
+                            onClick = onSetRouteOrigin,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                        ) { Text(stringResource(R.string.action_use_as_route_start), maxLines = 1) }
+                        OutlinedButton(
+                            onClick = onShowFavorites,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                        ) { Text(stringResource(R.string.action_choose_start_favorite), maxLines = 1) }
+                    }
+                    RoutePlanningStep.SelectDestination -> {
+                        RouteEndpointSummary(
+                            label = stringResource(R.string.route_start_label),
+                            coordinate = requireNotNull(routeOrigin),
+                        )
+                        RouteEndpointSummary(
+                            label = stringResource(R.string.route_choose_destination),
+                            coordinate = pendingCoordinate,
+                            supportingText = stringResource(R.string.route_move_reticle_destination),
+                        )
+                        Button(
+                            onClick = onSetRouteDestination,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                        ) { Text(stringResource(R.string.action_use_as_route_destination), maxLines = 1) }
+                        OutlinedButton(
+                            onClick = onShowFavorites,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                        ) { Text(stringResource(R.string.action_choose_destination_favorite), maxLines = 1) }
+                    }
+                    RoutePlanningStep.ReadyToPreview, RoutePlanningStep.Planning -> {
+                        RouteEndpointSummary(stringResource(R.string.route_start_label), requireNotNull(routeOrigin))
+                        RouteEndpointSummary(stringResource(R.string.route_destination_label), requireNotNull(routeDestination))
+                        Text(
+                            stringResource(R.string.route_provider_notice),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Button(
+                            onClick = onPlanRoute,
+                            enabled = !isPlanningRoute,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                        ) {
+                            if (isPlanningRoute) {
+                                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            } else {
+                                Text(stringResource(R.string.action_preview_bicycle_route), maxLines = 1)
+                            }
+                        }
+                        if (!isPlanningRoute) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                TextButton(onClick = onEditRouteOrigin, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                                    Text(stringResource(R.string.action_reset_route_start), maxLines = 1)
+                                }
+                                TextButton(onClick = onEditRouteDestination, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                                    Text(stringResource(R.string.action_change_destination), maxLines = 1)
+                                }
+                            }
+                        } else {
+                            Text(stringResource(R.string.route_planning), style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    RoutePlanningStep.Preview -> {
+                        plannedRoute?.let { route ->
+                            Text(
+                                stringResource(
+                                    R.string.route_summary,
+                                    String.format(Locale.US, "%.2f", route.distanceMeters / 1_000.0),
+                                    route.simulatedDurationSeconds.formatDuration(),
+                                ),
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                        if (!isStarting && !isActive) {
+                            Button(
+                                onClick = onStartRoute,
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                            ) { Text(stringResource(R.string.action_start_route_simulation), maxLines = 1) }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                TextButton(onClick = onEditRouteDestination, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                                    Text(stringResource(R.string.action_change_destination), maxLines = 1)
+                                }
+                                TextButton(onClick = onClearRoute, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                                    Text(stringResource(R.string.action_clear_route), maxLines = 1)
+                                }
+                            }
+                        }
+                        if (isStarting) {
+                            Text(stringResource(R.string.state_starting), style = MaterialTheme.typography.bodySmall)
+                        }
+                        if (isActive && isRouteSession) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(
+                                    onClick = onPauseResumeRoute,
+                                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                                ) {
+                                    Text(stringResource(if (routePaused) R.string.action_resume_route else R.string.action_pause_route))
+                                }
+                                OutlinedButton(onClick = onStop, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                                    Text(stringResource(R.string.action_stop))
+                                }
+                            }
+                        }
+                    }
+                    RoutePlanningStep.Inactive -> Unit
+                }
             }
-            if (!compactLayout && routeOrigin == null) {
+            TextButton(
+                onClick = { uriHandler.openUri("https://openfreemap.org/") },
+                contentPadding = PaddingValues(horizontal = 4.dp),
+                modifier = Modifier.heightIn(min = 48.dp),
+            ) { Text(stringResource(R.string.map_provider_attribution), style = MaterialTheme.typography.labelSmall) }
+            if (routePlanningStep in setOf(
+                    RoutePlanningStep.ReadyToPreview,
+                    RoutePlanningStep.Planning,
+                    RoutePlanningStep.Preview,
+                )
+            ) {
+                TextButton(
+                    onClick = { uriHandler.openUri("https://www.openstreetmap.org/fixthemap") },
+                    contentPadding = PaddingValues(horizontal = 4.dp),
+                    modifier = Modifier.heightIn(min = 48.dp),
+                ) { Text(stringResource(R.string.route_provider_attribution), style = MaterialTheme.typography.labelSmall) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RouteEndpointSummary(
+    label: String,
+    coordinate: Coordinate,
+    supportingText: String? = null,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Text(label, style = MaterialTheme.typography.labelLarge)
+            Text(
+                "${coordinate.latitude.formatCoordinate()}, ${coordinate.longitude.formatCoordinate()}",
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            supportingText?.let {
                 Text(
-                    stringResource(R.string.mock_app_setup_hint),
+                    it,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-            }
-            if (!compactLayout && routeOrigin != null) {
-                Text(
-                    stringResource(R.string.route_provider_notice),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                TextButton(
-                    onClick = { uriHandler.openUri("https://openfreemap.org/") },
-                    contentPadding = PaddingValues(horizontal = 4.dp),
-                    modifier = Modifier.heightIn(min = 48.dp),
-                ) { Text(stringResource(R.string.attribution_openfreemap), style = MaterialTheme.typography.labelSmall) }
-                TextButton(
-                    onClick = { uriHandler.openUri("https://www.openstreetmap.org/copyright") },
-                    contentPadding = PaddingValues(horizontal = 4.dp),
-                    modifier = Modifier.heightIn(min = 48.dp),
-                ) { Text(stringResource(R.string.attribution_openstreetmap), style = MaterialTheme.typography.labelSmall) }
-                if (routeOrigin != null) {
-                    TextButton(
-                        onClick = { uriHandler.openUri("https://www.openstreetmap.org/fixthemap") },
-                        contentPadding = PaddingValues(horizontal = 4.dp),
-                        modifier = Modifier.heightIn(min = 48.dp),
-                    ) { Text(stringResource(R.string.route_fix_map), style = MaterialTheme.typography.labelSmall) }
-                }
             }
         }
     }
@@ -593,6 +728,26 @@ private fun MapPicker(
     androidx.compose.runtime.LaunchedEffect(cameraState.isCameraMoving) {
         if (!cameraState.isCameraMoving) onCameraIdle(cameraState.position)
     }
+}
+
+internal fun List<Coordinate>.previewCameraPosition(fallback: CameraPosition): CameraPosition {
+    if (size < 2) return fallback
+    val minLatitude = minOf { it.latitude }
+    val maxLatitude = maxOf { it.latitude }
+    val minLongitude = minOf { it.longitude }
+    val maxLongitude = maxOf { it.longitude }
+    val centreLatitude = (minLatitude + maxLatitude) / 2.0
+    val centreLongitude = (minLongitude + maxLongitude) / 2.0
+    val longitudeScale = cos(Math.toRadians(centreLatitude)).coerceAtLeast(0.2)
+    val span = maxOf(
+        maxLatitude - minLatitude,
+        (maxLongitude - minLongitude) * longitudeScale,
+    ).coerceAtLeast(0.0005)
+    return fallback.copy(
+        target = Position(latitude = centreLatitude, longitude = centreLongitude),
+        zoom = (log2(360.0 / span) - 1.8).coerceIn(3.0, 17.0),
+        tilt = 0.0,
+    )
 }
 
 @Composable

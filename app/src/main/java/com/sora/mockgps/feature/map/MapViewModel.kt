@@ -3,6 +3,7 @@ package com.sora.mockgps.feature.map
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.sora.mockgps.R
 import com.sora.mockgps.core.model.Coordinate
 import com.sora.mockgps.feature.favorites.data.DefaultFavoriteLocationRepository
 import com.sora.mockgps.feature.favorites.data.FavoriteLocationDatabase
@@ -10,6 +11,7 @@ import com.sora.mockgps.feature.favorites.domain.FavoriteLocation
 import com.sora.mockgps.route.FossgisBicycleRoutingRepository
 import com.sora.mockgps.route.RoutingRepository
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,6 +37,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     private val routingRepository: RoutingRepository = FossgisBicycleRoutingRepository()
 
     private var mapLoadTimeout: Job? = null
+    private var routePlanningJob: Job? = null
 
     init {
         awaitMapLoad()
@@ -93,37 +96,132 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         mutableUiState.update { it.copy(favoriteMessage = null) }
     }
 
-    fun setRouteOrigin(coordinate: Coordinate) {
+    fun beginRoutePlanning() {
+        routePlanningJob?.cancel()
         mutableUiState.update {
-            it.copy(routeOrigin = coordinate, plannedRoute = null, routeError = null, isPlanningRoute = false)
+            it.copy(
+                isRoutePlanningMode = true,
+                routeOrigin = null,
+                routeDestination = null,
+                plannedRoute = null,
+                isPlanningRoute = false,
+                routeError = null,
+            )
         }
     }
 
-    fun planBicycleRoute(destination: Coordinate) {
-        val origin = mutableUiState.value.routeOrigin ?: return
+    fun setRouteOrigin(coordinate: Coordinate) {
+        routePlanningJob?.cancel()
+        mutableUiState.update {
+            it.copy(
+                isRoutePlanningMode = true,
+                routeOrigin = coordinate,
+                routeDestination = null,
+                plannedRoute = null,
+                routeError = null,
+                isPlanningRoute = false,
+            )
+        }
+    }
+
+    fun setRouteDestination(coordinate: Coordinate) {
+        routePlanningJob?.cancel()
+        mutableUiState.update {
+            it.copy(
+                routeDestination = coordinate,
+                plannedRoute = null,
+                routeError = null,
+                isPlanningRoute = false,
+            )
+        }
+    }
+
+    fun planBicycleRoute() {
+        val state = mutableUiState.value
+        val origin = state.routeOrigin ?: return
+        val destination = state.routeDestination ?: return
         if (origin == destination) {
-            mutableUiState.update { it.copy(routeError = "Choose a different destination.") }
+            mutableUiState.update {
+                it.copy(routeError = getApplication<Application>().getString(R.string.route_error_same_point))
+            }
             return
         }
+        routePlanningJob?.cancel()
         mutableUiState.update { it.copy(isPlanningRoute = true, plannedRoute = null, routeError = null) }
-        viewModelScope.launch {
-            runCatching { routingRepository.planBicycleRoute(origin, destination) }
-                .onSuccess { route ->
-                    mutableUiState.update {
-                        it.copy(plannedRoute = route, isPlanningRoute = false, routeError = null)
+        routePlanningJob = viewModelScope.launch {
+            try {
+                val route = routingRepository.planBicycleRoute(origin, destination)
+                mutableUiState.update { current ->
+                    if (current.isRoutePlanningMode &&
+                        current.routeOrigin == origin && current.routeDestination == destination
+                    ) {
+                        current.copy(plannedRoute = route, isPlanningRoute = false, routeError = null)
+                    } else {
+                        current
                     }
                 }
-                .onFailure { failure ->
-                    mutableUiState.update {
-                        it.copy(isPlanningRoute = false, routeError = failure.message ?: "Unable to plan route.")
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Throwable) {
+                mutableUiState.update { current ->
+                    if (current.isRoutePlanningMode &&
+                        current.routeOrigin == origin && current.routeDestination == destination
+                    ) {
+                        current.copy(
+                            isPlanningRoute = false,
+                            routeError = getApplication<Application>().getString(R.string.route_error_unavailable),
+                        )
+                    } else {
+                        current
                     }
                 }
+            }
+        }
+    }
+
+    fun editRouteDestination() {
+        routePlanningJob?.cancel()
+        mutableUiState.update {
+            it.copy(routeDestination = null, plannedRoute = null, isPlanningRoute = false, routeError = null)
+        }
+    }
+
+    fun editRouteOrigin() {
+        routePlanningJob?.cancel()
+        mutableUiState.update {
+            it.copy(
+                routeOrigin = null,
+                routeDestination = null,
+                plannedRoute = null,
+                isPlanningRoute = false,
+                routeError = null,
+            )
         }
     }
 
     fun clearRoute() {
+        routePlanningJob?.cancel()
         mutableUiState.update {
-            it.copy(routeOrigin = null, plannedRoute = null, isPlanningRoute = false, routeError = null)
+            it.copy(
+                isRoutePlanningMode = false,
+                routeOrigin = null,
+                routeDestination = null,
+                plannedRoute = null,
+                isPlanningRoute = false,
+                routeError = null,
+            )
+        }
+    }
+
+    fun navigateBackRoutePlanning() {
+        when (mutableUiState.value.routePlanningStep) {
+            RoutePlanningStep.Preview,
+            RoutePlanningStep.Planning,
+            RoutePlanningStep.ReadyToPreview,
+            -> editRouteDestination()
+            RoutePlanningStep.SelectDestination -> editRouteOrigin()
+            RoutePlanningStep.SelectStart -> clearRoute()
+            RoutePlanningStep.Inactive -> Unit
         }
     }
 

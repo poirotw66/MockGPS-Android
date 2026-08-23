@@ -14,12 +14,33 @@ data class MapUiState(
     val loadingState: MapLoadingState = MapLoadingState.Loading,
     // Changes when Retry is pressed so the Maps composable is recreated.
     val mapRenderKey: Int = 0,
+    val isRoutePlanningMode: Boolean = false,
     val routeOrigin: Coordinate? = null,
+    val routeDestination: Coordinate? = null,
     val plannedRoute: PlannedRoute? = null,
     val isPlanningRoute: Boolean = false,
     val routeError: String? = null,
     val favoriteMessage: String? = null,
-)
+) {
+    val routePlanningStep: RoutePlanningStep
+        get() = when {
+            !isRoutePlanningMode -> RoutePlanningStep.Inactive
+            isPlanningRoute -> RoutePlanningStep.Planning
+            plannedRoute != null -> RoutePlanningStep.Preview
+            routeOrigin == null -> RoutePlanningStep.SelectStart
+            routeDestination == null -> RoutePlanningStep.SelectDestination
+            else -> RoutePlanningStep.ReadyToPreview
+        }
+}
+
+enum class RoutePlanningStep {
+    Inactive,
+    SelectStart,
+    SelectDestination,
+    ReadyToPreview,
+    Planning,
+    Preview,
+}
 
 data class MapCamera(
     val coordinate: Coordinate,
