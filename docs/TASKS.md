@@ -49,7 +49,7 @@
 - [x] Active 中更換選點時要求明確「套用新位置」
 - [x] Activity 重建與旋轉後恢復 camera/selection，並重新觀察 service state
 
-實作進度（2026-08-23）：地圖垂直切片、Active 明確套用與完整 camera state 已完成，並改用不需要帳號或 API key 的 MapLibre + OpenFreeMap。仍需在實機完成圖磚載入、拖曳、樣式切換、旋轉與跨 App 出口驗證。
+實作進度（2026-08-23）：地圖垂直切片、Active 明確套用與完整 camera state 已完成，並改用不需要帳號或 API key 的 MapLibre + OpenFreeMap。在 Sony XQ-BC72（Android 13 / API 33）完成實機 Gate：明亮／深色圖磚載入、中央準星拖曳選點、旋轉後 camera/selection 保留、橫向畫面捲動、Start、Active 中明確套用新位置、GPS/FLP 與通知座標同步，以及 Stop 後清除服務、通知與 mock provider；期間無 crash 或 ANR。跨 App 客戶端驗證與 API 26/34/36 矩陣仍待執行。
 
 出口條件：拖地圖選點 → Start → 跨 App 驗證 → 通知 Stop 的完整流程通過。
 
