@@ -1,0 +1,4 @@
+<resources>
+    <color name="mock_gps_primary">#006C4C</color>
+    <color name="mock_gps_surface">#FBFDF9</color>
+</resources>

@@ -1,0 +1,9 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Theme.MockGPS" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">@color/mock_gps_primary</item>
+        <item name="android:statusBarColor">@color/mock_gps_surface</item>
+        <item name="android:navigationBarColor">@color/mock_gps_surface</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>

@@ -1,0 +1,26 @@
+<resources>
+    <string name="app_name">Mock GPS</string>
+    <string name="spike_title">Mock GPS spike</string>
+    <string name="service_state">Service state: %1$s</string>
+    <string name="state_idle">Idle</string>
+    <string name="state_starting">Starting</string>
+    <string name="state_active">Active</string>
+    <string name="state_error">Error: %1$s</string>
+    <string name="spike_description">Default coordinate is Taipei 101. Use this screen only for developer and QA testing.</string>
+    <string name="latitude">Latitude</string>
+    <string name="longitude">Longitude</string>
+    <string name="invalid_coordinate">Enter latitude -90 to 90 and longitude -180 to 180.</string>
+    <string name="location_permission_required">Location permission is required before starting the foreground service.</string>
+    <string name="notification_permission_denied">Notification permission was denied. Android may hide the ongoing notification from the notification drawer.</string>
+    <string name="foreground_service_start_failed">Android did not allow the foreground service to start. Check location services and Developer options, then try again.</string>
+    <string name="action_start_mock">Start mock location</string>
+    <string name="action_stop">Stop</string>
+    <string name="action_open_developer_options">Open Developer options</string>
+    <string name="developer_options_unavailable">Developer options are unavailable on this device.</string>
+    <string name="mock_app_setup_hint">In Developer options, select this app as the mock location app before starting.</string>
+    <string name="notification_channel_name">Mock location simulation</string>
+    <string name="notification_channel_description">Shown while mock location simulation is active.</string>
+    <string name="notification_active_title">Mock location active</string>
+    <string name="mock_operation_failed">Mock location operation failed.</string>
+    <string name="mock_cleanup_cancelled">Mock location cleanup was cancelled.</string>
+</resources>

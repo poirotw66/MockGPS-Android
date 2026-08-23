@@ -1,0 +1,26 @@
+<resources>
+    <string name="app_name">模擬定位</string>
+    <string name="spike_title">Mock GPS 核心驗證</string>
+    <string name="service_state">服務狀態：%1$s</string>
+    <string name="state_idle">閒置</string>
+    <string name="state_starting">啟動中</string>
+    <string name="state_active">模擬中</string>
+    <string name="state_error">錯誤：%1$s</string>
+    <string name="spike_description">預設座標為台北 101。本畫面僅供開發與 QA 測試。</string>
+    <string name="latitude">緯度</string>
+    <string name="longitude">經度</string>
+    <string name="invalid_coordinate">緯度須介於 -90 至 90，經度須介於 -180 至 180。</string>
+    <string name="location_permission_required">啟動前景服務前必須允許定位權限。</string>
+    <string name="notification_permission_denied">通知權限遭拒，Android 可能不會在通知欄顯示持續通知。</string>
+    <string name="foreground_service_start_failed">Android 不允許啟動前景服務。請確認定位服務與開發人員選項後重試。</string>
+    <string name="action_start_mock">開始模擬定位</string>
+    <string name="action_stop">停止</string>
+    <string name="action_open_developer_options">開啟開發人員選項</string>
+    <string name="developer_options_unavailable">此裝置無法開啟開發人員選項。</string>
+    <string name="mock_app_setup_hint">開始前，請在開發人員選項中將本 App 選為模擬位置資訊應用程式。</string>
+    <string name="notification_channel_name">模擬定位服務</string>
+    <string name="notification_channel_description">模擬定位執行期間顯示。</string>
+    <string name="notification_active_title">模擬定位執行中</string>
+    <string name="mock_operation_failed">模擬定位操作失敗。</string>
+    <string name="mock_cleanup_cancelled">模擬定位清理作業遭取消。</string>
+</resources>

@@ -1,0 +1,22 @@
+# Android / Gradle
+.gradle/
+build/
+**/build/
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# Local machine configuration
+local.properties
+.tools/
+.idea/
+*.iml
+
+# Native build output
+.cxx/
+externalNativeBuild/
+
+# OS files
+.DS_Store
+Thumbs.db
