@@ -12,9 +12,7 @@ ViewModel
   │
   ├──────────────► Search / Favorites / Settings repositories
   │
-  ▼
-MockLocationServiceController
-  │ explicit Intent commands: START, UPDATE, STOP
+  │ explicit Intent commands: START, UPDATE, STOP, route Pause/Resume
   ▼
 MockLocationForegroundService
   │ StateFlow<ServiceState> + one update coroutine
@@ -139,8 +137,8 @@ Idle → Starting → Active → Stopping → Idle
 
 ## 8. 地圖與搜尋
 
-- MapLibre Compose 以 `CameraState` 取得 camera center
-- 只在 camera idle 時更新選定座標，拖曳中不高頻觸發 reverse lookup
+- MapLibre Compose click handler 直接選定座標；camera state 只保存瀏覽位置
+- 拖曳與縮放只瀏覽，不會改變已選位置
 - MVP 不需要 reverse geocoding camera center；無 place name 時顯示座標，避免額外 API 成本與延遲
 - 地圖使用 OpenFreeMap 的 Positron／Dark 樣式，保留 MapLibre、OpenFreeMap 與 OpenStreetMap attribution
 - 搜尋透過可替換介面包裝 OSM 相容服務，只保留名稱、格式化地址與座標
@@ -210,7 +208,7 @@ recent_location
 
 - Compose：準星、camera idle、loading/error、Start/Stop disabled states
 - Room migration 與 persistence
-- Notification Stop PendingIntent
+- Notification Stop/Pause/Resume action composition，加上 command/session state coverage
 - Engine contract 以 fake engine 測 failure cleanup
 
 ### 裝置整合測試
@@ -223,6 +221,8 @@ Mock Location App selection 與跨 App 觀察必須在 emulator/實體裝置手�
 | API 34 | FGS type、notification/location permission |
 | API 36 Google APIs image | target 行為、FLP、MapLibre |
 | 一台非 Pixel 實體裝置 | OEM 省電與背景穩定性 |
+
+GitHub Actions runs the instrumentation suite on API 26, 34, and 36 `google_apis` x86_64 images. This verifies repository-owned tests only; mock-app selection, independent cross-app LocationManager/FLP reads, long soak, and OEM background behavior remain manual release evidence.
 
 ## 12. 主要風險與處理
 

@@ -1,6 +1,7 @@
 package com.sora.mockgps.feature.map
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -9,15 +10,25 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import com.sora.mockgps.R
 import com.sora.mockgps.feature.routes.domain.RecentRouteSummary
 import com.sora.mockgps.feature.routes.domain.SavedRouteSummary
@@ -30,6 +41,8 @@ internal fun RouteLibraryDialog(
     onLoadSaved: (SavedRouteSummary) -> Unit,
     onLoadRecent: (RecentRouteSummary) -> Unit,
     onReverse: (SavedRouteSummary) -> Unit,
+    onRename: (SavedRouteSummary) -> Unit,
+    onDuplicate: (SavedRouteSummary) -> Unit,
     onDelete: (SavedRouteSummary) -> Unit,
     onImportGpx: () -> Unit,
     onImportBackup: () -> Unit,
@@ -47,6 +60,11 @@ internal fun RouteLibraryDialog(
                     TextButton(onClick = onImportBackup) { Text(stringResource(R.string.action_import_backup)) }
                     TextButton(onClick = onExportBackup) { Text(stringResource(R.string.action_export_backup)) }
                 }
+                Text(
+                    stringResource(R.string.route_backup_excludes_favorites),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 if (savedRoutes.isEmpty() && recentRoutes.isEmpty()) {
                     Text(stringResource(R.string.route_library_empty))
                 } else {
@@ -59,11 +77,35 @@ internal fun RouteLibraryDialog(
                                     distanceMeters = route.distanceMeters,
                                     onLoad = { onLoadSaved(route) },
                                     actions = {
-                                        TextButton(onClick = { onReverse(route) }) {
-                                            Text(stringResource(R.string.action_reverse_route))
-                                        }
-                                        TextButton(onClick = { onDelete(route) }) {
-                                            Text(stringResource(R.string.action_delete))
+                                        var actionsExpanded by remember(route.id) { mutableStateOf(false) }
+                                        Box {
+                                            IconButton(onClick = { actionsExpanded = true }) {
+                                                Icon(
+                                                    Icons.Filled.MoreVert,
+                                                    contentDescription = stringResource(R.string.action_route_options),
+                                                )
+                                            }
+                                            DropdownMenu(
+                                                expanded = actionsExpanded,
+                                                onDismissRequest = { actionsExpanded = false },
+                                            ) {
+                                                RouteActionItem(R.string.action_reverse_route) {
+                                                    actionsExpanded = false
+                                                    onReverse(route)
+                                                }
+                                                RouteActionItem(R.string.action_rename) {
+                                                    actionsExpanded = false
+                                                    onRename(route)
+                                                }
+                                                RouteActionItem(R.string.action_duplicate) {
+                                                    actionsExpanded = false
+                                                    onDuplicate(route)
+                                                }
+                                                RouteActionItem(R.string.action_delete) {
+                                                    actionsExpanded = false
+                                                    onDelete(route)
+                                                }
+                                            }
                                         }
                                     },
                                 )
@@ -89,6 +131,14 @@ internal fun RouteLibraryDialog(
                 TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) }
             }
         },
+    )
+}
+
+@Composable
+private fun RouteActionItem(label: Int, onClick: () -> Unit) {
+    DropdownMenuItem(
+        text = { Text(stringResource(label)) },
+        onClick = onClick,
     )
 }
 

@@ -15,8 +15,8 @@ Android Mock Location 工具。目前已完成靜態選點、喜愛地點，以�
 - 路線 UX：權威 Running/Paused/Completed/Failed 狀態、通知暫停／繼續、地圖即時位置、距離／時間／進度
 - 路線資料：Room 儲存與最近使用、反向路線、GPX 匯入匯出、JSON 備份還原
 - 韌性：有界路線快取、網路失敗 stale fallback、可替換 routing provider 設定與 service session token
-- 自動驗證：49 個 JVM tests、Room migration／service instrumentation tests、`assembleDebug`、`lintDebug` 與 R8 release 組裝；CI 另執行 API 34 instrumentation
-- 實機驗證：本次變更未在實機或 emulator 執行；仍需驗證 API 26/34/36 與獨立 LocationManager／FLP client 的跨 App 讀值
+- 自動驗證：JVM、Room migration／Compose/service instrumentation tests、`assembleDebug`、`lintDebug`、R8 release APK/AAB；CI 以 API 26、34、36 Google APIs emulator matrix 執行 instrumentation
+- 實機證據：Sony XQ-BC72（Android 13 / API 33）已完成核心 Start/Stop 與 notification 行為驗證；API 26/34/36 與獨立 LocationManager／FLP client 跨 App 讀值仍需依下方手動程序驗證
 
 Debug APK：`app/build/outputs/apk/debug/app-debug.apk`
 
@@ -35,6 +35,25 @@ Debug APK：`app/build/outputs/apk/debug/app-debug.apk`
 - 使用前景服務維持模擬，通知提供立即停止操作
 - Room 儲存喜愛地點、已儲存路線與最近路線
 - 只採用 Android 官方 Mock Location 機制，不隱藏 Mock 狀態、不繞過第三方偵測
+
+## Release 與手動驗證
+
+Google Play Console、Data Safety、foreground-service declaration、privacy policy URL、Internal Testing 軌道與審查送件都需要帳號擁有者操作；本專案沒有宣稱已完成這些外部動作。每個 release 前：更新 `versionCode`/`versionName`、以受保護環境變數簽署 AAB、上傳 Internal Testing、完成 Data Safety 和 FGS declaration，並發布可公開存取的隱私權政策 URL。
+
+JSON backup 僅包含 saved/recent routes，**不包含 favorites**；這維持 v1 格式與 route database restore 的原子性。
+
+### 手動裝置矩陣
+
+在 API 26、34、36 Google APIs emulator，以及至少一台 OEM 實機（已有 Sony API 33 evidence）執行：選 BloomWalk GPS 為 mock location app，Start static mock，使用獨立 LocationManager 和 FLP client 讀取目標座標，Stop 並確認通知、test provider 和 FLP mock mode 都消失。可用：
+
+```bash
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb shell am start -n com.bloss0m.bloomwalk/com.sora.mockgps.MainActivity
+adb shell dumpsys activity services com.sora.mockgps/.service.MockLocationForegroundService
+adb shell dumpsys notification --noredact | grep -i bloomwalk
+```
+
+Reliability checklist（需記錄實際裝置、API、結果，未在本文件宣稱完成）：8-hour static soak；10-minute lockscreen；swipe-away Activity；force-stop（服務不得自行恢復）；notification Pause/Resume/Stop；20 次 Start/Stop；上述 `dumpsys` residue checks；OEM battery optimization on/off。Route scenarios must also confirm pause freezes coordinates and resume continues them.
 
 ## 開工前需確定
 
@@ -80,7 +99,7 @@ macOS／Linux：
 
 ```bash
 ./gradlew testDebugUnitTest assembleDebug lintDebug
-./gradlew assembleRelease
+./gradlew assembleRelease bundleRelease
 ```
 
 Windows PowerShell（保留原本驗證方式）：
@@ -97,7 +116,7 @@ export MOCKGPS_KEYSTORE_FILE=/absolute/path/release.jks
 export MOCKGPS_KEYSTORE_PASSWORD='...'
 export MOCKGPS_KEY_ALIAS='...'
 export MOCKGPS_KEY_PASSWORD='...'
-./gradlew assembleRelease
+./gradlew bundleRelease
 ```
 
 安裝到已連線裝置：

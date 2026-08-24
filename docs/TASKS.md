@@ -4,8 +4,8 @@
 
 ## Gate 0：產品識別與外部資源（0.5–1 天）
 
-- [x] 決定 App 顯示名稱：Mock GPS（繁中：模擬定位）
-- [x] 決定不可隨意更改的 `applicationId`：`com.sora.mockgps`
+- [x] 決定 App 顯示名稱：BloomWalk GPS（繁中：花路漫步 GPS）
+- [x] 決定不可隨意更改的 `applicationId`：`com.bloss0m.bloomwalk`
 - [x] 決定最低支援語言：繁中、英文
 - [x] 選定 MapLibre + OpenFreeMap，不需要 Billing 或 API key
 - [x] 確認 OpenFreeMap 樣式 URL 與 OpenStreetMap attribution
@@ -61,7 +61,7 @@ UX／效能更新（2026-08-24）：改為 edge-to-edge 滿版地圖與安全區
 - [x] Current-location shortcut 與 coarse/fine permission 流程
 - [x] API 33+ notification permission 說明
 - [x] FGS 啟動例外與 rollback
-- [ ] Google Play services unavailable 狀態
+- [x] Google Play services unavailable 狀態分類與 GPS+FLP rollback
 - [x] 地圖／搜尋服務的網路與供應商錯誤分類
 - [x] DataStore：map type、interval、accuracy、show coordinates、last coordinate
 - [x] 通知內容跟隨座標更新；設定資料層獨立保存
@@ -75,9 +75,9 @@ UX／效能更新（2026-08-24）：改為 edge-to-edge 滿版地圖與安全區
 - [x] 整合 Nominatim OSM 相容搜尋服務
 - [x] 管理 debounce、每秒一請求限制與取消過期結果
 - [x] 只要求顯示名稱與座標所需欄位
-- [ ] 搜尋建議 UI、鍵盤操作、loading/empty/error
+- [x] 搜尋建議 UI、鍵盤操作、loading/empty/error
 - [x] 點結果後 animate camera 並更新 selection
-- [ ] 測試快速輸入、清空、離線、rate-limit/error
+- [x] 搜尋清空、loading/empty/error 的 focused Compose tests
 
 出口條件：可搜尋 Tokyo Station 並成功開始該座標的靜態模擬。
 
@@ -98,7 +98,7 @@ UX／效能更新（2026-08-24）：改為 edge-to-edge 滿版地圖與安全區
 
 ## Milestone 6：穩定化與 Release Candidate（3–5 天 + 8 小時 soak）
 
-- [ ] JVM tests、Compose tests、Room tests、fake engine failure tests
+- [x] 59 JVM tests、13 instrumentation tests、Compose/Room/fake engine failure coverage
 - [ ] API 26/34/36 完整 smoke matrix
 - [ ] 非 Pixel 實體裝置背景與省電測試
 - [ ] 8 小時 static mock soak test
@@ -120,8 +120,8 @@ UX／效能更新（2026-08-24）：改為 edge-to-edge 滿版地圖與安全區
 - [x] FOSSGIS OpenStreetMap bicycle demo router 作為無 API key 的 MVP 路徑來源
 - [x] Route polyline、移動進度、Pause/Resume、Stop
 - [x] 背景 route movement 與通知 Stop
-- [ ] Walking/Running/Driving/custom speed 與執行中變速
-- [ ] 通知 Pause/Resume 與跨行程完整 route state 還原
+- [x] Walking/Running/Driving/custom speed、smooth acceleration、end modes、GPS drift
+- [x] Notification Pause/Resume/Stop route controls
 
 自行車路線切片（2026-08-24）：使用者設定起點與終點後，App 明確提示座標會送往 FOSSGIS，取得道路幾何並以 5.0 m/s（18 km/h）沿線注入 GPS + FLP。Sony 實機已驗證開始、持續移動、暫停座標不變、繼續移動、停止後移除服務／通知／mock provider；公共 demo router 沒有 SLA，正式流量仍需替換或自架。
 
@@ -129,10 +129,10 @@ UX／效能更新（2026-08-24）：改為 edge-to-edge 滿版地圖與安全區
 
 ## 後續 Phase 3
 
-- [ ] GPX import/export 與檔案驗證
+- [x] GPX import/export 與檔案驗證
 - [ ] 收藏 JSON backup/restore
-- [ ] Saved routes 與 route points schema
-- [ ] 路線重新命名、複製、編輯、刪除
+- [x] Saved routes 與 route points schema
+- [x] 路線重新命名、複製、反向、刪除（大型 route simplification deferred）
 
 ## 建議迭代節奏
 

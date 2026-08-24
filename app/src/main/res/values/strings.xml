@@ -39,6 +39,10 @@
     <string name="notification_active_title">Mock location active</string>
     <string name="mock_operation_failed">Mock location operation failed.</string>
     <string name="mock_cleanup_cancelled">Mock location cleanup was cancelled.</string>
+    <string name="mock_error_title">Mock location could not start</string>
+    <string name="mock_error_generic">The mock location session stopped. Try again after checking location services.</string>
+    <string name="mock_error_setup_required">Select BloomWalk GPS as the mock location app in Developer options, then try again.</string>
+    <string name="mock_error_google_play_services">Google Play services could not provide mock locations. Update or enable Google Play services, then try again.</string>
     <string name="action_save_place">Save place</string>
     <string name="action_favorites">Favorites (%1$d)</string>
     <string name="favorites_title">Favorite places</string>
@@ -138,6 +142,11 @@
     <string name="action_save_route">Save route</string>
     <string name="action_load_route">Load</string>
     <string name="action_reverse_route">Reverse</string>
+    <string name="action_duplicate">Duplicate</string>
+    <string name="action_route_options">Route options</string>
+    <string name="action_move_stop_up">Move stop up</string>
+    <string name="action_move_stop_down">Move stop down</string>
+    <string name="action_remove_route_stop">Remove stop</string>
     <string name="action_import_gpx">GPX</string>
     <string name="action_import_backup">Import</string>
     <string name="action_export_backup">Export</string>
@@ -191,6 +200,13 @@
     <string name="route_plan_before_save">Plan a route before saving it.</string>
     <string name="route_saved">Saved route “%1$s”.</string>
     <string name="route_save_failed">Unable to save the route.</string>
+    <string name="route_rename_title">Rename saved route</string>
+    <string name="route_duplicate_title">Duplicate saved route</string>
+    <string name="route_duplicate_name">%1$s copy</string>
+    <string name="route_renamed">Renamed route to “%1$s”.</string>
+    <string name="route_rename_failed">Unable to rename the saved route.</string>
+    <string name="route_duplicated">Duplicated route as “%1$s”.</string>
+    <string name="route_duplicate_failed">Unable to duplicate the saved route.</string>
     <string name="saved_route_unavailable">The saved route is no longer available.</string>
     <string name="saved_route_load_failed">Unable to load the saved route.</string>
     <string name="saved_route_deleted">Saved route deleted.</string>
@@ -207,6 +223,7 @@
     <string name="recent_routes_cleared">Recent routes cleared.</string>
     <string name="recent_routes_clear_failed">Unable to clear recent routes.</string>
     <string name="route_backup_ready">Route backup is ready.</string>
+    <string name="route_backup_excludes_favorites">Route backup includes saved and recent routes only; favorites are not included.</string>
     <string name="route_backup_export_failed">Unable to export the route backup.</string>
     <string name="route_backup_restored">Restore complete — saved routes: %1$d; recent routes: %2$d.</string>
     <string name="route_backup_restore_failed">Unable to restore the route backup.</string>

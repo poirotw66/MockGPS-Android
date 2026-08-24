@@ -25,6 +25,8 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -50,9 +52,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sora.mockgps.R
 import com.sora.mockgps.core.model.Coordinate
 import com.sora.mockgps.feature.favorites.domain.FavoriteLocation
+import com.sora.mockgps.feature.routes.domain.SavedRouteSummary
 import com.sora.mockgps.route.PlannedRoute
 import com.sora.mockgps.service.MockLocationForegroundService
 import com.sora.mockgps.service.MockServiceState
+import com.sora.mockgps.service.MockServiceErrorKind
 import com.sora.mockgps.service.RouteCompleted
 import com.sora.mockgps.service.RouteFailed
 import com.sora.mockgps.service.RoutePaused
@@ -81,6 +85,36 @@ import org.maplibre.compose.sources.rememberGeoJsonSource
 import org.maplibre.compose.style.BaseStyle
 import org.maplibre.compose.util.ClickResult
 import org.maplibre.spatialk.geojson.Position
+
+@Composable
+internal fun ServiceErrorDialog(
+    kind: MockServiceErrorKind,
+    onDismiss: () -> Unit,
+    onOpenDeveloperOptions: () -> Unit,
+) {
+    val message = stringResource(
+        when (kind) {
+            MockServiceErrorKind.MockAppSetup -> R.string.mock_error_setup_required
+            MockServiceErrorKind.GooglePlayServices -> R.string.mock_error_google_play_services
+            MockServiceErrorKind.Generic -> R.string.mock_error_generic
+        },
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.mock_error_title)) },
+        text = { Text(message) },
+        confirmButton = {
+            if (kind == MockServiceErrorKind.MockAppSetup) {
+                TextButton(onClick = onOpenDeveloperOptions) {
+                    Text(stringResource(R.string.action_open_developer_options))
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) }
+        },
+    )
+}
 
 /** A full-screen map picker with controls kept clear of the map's centre. */
 @Composable
@@ -111,6 +145,8 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     var renameFavorite by remember { mutableStateOf<FavoriteLocation?>(null) }
     var deleteFavorite by remember { mutableStateOf<FavoriteLocation?>(null) }
     var showRouteLibrary by remember { mutableStateOf(false) }
+    var renameSavedRoute by remember { mutableStateOf<SavedRouteSummary?>(null) }
+    var duplicateSavedRoute by remember { mutableStateOf<SavedRouteSummary?>(null) }
     var saveRouteName by remember { mutableStateOf(false) }
     var pendingRouteExport by remember { mutableStateOf<RouteExport?>(null) }
     var pendingRecentRoute by remember { mutableStateOf(false) }
@@ -214,6 +250,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     val favoriteSavedMessage = uiState.favoriteMessage?.let {
         stringResource(R.string.favorite_saved, it)
     }
+    val serviceError = serviceState as? MockServiceState.Error
 
     LaunchedEffect(favoriteSavedMessage) {
         favoriteSavedMessage?.let { message ->
@@ -260,6 +297,18 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 else -> Unit
             }
         }
+    }
+    serviceError?.let { error ->
+        ServiceErrorDialog(
+            kind = error.kind,
+            onDismiss = MockLocationForegroundService::consumeError,
+            onOpenDeveloperOptions = {
+                runCatching {
+                    context.startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS))
+                }.onFailure { permissionMessage = developerOptionsUnavailable }
+                MockLocationForegroundService.consumeError()
+            },
+        )
     }
 
     saveFavoriteCoordinate?.let { coordinate ->
@@ -330,6 +379,8 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 viewModel.reverseSavedRoute(it.id)
                 showRouteLibrary = false
             },
+            onRename = { renameSavedRoute = it },
+            onDuplicate = { duplicateSavedRoute = it },
             onDelete = { viewModel.deleteSavedRoute(it.id) },
             onImportGpx = { importGpxLauncher.launch(arrayOf("application/gpx+xml", "text/xml", "application/xml")) },
             onImportBackup = { importBackupLauncher.launch(arrayOf("application/json")) },
@@ -347,6 +398,30 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             onConfirm = {
                 viewModel.savePlannedRoute(it)
                 saveRouteName = false
+            },
+        )
+    }
+    renameSavedRoute?.let { route ->
+        FavoriteNameDialog(
+            title = stringResource(R.string.route_rename_title),
+            initialName = route.name,
+            fieldLabelResource = R.string.route_name,
+            onDismiss = { renameSavedRoute = null },
+            onConfirm = { name ->
+                viewModel.renameSavedRoute(route.id, name)
+                renameSavedRoute = null
+            },
+        )
+    }
+    duplicateSavedRoute?.let { route ->
+        FavoriteNameDialog(
+            title = stringResource(R.string.route_duplicate_title),
+            initialName = stringResource(R.string.route_duplicate_name, route.name),
+            fieldLabelResource = R.string.route_name,
+            onDismiss = { duplicateSavedRoute = null },
+            onConfirm = { name ->
+                viewModel.duplicateSavedRoute(route.id, name)
+                duplicateSavedRoute = null
             },
         )
     }

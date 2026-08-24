@@ -277,6 +277,36 @@ class MapViewModel @JvmOverloads constructor(
                 .onFailure { setRouteOperationError(localized(R.string.saved_route_delete_failed)) }
         }
     }
+    fun renameSavedRoute(id: Long, name: String) {
+        viewModelScope.launch {
+            runCatching { routeRepository.rename(id, name) }
+                .onSuccess { renamed ->
+                    mutableUiState.update {
+                        it.copy(
+                            activeRouteName = if (renamed && it.activeSavedRouteId == id) name.trim() else it.activeRouteName,
+                            routeOperationResult = RouteOperationResult(
+                                if (renamed) localized(R.string.route_renamed, name)
+                                else localized(R.string.saved_route_unavailable),
+                                isError = !renamed,
+                            ),
+                        )
+                    }
+                }
+                .onFailure { setRouteOperationError(localized(R.string.route_rename_failed)) }
+        }
+    }
+
+    fun duplicateSavedRoute(id: Long, name: String) {
+        viewModelScope.launch {
+            runCatching { routeRepository.duplicate(id, name) }
+                .onSuccess { duplicated ->
+                    mutableUiState.update {
+                        it.copy(routeOperationResult = RouteOperationResult(localized(R.string.route_duplicated, duplicated.name)))
+                    }
+                }
+                .onFailure { setRouteOperationError(localized(R.string.route_duplicate_failed)) }
+        }
+    }
 
     fun reverseSavedRoute(id: Long, name: String? = null) {
         viewModelScope.launch {

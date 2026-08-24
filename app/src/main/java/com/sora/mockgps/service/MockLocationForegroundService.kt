@@ -17,6 +17,7 @@ import com.sora.mockgps.core.model.Coordinate
 import com.sora.mockgps.core.model.MockClock
 import com.sora.mockgps.core.model.MockPayloadFactory
 import com.sora.mockgps.core.model.MockPayloadOptions
+import com.sora.mockgps.core.model.MockError
 import com.sora.mockgps.core.model.MockResult
 import com.sora.mockgps.route.AccelerationModel
 import com.sora.mockgps.route.GpsDriftConfiguration
@@ -126,9 +127,10 @@ class MockLocationForegroundService : Service() {
                 cleanedUp = false
                 publishState(MockServiceState.Starting(coordinate))
                 var terminalError: String? = null
+                var terminalErrorKind = MockServiceErrorKind.Generic
                 try {
                     when (val result = coordinator.start()) {
-                        is MockResult.Failure -> throw MockSessionException(result.error.toString())
+                        is MockResult.Failure -> throw MockSessionException(result.error.toString(), result.error)
                         is MockResult.Success -> Unit
                     }
                     publishState(MockServiceState.Active(coordinate))
@@ -154,8 +156,10 @@ class MockLocationForegroundService : Service() {
                     throw cancelled
                 } catch (failure: Throwable) {
                     terminalError = failure.userFacingMessage(getString(R.string.mock_operation_failed))
+                    terminalErrorKind = (failure as? MockSessionException)?.mockError?.toServiceErrorKind()
+                        ?: MockServiceErrorKind.Generic
                 } finally {
-                    finishSession(sessionToken, terminalError)
+                    finishSession(sessionToken, terminalError, errorKind = terminalErrorKind)
                 }
             }
         }
@@ -221,10 +225,11 @@ class MockLocationForegroundService : Service() {
                 cleanedUp = false
                 publishState(MockServiceState.Starting(initialCoordinate))
                 var terminalError: String? = null
+                var terminalErrorKind = MockServiceErrorKind.Generic
                 var completedRouteState: RouteCompleted? = null
                 try {
                     when (val result = coordinator.start()) {
-                        is MockResult.Failure -> throw MockSessionException(result.error.toString())
+                        is MockResult.Failure -> throw MockSessionException(result.error.toString(), result.error)
                         is MockResult.Success -> Unit
                     }
                     execution.start(SystemClock.elapsedRealtime())
@@ -284,8 +289,10 @@ class MockLocationForegroundService : Service() {
                     throw cancelled
                 } catch (failure: Throwable) {
                     terminalError = failure.userFacingMessage(getString(R.string.mock_operation_failed))
+                    terminalErrorKind = (failure as? MockSessionException)?.mockError?.toServiceErrorKind()
+                        ?: MockServiceErrorKind.Generic
                 } finally {
-                    finishSession(sessionToken, terminalError, completedRouteState)
+                    finishSession(sessionToken, terminalError, completedRouteState, terminalErrorKind)
                 }
             }
         }
@@ -363,6 +370,7 @@ class MockLocationForegroundService : Service() {
         sessionToken: ServiceSessionToken,
         terminalError: String?,
         completedRouteState: RouteCompleted? = null,
+        errorKind: MockServiceErrorKind = MockServiceErrorKind.Generic,
     ) {
         // A delayed Stop coroutine from an old session must never clean up a replacement's
         // providers or demote its foreground notification.
@@ -392,7 +400,7 @@ class MockLocationForegroundService : Service() {
         }
 
         val finalError = listOfNotNull(terminalError, cleanupError).joinToString(separator = "\n").ifBlank { null }
-        publishState(finalError?.let(MockServiceState::Error) ?: MockServiceState.Idle)
+        publishState(finalError?.let { MockServiceState.Error(it, errorKind) } ?: MockServiceState.Idle)
         val finishingExecution = routeExecution
         val finalRouteState = when {
             completedRouteState != null && finalError == null -> completedRouteState
@@ -466,7 +474,10 @@ class MockLocationForegroundService : Service() {
         } ?: DEFAULT_COORDINATE
     }
 
-    private class MockSessionException(message: String) : IllegalStateException(message)
+    private class MockSessionException(
+        message: String,
+        val mockError: MockError? = null,
+    ) : IllegalStateException(message)
 
     companion object {
         const val ACTION_START = "com.sora.mockgps.action.START"
@@ -614,6 +625,12 @@ class MockLocationForegroundService : Service() {
             mutableState.value = state
         }
 
+        fun consumeError() {
+            if (mutableState.value is MockServiceState.Error) {
+                mutableState.value = MockServiceState.Idle
+            }
+        }
+
         private val mutableRouteState = MutableStateFlow<RouteServiceState>(RouteServiceState.Idle)
         val routeState: StateFlow<RouteServiceState> = mutableRouteState.asStateFlow()
 
@@ -746,6 +763,20 @@ private fun Intent.putSessionToken(sessionToken: ServiceSessionToken?) {
 
 /** Internal provider details stay out of localized UI and notifications. */
 private fun Throwable.userFacingMessage(fallback: String): String = fallback
+
+internal fun MockError.toServiceErrorKind(): MockServiceErrorKind = when (this) {
+    is MockError.StartFailed -> when (engineName) {
+        "fused-location" -> MockServiceErrorKind.GooglePlayServices
+        "framework-gps" -> MockServiceErrorKind.MockAppSetup
+        else -> MockServiceErrorKind.Generic
+    }
+    is MockError.PushFailed -> when {
+        failures.any { it.engineName == "fused-location" } -> MockServiceErrorKind.GooglePlayServices
+        failures.any { it.engineName == "framework-gps" } -> MockServiceErrorKind.MockAppSetup
+        else -> MockServiceErrorKind.Generic
+    }
+    else -> MockServiceErrorKind.Generic
+}
 
 private object SystemMockClock : MockClock {
     override fun currentTimeMillis(): Long = System.currentTimeMillis()

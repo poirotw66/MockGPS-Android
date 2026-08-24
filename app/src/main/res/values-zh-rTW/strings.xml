@@ -215,4 +215,21 @@
     <string name="gpx_export_failed">無法匯出 GPX。</string>
     <string name="gpx_imported">已匯入 GPX 路線「%1$s」。</string>
     <string name="gpx_import_failed">無法匯入 GPX。</string>
+    <string name="mock_error_title">無法啟動模擬位置</string>
+    <string name="mock_error_generic">模擬位置工作階段已停止。請檢查定位服務後再試一次。</string>
+    <string name="mock_error_setup_required">請在開發人員選項中將 BloomWalk GPS 設為模擬位置應用程式，然後再試一次。</string>
+    <string name="mock_error_google_play_services">Google Play 服務無法提供模擬位置。請更新或啟用 Google Play 服務後再試一次。</string>
+    <string name="action_duplicate">複製</string>
+    <string name="action_route_options">路線操作</string>
+    <string name="action_move_stop_up">上移停靠點</string>
+    <string name="action_move_stop_down">下移停靠點</string>
+    <string name="action_remove_route_stop">移除停靠點</string>
+    <string name="route_rename_title">重新命名已儲存路線</string>
+    <string name="route_duplicate_title">複製已儲存路線</string>
+    <string name="route_duplicate_name">%1$s 副本</string>
+    <string name="route_renamed">已將路線重新命名為「%1$s」。</string>
+    <string name="route_rename_failed">無法重新命名已儲存路線。</string>
+    <string name="route_duplicated">已複製路線為「%1$s」。</string>
+    <string name="route_duplicate_failed">無法複製已儲存路線。</string>
+    <string name="route_backup_excludes_favorites">路線備份只包含已儲存與最近路線，不包含收藏地點。</string>
 </resources>

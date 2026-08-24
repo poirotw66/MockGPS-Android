@@ -8,7 +8,16 @@ sealed interface MockServiceState {
     data object Idle : MockServiceState
     data class Starting(val coordinate: Coordinate) : MockServiceState
     data class Active(val coordinate: Coordinate) : MockServiceState
-    data class Error(val message: String) : MockServiceState
+    data class Error(
+        val message: String,
+        val kind: MockServiceErrorKind = MockServiceErrorKind.Generic,
+    ) : MockServiceState
+}
+
+enum class MockServiceErrorKind {
+    Generic,
+    MockAppSetup,
+    GooglePlayServices,
 }
 
 /**

@@ -45,7 +45,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
@@ -837,15 +840,21 @@ private fun RouteWaypointEditor(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                TextButton(
+                IconButton(
                     onClick = { onMove(routeIndex, -1) },
                     enabled = routeIndex > 1,
-                ) { Text("↑") }
-                TextButton(
+                ) {
+                    Icon(Icons.Filled.KeyboardArrowUp, contentDescription = stringResource(R.string.action_move_stop_up))
+                }
+                IconButton(
                     onClick = { onMove(routeIndex, 1) },
                     enabled = routeIndex < waypoints.lastIndex - 1,
-                ) { Text("↓") }
-                TextButton(onClick = { onRemove(routeIndex) }) { Text("×") }
+                ) {
+                    Icon(Icons.Filled.KeyboardArrowDown, contentDescription = stringResource(R.string.action_move_stop_down))
+                }
+                IconButton(onClick = { onRemove(routeIndex) }) {
+                    Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.action_remove_route_stop))
+                }
             }
         }
     }

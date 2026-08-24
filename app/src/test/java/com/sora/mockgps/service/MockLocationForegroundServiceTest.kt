@@ -1,5 +1,8 @@
 package com.sora.mockgps.service
 
+import com.sora.mockgps.core.model.EngineFailure
+import com.sora.mockgps.core.model.EngineOperation
+import com.sora.mockgps.core.model.MockError
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -33,5 +36,23 @@ class MockLocationForegroundServiceTest {
             MockLocationForegroundService.EXTRA_SESSION_GENERATION,
         )
         assertEquals(1_000L, MockLocationForegroundService.UPDATE_INTERVAL_MILLIS)
+    }
+
+    @Test
+    fun `service errors distinguish setup Play services and generic failures`() {
+        assertEquals(
+            MockServiceErrorKind.MockAppSetup,
+            MockError.StartFailed("framework-gps", SecurityException()).toServiceErrorKind(),
+        )
+        assertEquals(
+            MockServiceErrorKind.GooglePlayServices,
+            MockError.StartFailed("fused-location", IllegalStateException()).toServiceErrorKind(),
+        )
+        assertEquals(
+            MockServiceErrorKind.Generic,
+            MockError.StopFailed(
+                listOf(EngineFailure("framework-gps", EngineOperation.STOP, IllegalStateException())),
+            ).toServiceErrorKind(),
+        )
     }
 }

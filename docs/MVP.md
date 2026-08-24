@@ -6,12 +6,12 @@
 
 ## 1. 產品目標
 
-讓開發者與 QA 在 Android 裝置上，用最短流程選擇一個座標並透過 Android 官方 Mock Location 機制持續模擬該位置。
+BloomWalk GPS / 花路漫步 GPS（`com.bloss0m.bloomwalk`）讓開發者與 QA 在 Android 裝置上，用最短流程選擇一個座標並透過 Android 官方 Mock Location 機制持續模擬該位置。
 
 核心體驗：
 
 ```text
-開啟 App → 搜尋或拖曳地圖 → 選定座標 → Start → 背景持續 → Stop
+開啟 App → 搜尋或點擊地圖選點（拖曳只瀏覽）→ Start → 背景持續 → Stop
 ```
 
 成功指標：已完成首次設定的使用者，可在 10 秒內從首頁開始一個靜態位置模擬。
@@ -27,7 +27,7 @@
 ### 3.1 地圖與選點
 
 - MapLibre + OpenFreeMap 明亮／深色樣式切換
-- 地圖中央固定準星；拖曳地圖，以 camera center 作為選定座標
+- 點擊地圖直接選定座標；拖曳、縮放只瀏覽，不改變已選位置
 - 顯示緯度、經度；至少保留小數點後 6 位
 - 定位到裝置目前位置（只有在尚未模擬時作為真實定位快捷操作）
 - 地圖載入失敗時顯示可重試狀態，不讓主 CTA 誤啟動未知座標
@@ -57,7 +57,7 @@
 
 ### 3.5 首次設定與錯誤處理
 
-- 引導使用者開啟開發人員選項並選擇本 App 為 Mock Location App
+- More sheet 提供非侵入式 Developer Options 入口；mock session 失敗時以可關閉的錯誤對話框提供設定復原操作
 - 不假設系統有可靠 API 可預先讀出目前選定的 Mock App；Start 時以實際 API 結果為準
 - 捕捉 `SecurityException`、invalid/incomplete location、Google Play services 不可用、前景服務啟動失敗
 - 未設定 Mock App 時不得 crash，需提供開啟開發人員設定的操作
@@ -110,7 +110,7 @@ Active
 
 ### AC-01 選點
 
-地圖停止移動後，選定座標等於 camera center；旋轉或重組畫面不遺失。
+點擊地圖後，選定座標等於點擊位置；拖曳只瀏覽，旋轉或重組畫面不遺失。
 
 ### AC-02 正常啟動
 
@@ -155,7 +155,7 @@ App 未被選為 Mock Location App 時，按 Start 不 crash、不留下 ongoing
 
 ## 9. MVP Definition of Done
 
-- 所有 AC-01 至 AC-09 通過
+- 自動測試通過（目前 59 JVM + 13 instrumentation）；裝置/跨 App AC 依 release checklist 記錄後才可宣稱通過
 - `assembleDebug`、unit tests、lint 通過
 - API 26、API 34、API 36 完成啟停 smoke test
 - 至少一台實體 Android 裝置完成 8 小時穩定測試

@@ -6,7 +6,10 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.sora.mockgps.feature.routes.data.RecentRouteEntity
+import com.sora.mockgps.feature.routes.data.DefaultRouteRepository
+import com.sora.mockgps.feature.routes.data.RouteClock
 import com.sora.mockgps.feature.routes.data.SavedRouteEntity
+import com.sora.mockgps.core.model.Coordinate
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.Rule
@@ -62,6 +65,27 @@ class RoomMigrationInstrumentedTest {
                 db.routeDao().insertRecentRoute(RecentRouteEntity(name = "route", geometry = "[[25,121],[25.1,121.1]]", distanceMeters = 10.0, usedAt = 1))
                 assertEquals(1, db.routeDao().getAllSavedRoutes().size)
                 assertEquals(1, db.routeDao().getAllRecentRoutes().size)
+            } finally { db.close() }
+        }
+    }
+
+    @Test fun route_repository_renames_and_duplicates_saved_geometry() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val db = Room.inMemoryDatabaseBuilder(context, FavoriteLocationDatabase::class.java)
+            .allowMainThreadQueries().build()
+        runBlocking {
+            try {
+                val repository = DefaultRouteRepository(db.routeDao(), RouteClock { 10L })
+                val points = listOf(Coordinate(25.0, 121.0), Coordinate(25.1, 121.1))
+                val original = repository.save("Original", points)
+
+                assertEquals(true, repository.rename(original.id, "Renamed"))
+                assertEquals("Renamed", repository.getSavedRoute(original.id)?.name)
+
+                val duplicate = repository.duplicate(original.id, "Copy")
+                assertEquals("Copy", duplicate.name)
+                assertEquals(points, duplicate.points)
+                assertEquals(2, db.routeDao().getAllSavedRoutes().size)
             } finally { db.close() }
         }
     }
