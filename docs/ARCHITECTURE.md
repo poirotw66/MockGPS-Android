@@ -118,7 +118,7 @@ Mock 注入本身是否能以更窄的 `specialUse` type 通過實際 Play Conso
 | `FOREGROUND_SERVICE` | 長時間執行 | Manifest |
 | `FOREGROUND_SERVICE_LOCATION` | location FGS type | Manifest，API 34+ |
 | `POST_NOTIFICATIONS` | 顯示 ongoing notification 與 Stop | API 33+ 請求；拒絕時說明限制 |
-| Mock Location app selection | 注入測試位置 | 使用者在 Developer Options 手動選擇；不是一般 runtime permission |
+| `ACCESS_MOCK_LOCATION` / Mock Location app selection | 讓 debug APK 出現在候選並注入測試位置 | Manifest 宣告受保護權限；實際授權仍由使用者在 Developer Options 選擇，不是一般 runtime permission |
 | `ACCESS_BACKGROUND_LOCATION` | 從背景新啟動 location FGS | MVP 不請求，也不支援背景新啟動 |
 
 ## 7. 狀態來源

@@ -54,6 +54,14 @@ adb shell dumpsys activity services com.sora.mockgps/.service.MockLocationForegr
 adb shell dumpsys notification --noredact | grep -i bloomwalk
 ```
 
+若「選取模擬位置應用程式」沒有顯示 BloomWalk GPS，請先重新安裝最新 debug APK，再關閉並重開系統設定。APK 必須在 merged manifest 宣告受保護的 `ACCESS_MOCK_LOCATION`，系統才會把它列為候選；真正授權仍由 Developer Options 的選擇控制。可用以下指令檢查或在測試裝置上直接選取：
+
+```bash
+adb shell dumpsys package com.bloss0m.bloomwalk | grep ACCESS_MOCK_LOCATION
+adb shell appops set com.bloss0m.bloomwalk android:mock_location allow
+adb shell cmd appops query-op android:mock_location allow
+```
+
 Reliability checklist（需記錄實際裝置、API、結果，未在本文件宣稱完成）：8-hour static soak；10-minute lockscreen；swipe-away Activity；force-stop（服務不得自行恢復）；notification Pause/Resume/Stop；20 次 Start/Stop；上述 `dumpsys` residue checks；OEM battery optimization on/off。Route scenarios must also confirm pause freezes coordinates and resume continues them.
 
 ## 開工前需確定

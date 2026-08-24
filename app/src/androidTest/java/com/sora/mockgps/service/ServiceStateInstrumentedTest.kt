@@ -21,6 +21,16 @@ class ServiceStateInstrumentedTest {
         assertTrue(MockLocationNotification.CHANNEL_ID.isNotBlank())
     }
 
+    @Test fun installed_app_is_eligible_for_the_mock_location_picker() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val requestedPermissions = context.packageManager.getPackageInfo(
+            context.packageName,
+            android.content.pm.PackageManager.GET_PERMISSIONS,
+        ).requestedPermissions.orEmpty()
+
+        assertTrue("android.permission.ACCESS_MOCK_LOCATION" in requestedPermissions)
+    }
+
     @Test fun notifications_expose_the_expected_route_and_stop_actions() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val stop = context.getString(R.string.action_stop)
