@@ -66,7 +66,7 @@
     <string name="auto_journey_region">Region</string>
     <string name="auto_journey_duration">Duration</string>
     <string name="auto_journey_transport">Transport</string>
-    <string name="auto_journey_notice">Each generation randomly draws a fun shape near the selected capital. Duration and transport determine its route length and simulation speed.</string>
+    <string name="auto_journey_notice">Each generation picks a famous landmark in the selected region and draws a random fun shape nearby. Duration and transport determine its route length and simulation speed.</string>
     <string name="generated_journey_name">%1$s · %2$s journey</string>
     <string name="action_generate_journey">Generate</string>
     <string name="region_taiwan">Taiwan</string>

@@ -62,7 +62,7 @@
     <string name="auto_journey_region">地區</string>
     <string name="auto_journey_duration">旅程時長</string>
     <string name="auto_journey_transport">交通工具</string>
-    <string name="auto_journey_notice">每次會在所選首都附近隨機畫出趣味形狀；時長與交通工具會決定路線長度及模擬速度。</string>
+    <string name="auto_journey_notice">每次會在所選地區挑選著名景點，並在附近隨機畫出趣味形狀；時長與交通工具會決定路線長度及模擬速度。</string>
     <string name="generated_journey_name">%1$s · %2$s旅程</string>
     <string name="action_generate_journey">產生旅程</string>
     <string name="region_taiwan">台灣</string>
