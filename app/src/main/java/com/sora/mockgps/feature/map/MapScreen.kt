@@ -36,7 +36,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -58,6 +57,9 @@ import com.sora.mockgps.service.RouteProgress
 import com.sora.mockgps.service.RouteRunning
 import com.sora.mockgps.service.RouteServiceState
 import com.sora.mockgps.service.RouteStarting
+import com.sora.mockgps.ui.theme.BloomWalkCoral
+import com.sora.mockgps.ui.theme.BloomWalkGold
+import com.sora.mockgps.ui.theme.BloomWalkSage
 import java.util.Locale
 import kotlin.math.cos
 import kotlin.math.log2
@@ -499,10 +501,11 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .statusBarsPadding()
-                    .padding(top = 72.dp, start = 16.dp, end = 16.dp)
-                    .shadow(4.dp, MaterialTheme.shapes.small),
-                shape = MaterialTheme.shapes.small,
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+                    .padding(top = 76.dp, start = 16.dp, end = 16.dp),
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
+                tonalElevation = 3.dp,
+                shadowElevation = 5.dp,
             ) {
                 Text(
                     text = prompt,
@@ -704,9 +707,9 @@ private fun MapPicker(
                     RouteControlMarker(
                         label = routePointLabel(index),
                         color = when (index) {
-                            0 -> Color(0xFF2E7D32)
-                            visibleControlPoints.lastIndex -> Color(0xFFC62828)
-                            else -> Color(0xFF6A1B9A)
+                            0 -> BloomWalkSage
+                            visibleControlPoints.lastIndex -> BloomWalkCoral
+                            else -> BloomWalkGold
                         },
                         modifier = Modifier.offset(x = position.x - 14.dp, y = position.y - 14.dp),
                     )
@@ -776,7 +779,7 @@ private fun RouteLine(points: List<Coordinate>) {
     LineLayer(
         id = "planned-bicycle-route",
         source = source,
-        color = const(Color(0xFF6750A4)),
+        color = const(BloomWalkCoral),
         width = const(4.dp),
     )
 }
@@ -804,7 +807,7 @@ private fun RouteActiveMarker(coordinate: Coordinate) {
     CircleLayer(
         id = "route-active-position",
         source = source,
-        color = const(Color(0xFF1565C0)),
+        color = const(BloomWalkSage),
         radius = const(8.dp),
         strokeColor = const(Color.White),
         strokeWidth = const(3.dp),
@@ -819,7 +822,7 @@ private fun SelectedLocationMarker(coordinate: Coordinate) {
     CircleLayer(
         id = "selected-location-halo",
         source = source,
-        color = const(Color(0xFFFFC107).copy(alpha = 0.32f)),
+        color = const(BloomWalkGold.copy(alpha = 0.30f)),
         radius = const(18.dp),
         strokeColor = const(Color.Black.copy(alpha = 0.8f)),
         strokeWidth = const(2.dp),
@@ -827,7 +830,7 @@ private fun SelectedLocationMarker(coordinate: Coordinate) {
     CircleLayer(
         id = "selected-location-marker",
         source = source,
-        color = const(Color(0xFFFFC107)),
+        color = const(BloomWalkGold),
         radius = const(9.dp),
         strokeColor = const(Color.Black),
         strokeWidth = const(3.dp),
