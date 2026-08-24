@@ -16,6 +16,9 @@ class DefaultFavoriteLocationRepository(
     override val favorites: Flow<List<FavoriteLocation>> = dao.observeAll().map { entities ->
         entities.map(FavoriteLocationEntity::toDomain)
     }
+    override val recentLocations = dao.observeRecentLocations().map { entities ->
+        entities.map(RecentLocationEntity::toDomain)
+    }
 
     override suspend fun save(name: String, latitude: Double, longitude: Double): FavoriteLocation {
         val coordinate = FavoriteCoordinate(latitude, longitude)
@@ -41,6 +44,30 @@ class DefaultFavoriteLocationRepository(
 
     override suspend fun delete(id: Long): Boolean = dao.deleteById(id) > 0
 
+    override suspend fun clearAll() { dao.clearAll() }
+
+    override suspend fun recordRecent(
+        latitude: Double,
+        longitude: Double,
+    ): com.sora.mockgps.feature.favorites.domain.RecentLocation {
+        val coordinate = FavoriteCoordinate(latitude, longitude)
+        val id = dao.recordRecentLocation(
+            RecentLocationEntity(
+                latitude = coordinate.latitude,
+                longitude = coordinate.longitude,
+                normalizedLatitude = coordinate.normalizedLatitude,
+                normalizedLongitude = coordinate.normalizedLongitude,
+                usedAt = clock.currentTimeMillis(),
+            ),
+            MAX_RECENT_LOCATIONS,
+        )
+        return requireNotNull(
+            dao.getRecentLocationByCoordinate(coordinate.normalizedLatitude, coordinate.normalizedLongitude),
+        ) { "Recent location could not be read back after insert $id." }.toDomain()
+    }
+
+    override suspend fun clearRecentLocations() { dao.clearRecentLocations() }
+
     private fun String.validatedName(): String {
         val normalized = trim()
         require(normalized.isNotEmpty()) { "Favorite name cannot be blank." }
@@ -52,5 +79,6 @@ class DefaultFavoriteLocationRepository(
 
     private companion object {
         const val MAX_NAME_LENGTH = 100
+        const val MAX_RECENT_LOCATIONS = 50
     }
 }

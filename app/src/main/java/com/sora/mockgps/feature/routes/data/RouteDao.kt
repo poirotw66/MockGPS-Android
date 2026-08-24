@@ -9,11 +9,11 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface RouteDao {
-    @Query("SELECT * FROM saved_routes ORDER BY updatedAt DESC, id DESC")
-    fun observeSavedRoutes(): Flow<List<SavedRouteEntity>>
+    @Query("SELECT id, name, distanceMeters, updatedAt FROM saved_routes ORDER BY updatedAt DESC, id DESC")
+    fun observeSavedRoutes(): Flow<List<SavedRouteSummaryEntity>>
 
-    @Query("SELECT * FROM recent_routes ORDER BY usedAt DESC, id DESC")
-    fun observeRecentRoutes(): Flow<List<RecentRouteEntity>>
+    @Query("SELECT id, name, distanceMeters, usedAt FROM recent_routes ORDER BY usedAt DESC, id DESC")
+    fun observeRecentRoutes(): Flow<List<RecentRouteSummaryEntity>>
 
     @Query("SELECT * FROM saved_routes WHERE id = :id LIMIT 1")
     suspend fun getSavedRoute(id: Long): SavedRouteEntity?
@@ -41,6 +41,12 @@ interface RouteDao {
 
     @Query("SELECT * FROM recent_routes WHERE id = :id LIMIT 1")
     suspend fun getRecentRoute(id: Long): RecentRouteEntity?
+
+    @Query("SELECT * FROM recent_routes WHERE geometry = :geometry ORDER BY usedAt DESC, id DESC LIMIT 1")
+    suspend fun getRecentRouteByGeometry(geometry: String): RecentRouteEntity?
+
+    @Query("UPDATE recent_routes SET name = :name, usedAt = :usedAt, savedRouteId = :savedRouteId WHERE id = :id")
+    suspend fun refreshRecentRoute(id: Long, name: String, usedAt: Long, savedRouteId: Long?): Int
 
     @Query("DELETE FROM recent_routes WHERE id = :id")
     suspend fun deleteRecentRouteById(id: Long): Int

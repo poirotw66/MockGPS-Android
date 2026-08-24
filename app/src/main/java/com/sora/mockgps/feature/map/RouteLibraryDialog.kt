@@ -19,21 +19,22 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.sora.mockgps.R
-import com.sora.mockgps.feature.routes.domain.RecentRoute
-import com.sora.mockgps.feature.routes.domain.SavedRoute
+import com.sora.mockgps.feature.routes.domain.RecentRouteSummary
+import com.sora.mockgps.feature.routes.domain.SavedRouteSummary
 import java.util.Locale
 
 @Composable
 internal fun RouteLibraryDialog(
-    savedRoutes: List<SavedRoute>,
-    recentRoutes: List<RecentRoute>,
-    onLoadSaved: (SavedRoute) -> Unit,
-    onLoadRecent: (RecentRoute) -> Unit,
-    onReverse: (SavedRoute) -> Unit,
-    onDelete: (SavedRoute) -> Unit,
+    savedRoutes: List<SavedRouteSummary>,
+    recentRoutes: List<RecentRouteSummary>,
+    onLoadSaved: (SavedRouteSummary) -> Unit,
+    onLoadRecent: (RecentRouteSummary) -> Unit,
+    onReverse: (SavedRouteSummary) -> Unit,
+    onDelete: (SavedRouteSummary) -> Unit,
     onImportGpx: () -> Unit,
     onImportBackup: () -> Unit,
     onExportBackup: () -> Unit,
+    onClearRecents: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     AlertDialog(
@@ -83,7 +84,10 @@ internal fun RouteLibraryDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) }
+            Row {
+                if (recentRoutes.isNotEmpty()) TextButton(onClick = onClearRecents) { Text(stringResource(R.string.action_clear_history)) }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) }
+            }
         },
     )
 }

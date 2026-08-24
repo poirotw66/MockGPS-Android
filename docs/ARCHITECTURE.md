@@ -169,10 +169,11 @@ favorite_location
 
 recent_location
 - id: Long PK
-- name: String?
 - latitude: Double
 - longitude: Double
-- last_used_at: Long
+- normalized_latitude: Long
+- normalized_longitude: Long
+- used_at: Long
 ```
 
 - 對標準化後的座標建立唯一策略，避免同一地點反覆新增
@@ -180,6 +181,14 @@ recent_location
 - transaction 中保留最新 50 筆並刪除其餘資料
 
 ### DataStore
+
+`AppSettingsRepository` 以 Preferences DataStore 保存地圖樣式、更新間隔、精度、座標顯示偏好與最後一次真正 Active 的座標。它絕不保存服務 Active 旗標；服務事實一律由前景服務的 state flow 提供。
+
+### 外部搜尋與路由
+
+`NominatimPlaceSearchRepository` 與 `FossgisBicycleRoutingRepository` 是可替換 adapter。兩者都有可注入設定與 bounded HTTP body；公共端點以 mutex 節流到每秒最多一個請求，離線不可用且沒有 SLA。搜尋輸入由 ViewModel debounce 350ms，新的輸入會取消舊工作，並以 typed error 對應本地化畫面訊息。
+
+路線資料庫的 observable library query 只投影 id、名稱、距離與時間摘要；geometry 僅在載入、反向、備份或實際模擬時按需解碼，避免清單更新時重複配置完整 polyline。
 
 - map type
 - update interval

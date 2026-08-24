@@ -23,6 +23,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.sora.mockgps.R
 import com.sora.mockgps.feature.favorites.domain.FavoriteLocation
+import com.sora.mockgps.feature.favorites.domain.RecentLocation
 import java.util.Locale
 
 @Composable
@@ -61,23 +62,30 @@ internal fun FavoriteNameDialog(
 @Composable
 internal fun FavoritesDialog(
     favorites: List<FavoriteLocation>,
+    recentLocations: List<RecentLocation>,
     onSelect: (FavoriteLocation) -> Unit,
+    onSelectRecent: (RecentLocation) -> Unit,
     onRename: (FavoriteLocation) -> Unit,
     onDelete: (FavoriteLocation) -> Unit,
+    onClearAll: () -> Unit,
+    onClearRecentLocations: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.favorites_title)) },
         text = {
-            if (favorites.isEmpty()) {
+            if (favorites.isEmpty() && recentLocations.isEmpty()) {
                 Text(stringResource(R.string.favorites_empty))
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(favorites, key = FavoriteLocation::id) { favorite ->
+                    if (favorites.isNotEmpty()) {
+                        item { Text(stringResource(R.string.favorites_title), style = MaterialTheme.typography.titleSmall) }
+                    }
+                    items(favorites, key = { "favorite-${it.id}" }) { favorite ->
                         Column(modifier = Modifier.fillMaxWidth()) {
                             TextButton(onClick = { onSelect(favorite) }, modifier = Modifier.fillMaxWidth()) {
                                 Column(modifier = Modifier.fillMaxWidth()) {
@@ -99,12 +107,44 @@ internal fun FavoritesDialog(
                             }
                         }
                     }
+                    if (recentLocations.isNotEmpty()) {
+                        item { Text(stringResource(R.string.recent_locations_title), style = MaterialTheme.typography.titleSmall) }
+                    }
+                    items(recentLocations, key = { "recent-${it.id}" }) { recent ->
+                        TextButton(onClick = { onSelectRecent(recent) }, modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                String.format(Locale.US, "%.6f, %.6f", recent.latitude, recent.longitude),
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) }
+            Row {
+                if (favorites.isNotEmpty()) TextButton(onClick = onClearAll) { Text(stringResource(R.string.action_clear_all)) }
+                if (recentLocations.isNotEmpty()) TextButton(onClick = onClearRecentLocations) {
+                    Text(stringResource(R.string.action_clear_history))
+                }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) }
+            }
         },
+    )
+}
+
+@Composable
+internal fun ConfirmClearDialog(
+    title: String,
+    message: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) }, text = { Text(message) },
+        confirmButton = { TextButton(onClick = onConfirm) { Text(stringResource(R.string.action_clear_all)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }
 

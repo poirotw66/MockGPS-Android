@@ -24,6 +24,21 @@ data class RecentRoute(
     val savedRouteId: Long? = null,
 )
 
+/** Lightweight library rows; geometry is decoded only after the user loads a route. */
+data class SavedRouteSummary(
+    val id: Long,
+    val name: String,
+    val distanceMeters: Double,
+    val updatedAt: Long,
+)
+
+data class RecentRouteSummary(
+    val id: Long,
+    val name: String,
+    val distanceMeters: Double,
+    val usedAt: Long,
+)
+
 data class ImportedRoute(
     val name: String,
     val points: List<Coordinate>,

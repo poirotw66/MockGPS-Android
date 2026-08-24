@@ -3,6 +3,7 @@ package com.sora.mockgps.feature.map
 import com.sora.mockgps.core.model.Coordinate
 import com.sora.mockgps.service.MockLocationForegroundService
 import com.sora.mockgps.route.PlannedRoute
+import com.sora.mockgps.feature.search.PlaceSearchResult
 
 /** Immutable state rendered by the map selection screen. */
 data class MapUiState(
@@ -29,6 +30,12 @@ data class MapUiState(
     val activeRouteName: String? = null,
     /** One-shot success/failure/export event for route persistence and interchange UI. */
     val routeOperationResult: RouteOperationResult? = null,
+    val placeSearchQuery: String = "",
+    val placeSearchResults: List<PlaceSearchResult> = emptyList(),
+    val placeSearchError: PlaceSearchError? = null,
+    val showCoordinates: Boolean = true,
+    val updateIntervalMillis: Long = 1_000L,
+    val accuracyMeters: Float = 5f,
 ) {
     val routePlanningStep: RoutePlanningStep
         get() = when {
@@ -40,6 +47,8 @@ data class MapUiState(
             else -> RoutePlanningStep.ReadyToPreview
         }
 }
+
+enum class PlaceSearchError { Network, RateLimited, InvalidResponse }
 
 data class RouteOperationResult(
     val message: String,

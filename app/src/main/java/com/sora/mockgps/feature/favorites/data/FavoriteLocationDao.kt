@@ -34,6 +34,52 @@ interface FavoriteLocationDao {
     @Query("DELETE FROM favorite_locations WHERE id = :id")
     suspend fun deleteById(id: Long): Int
 
+    @Query("DELETE FROM favorite_locations")
+    suspend fun clearAll(): Int
+
+    @Query("SELECT * FROM recent_locations ORDER BY usedAt DESC, id DESC")
+    fun observeRecentLocations(): Flow<List<RecentLocationEntity>>
+
+    @Query(
+        "SELECT * FROM recent_locations WHERE normalizedLatitude = :normalizedLatitude " +
+            "AND normalizedLongitude = :normalizedLongitude LIMIT 1",
+    )
+    suspend fun getRecentLocationByCoordinate(
+        normalizedLatitude: Long,
+        normalizedLongitude: Long,
+    ): RecentLocationEntity?
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertRecentLocation(entity: RecentLocationEntity): Long
+
+    @Query("UPDATE recent_locations SET latitude = :latitude, longitude = :longitude, usedAt = :usedAt WHERE id = :id")
+    suspend fun refreshRecentLocation(id: Long, latitude: Double, longitude: Double, usedAt: Long): Int
+
+    @Query(
+        "DELETE FROM recent_locations WHERE id NOT IN " +
+            "(SELECT id FROM recent_locations ORDER BY usedAt DESC, id DESC LIMIT :maximumRows)",
+    )
+    suspend fun trimRecentLocations(maximumRows: Int): Int
+
+    @Query("DELETE FROM recent_locations")
+    suspend fun clearRecentLocations(): Int
+
+    @Transaction
+    suspend fun recordRecentLocation(entity: RecentLocationEntity, maximumRows: Int): Long {
+        val existing = getRecentLocationByCoordinate(entity.normalizedLatitude, entity.normalizedLongitude)
+        val id = if (existing != null) {
+            refreshRecentLocation(existing.id, entity.latitude, entity.longitude, entity.usedAt)
+            existing.id
+        } else {
+            val inserted = insertRecentLocation(entity)
+            if (inserted != -1L) inserted else requireNotNull(
+                getRecentLocationByCoordinate(entity.normalizedLatitude, entity.normalizedLongitude),
+            ).id
+        }
+        trimRecentLocations(maximumRows)
+        return id
+    }
+
     @Transaction
     suspend fun save(entity: FavoriteLocationEntity): Long {
         val existing = getByCoordinate(entity.normalizedLatitude, entity.normalizedLongitude)

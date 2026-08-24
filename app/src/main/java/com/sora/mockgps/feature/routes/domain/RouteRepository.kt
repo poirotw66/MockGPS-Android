@@ -4,8 +4,8 @@ import com.sora.mockgps.core.model.Coordinate
 import kotlinx.coroutines.flow.Flow
 
 interface RouteRepository {
-    val savedRoutes: Flow<List<SavedRoute>>
-    val recentRoutes: Flow<List<RecentRoute>>
+    val savedRoutes: Flow<List<SavedRouteSummary>>
+    val recentRoutes: Flow<List<RecentRouteSummary>>
 
     suspend fun save(name: String, points: List<Coordinate>): SavedRoute
     suspend fun getSavedRoute(id: Long): SavedRoute?

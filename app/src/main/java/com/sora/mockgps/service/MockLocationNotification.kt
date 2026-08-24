@@ -66,7 +66,7 @@ internal object MockLocationNotification {
         }
 
         return NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(context.getString(R.string.notification_active_title))
             .setContentText("%.6f, %.6f".format(java.util.Locale.US, latitude, longitude))
             .setContentIntent(openAppIntent)

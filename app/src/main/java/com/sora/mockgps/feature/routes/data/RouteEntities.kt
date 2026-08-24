@@ -31,3 +31,17 @@ data class RecentRouteEntity(
     val usedAt: Long,
     val savedRouteId: Long? = null,
 )
+
+data class SavedRouteSummaryEntity(
+    val id: Long,
+    val name: String,
+    val distanceMeters: Double,
+    val updatedAt: Long,
+)
+
+data class RecentRouteSummaryEntity(
+    val id: Long,
+    val name: String,
+    val distanceMeters: Double,
+    val usedAt: Long,
+)

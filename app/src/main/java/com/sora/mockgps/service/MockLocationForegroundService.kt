@@ -75,7 +75,11 @@ class MockLocationForegroundService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP, ACTION_STOP_ROUTE -> requestStop(intent.commandToken())
-            ACTION_START -> startSession(intent.coordinateOrDefault())
+            ACTION_START -> startSession(
+                coordinate = intent.coordinateOrDefault(),
+                updateIntervalMillis = intent.updateIntervalMillis(),
+                accuracyMeters = intent.accuracyMeters(),
+            )
             ACTION_UPDATE -> updateSession(intent.coordinateOrDefault(), intent.commandToken())
             ACTION_START_ROUTE -> intent.routeRequestOrNull()?.let { request ->
                 startRouteSession(
@@ -84,6 +88,8 @@ class MockLocationForegroundService : Service() {
                     accelerationModel = request.accelerationModel,
                     executionMode = request.executionMode,
                     gpsDrift = request.gpsDrift,
+                    updateIntervalMillis = request.updateIntervalMillis,
+                    accuracyMeters = request.accuracyMeters,
                 )
             } ?: rejectRouteStart()
             ACTION_PAUSE_ROUTE -> pauseRoute(intent.commandToken())
@@ -93,7 +99,11 @@ class MockLocationForegroundService : Service() {
         return START_NOT_STICKY
     }
 
-    private fun startSession(coordinate: Coordinate) {
+    private fun startSession(
+        coordinate: Coordinate,
+        updateIntervalMillis: Long,
+        accuracyMeters: Float,
+    ) {
         if (sessionJob?.isActive == true || sessionGate.current() != null) return
         val sessionToken = sessionGate.begin()
 
@@ -125,7 +135,12 @@ class MockLocationForegroundService : Service() {
 
                     while (isActive) {
                         val payloadCoordinate = sessionCoordinate ?: coordinate
-                        val payload = when (val result = payloadFactory.create(payloadCoordinate)) {
+                        val payload = when (
+                            val result = payloadFactory.create(
+                                payloadCoordinate,
+                                MockPayloadOptions(accuracyMeters = accuracyMeters),
+                            )
+                        ) {
                             is MockResult.Success -> result.value
                             is MockResult.Failure -> throw MockSessionException(result.error.toString())
                         }
@@ -133,7 +148,7 @@ class MockLocationForegroundService : Service() {
                             is MockResult.Success -> Unit
                             is MockResult.Failure -> throw MockSessionException(result.error.toString())
                         }
-                        delay(UPDATE_INTERVAL_MILLIS)
+                        delay(updateIntervalMillis)
                     }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
@@ -162,6 +177,8 @@ class MockLocationForegroundService : Service() {
         accelerationModel: AccelerationModel,
         executionMode: RouteExecutionMode,
         gpsDrift: GpsDriftConfiguration,
+        updateIntervalMillis: Long,
+        accuracyMeters: Float,
     ) {
         if (sessionJob?.isActive == true) return
         val execution = try {
@@ -173,10 +190,14 @@ class MockLocationForegroundService : Service() {
             stopSelf()
             return
         }
-        startRouteSession(execution)
+        startRouteSession(execution, updateIntervalMillis, accuracyMeters)
     }
 
-    private fun startRouteSession(execution: RouteExecution) {
+    private fun startRouteSession(
+        execution: RouteExecution,
+        updateIntervalMillis: Long,
+        accuracyMeters: Float,
+    ) {
         if (sessionJob?.isActive == true || sessionGate.current() != null) return
         val sessionToken = sessionGate.begin()
         val initialCoordinate = execution.snapshot().reportedCoordinate
@@ -226,6 +247,7 @@ class MockLocationForegroundService : Service() {
                             val result = payloadFactory.create(
                                 coordinate = snapshot.reportedCoordinate,
                                 options = MockPayloadOptions(
+                                    accuracyMeters = accuracyMeters,
                                     speedMetersPerSecond = snapshot.speedMetersPerSecond.toFloat(),
                                     bearingDegrees = snapshot.position.bearingDegrees,
                                 ),
@@ -256,7 +278,7 @@ class MockLocationForegroundService : Service() {
                             else -> publishRouteActive(current, sessionToken)
                         }
                         promoteToForeground(sessionCoordinate ?: snapshot.reportedCoordinate, sessionToken = sessionToken)
-                        delay(UPDATE_INTERVAL_MILLIS)
+                        delay(updateIntervalMillis)
                     }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
@@ -469,6 +491,8 @@ class MockLocationForegroundService : Service() {
         const val EXTRA_ROUTE_EXECUTION_MODE = "com.sora.mockgps.extra.ROUTE_EXECUTION_MODE"
         const val EXTRA_ROUTE_GPS_DRIFT_METERS = "com.sora.mockgps.extra.ROUTE_GPS_DRIFT_METERS"
         const val EXTRA_ROUTE_GPS_DRIFT_SEED = "com.sora.mockgps.extra.ROUTE_GPS_DRIFT_SEED"
+        const val EXTRA_UPDATE_INTERVAL_MILLIS = "com.sora.mockgps.extra.UPDATE_INTERVAL_MILLIS"
+        const val EXTRA_ACCURACY_METERS = "com.sora.mockgps.extra.ACCURACY_METERS"
         const val EXTRA_SESSION_ID = "com.sora.mockgps.extra.SESSION_ID"
         const val EXTRA_SESSION_GENERATION = "com.sora.mockgps.extra.SESSION_GENERATION"
         const val UPDATE_INTERVAL_MILLIS = 1_000L
@@ -479,11 +503,18 @@ class MockLocationForegroundService : Service() {
         private val mutableState = MutableStateFlow<MockServiceState>(MockServiceState.Idle)
         val state: StateFlow<MockServiceState> = mutableState.asStateFlow()
 
-        fun startIntent(context: Context, coordinate: Coordinate = DEFAULT_COORDINATE): Intent =
+        fun startIntent(
+            context: Context,
+            coordinate: Coordinate = DEFAULT_COORDINATE,
+            updateIntervalMillis: Long = UPDATE_INTERVAL_MILLIS,
+            accuracyMeters: Float = MockPayloadOptions.DEFAULT_ACCURACY_METERS,
+        ): Intent =
             Intent(context, MockLocationForegroundService::class.java).apply {
                 action = ACTION_START
                 putExtra(EXTRA_LATITUDE, coordinate.latitude)
                 putExtra(EXTRA_LONGITUDE, coordinate.longitude)
+                putExtra(EXTRA_UPDATE_INTERVAL_MILLIS, updateIntervalMillis.coerceIn(250L, 60_000L))
+                putExtra(EXTRA_ACCURACY_METERS, accuracyMeters.coerceIn(1f, 100f))
             }
 
         fun stopIntent(context: Context, sessionToken: ServiceSessionToken? = null): Intent =
@@ -534,6 +565,8 @@ class MockLocationForegroundService : Service() {
             accelerationModel: AccelerationModel = AccelerationModel.Instant,
             executionMode: RouteExecutionMode = RouteExecutionMode.StopAtEnd,
             gpsDrift: GpsDriftConfiguration = GpsDriftConfiguration(),
+            updateIntervalMillis: Long = UPDATE_INTERVAL_MILLIS,
+            accuracyMeters: Float = MockPayloadOptions.DEFAULT_ACCURACY_METERS,
         ): Intent {
             require(points.size <= MAX_ROUTE_POINTS) { "Route has too many points" }
             val route = RoutePolyline(points)
@@ -554,6 +587,8 @@ class MockLocationForegroundService : Service() {
                 putExtra(EXTRA_ROUTE_EXECUTION_MODE, executionMode.name)
                 putExtra(EXTRA_ROUTE_GPS_DRIFT_METERS, gpsDrift.maximumHorizontalMeters)
                 putExtra(EXTRA_ROUTE_GPS_DRIFT_SEED, gpsDrift.seed)
+                putExtra(EXTRA_UPDATE_INTERVAL_MILLIS, updateIntervalMillis.coerceIn(250L, 60_000L))
+                putExtra(EXTRA_ACCURACY_METERS, accuracyMeters.coerceIn(1f, 100f))
             }
         }
 
@@ -614,6 +649,8 @@ class MockLocationForegroundService : Service() {
                     maximumHorizontalMeters = getDoubleExtra(EXTRA_ROUTE_GPS_DRIFT_METERS, 0.0),
                     seed = getLongExtra(EXTRA_ROUTE_GPS_DRIFT_SEED, 0L),
                 ),
+                updateIntervalMillis = updateIntervalMillis(),
+                accuracyMeters = accuracyMeters(),
             )
         }.getOrNull()
     }
@@ -657,7 +694,18 @@ class MockLocationForegroundService : Service() {
         val accelerationModel: AccelerationModel,
         val executionMode: RouteExecutionMode,
         val gpsDrift: GpsDriftConfiguration,
+        val updateIntervalMillis: Long,
+        val accuracyMeters: Float,
     )
+
+    private fun Intent.updateIntervalMillis(): Long =
+        getLongExtra(EXTRA_UPDATE_INTERVAL_MILLIS, UPDATE_INTERVAL_MILLIS).coerceIn(250L, 60_000L)
+
+    private fun Intent.accuracyMeters(): Float =
+        getFloatExtra(EXTRA_ACCURACY_METERS, MockPayloadOptions.DEFAULT_ACCURACY_METERS)
+            .takeIf(Float::isFinite)
+            ?.coerceIn(1f, 100f)
+            ?: MockPayloadOptions.DEFAULT_ACCURACY_METERS
 
     private fun Intent.commandToken(): ServiceSessionToken? {
         val hasSessionId = hasExtra(EXTRA_SESSION_ID)
@@ -696,8 +744,8 @@ private fun Intent.putSessionToken(sessionToken: ServiceSessionToken?) {
     putExtra(MockLocationForegroundService.EXTRA_SESSION_GENERATION, sessionToken.generation)
 }
 
-private fun Throwable.userFacingMessage(fallback: String): String =
-    message?.takeIf(String::isNotBlank) ?: fallback
+/** Internal provider details stay out of localized UI and notifications. */
+private fun Throwable.userFacingMessage(fallback: String): String = fallback
 
 private object SystemMockClock : MockClock {
     override fun currentTimeMillis(): Long = System.currentTimeMillis()

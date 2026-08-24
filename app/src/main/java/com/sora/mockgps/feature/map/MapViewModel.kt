@@ -1,22 +1,19 @@
 package com.sora.mockgps.feature.map
 
 import android.app.Application
+import androidx.annotation.StringRes
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.sora.mockgps.R
+import com.sora.mockgps.feature.search.PlaceSearchException
 import com.sora.mockgps.core.model.Coordinate
-import com.sora.mockgps.feature.favorites.data.DefaultFavoriteLocationRepository
-import com.sora.mockgps.feature.favorites.data.FavoriteLocationDatabase
 import com.sora.mockgps.feature.favorites.domain.FavoriteLocation
-import com.sora.mockgps.feature.routes.data.DefaultRouteRepository
+import com.sora.mockgps.feature.favorites.domain.RecentLocation
 import com.sora.mockgps.feature.routes.data.RouteGpxInterchange
-import com.sora.mockgps.feature.routes.domain.RecentRoute
-import com.sora.mockgps.feature.routes.domain.SavedRoute
-import com.sora.mockgps.route.FossgisBicycleRoutingRepository
-import com.sora.mockgps.route.CachingRoutingRepository
+import com.sora.mockgps.feature.routes.domain.RecentRouteSummary
+import com.sora.mockgps.feature.routes.domain.SavedRouteSummary
 import com.sora.mockgps.route.PlannedRoute
 import com.sora.mockgps.route.RoutePolyline
-import com.sora.mockgps.route.RoutingRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -29,38 +26,62 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import org.maplibre.compose.camera.CameraPosition
 
-class MapViewModel(application: Application) : AndroidViewModel(application) {
+class MapViewModel @JvmOverloads constructor(
+    application: Application,
+    private val dependencies: MapDependencies = MapDependencies.from(application),
+) : AndroidViewModel(application) {
     private val mutableUiState = MutableStateFlow(MapUiState())
     val uiState: StateFlow<MapUiState> = mutableUiState.asStateFlow()
 
-    private val favoriteRepository = DefaultFavoriteLocationRepository(
-        FavoriteLocationDatabase.getInstance(application).favoriteLocationDao(),
-    )
-    private val routeRepository = DefaultRouteRepository(
-        FavoriteLocationDatabase.getInstance(application).routeDao(),
-    )
+    private val favoriteRepository = dependencies.favoriteRepository
+    private val routeRepository = dependencies.routeRepository
     val favorites: StateFlow<List<FavoriteLocation>> = favoriteRepository.favorites.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = emptyList(),
     )
-    val savedRoutes: StateFlow<List<SavedRoute>> = routeRepository.savedRoutes.stateIn(
+    val recentLocations: StateFlow<List<RecentLocation>> = favoriteRepository.recentLocations.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = emptyList(),
     )
-    val recentRoutes: StateFlow<List<RecentRoute>> = routeRepository.recentRoutes.stateIn(
+    val savedRoutes: StateFlow<List<SavedRouteSummary>> = routeRepository.savedRoutes.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = emptyList(),
     )
-    private val routingRepository: RoutingRepository = CachingRoutingRepository(FossgisBicycleRoutingRepository())
+    val recentRoutes: StateFlow<List<RecentRouteSummary>> = routeRepository.recentRoutes.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = emptyList(),
+    )
+    private val routingRepository = dependencies.routingRepository
+    private val settingsRepository = dependencies.settingsRepository
+    private val placeSearchRepository = dependencies.placeSearchRepository
 
     private var mapLoadTimeout: Job? = null
     private var routePlanningJob: Job? = null
+    private var placeSearchJob: Job? = null
+    private var initialSettingsApplied = false
 
     init {
         awaitMapLoad()
+        viewModelScope.launch {
+            settingsRepository.settings.collect { settings ->
+                mutableUiState.update { state ->
+                    val restoredCoordinate = settings.lastCoordinate.takeUnless { initialSettingsApplied }
+                    state.copy(
+                        mapType = settings.mapType,
+                        showCoordinates = settings.showCoordinates,
+                        updateIntervalMillis = settings.updateIntervalMillis,
+                        accuracyMeters = settings.accuracyMeters,
+                        pendingCoordinate = restoredCoordinate ?: state.pendingCoordinate,
+                        camera = restoredCoordinate?.let { state.camera.copy(coordinate = it) } ?: state.camera,
+                    )
+                }
+                initialSettingsApplied = true
+            }
+        }
     }
 
     fun onCameraIdle(position: CameraPosition) {
@@ -84,7 +105,56 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleMapType() {
         mutableUiState.update(MapStateReducer::toggleMapType)
+        val mapType = mutableUiState.value.mapType
+        viewModelScope.launch { settingsRepository.update { it.copy(mapType = mapType) } }
         awaitMapLoad()
+    }
+
+    fun setShowCoordinates(show: Boolean) {
+        mutableUiState.update { it.copy(showCoordinates = show) }
+        viewModelScope.launch { settingsRepository.update { it.copy(showCoordinates = show) } }
+    }
+
+    fun setUpdateIntervalMillis(intervalMillis: Long) {
+        val normalized = intervalMillis.coerceIn(250L, 60_000L)
+        mutableUiState.update { it.copy(updateIntervalMillis = normalized) }
+        viewModelScope.launch { settingsRepository.update { it.copy(updateIntervalMillis = normalized) } }
+    }
+
+    fun setAccuracyMeters(accuracyMeters: Float) {
+        val normalized = accuracyMeters.coerceIn(1f, 100f)
+        mutableUiState.update { it.copy(accuracyMeters = normalized) }
+        viewModelScope.launch { settingsRepository.update { it.copy(accuracyMeters = normalized) } }
+    }
+
+    fun rememberActiveCoordinate(coordinate: Coordinate, recordStaticRecent: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.update { it.copy(lastCoordinate = coordinate) }
+            if (recordStaticRecent) favoriteRepository.recordRecent(coordinate.latitude, coordinate.longitude)
+        }
+    }
+
+    /** Debounced, cancellable query entry point. Provider requests remain rate limited at 1/s. */
+    fun onPlaceSearchQueryChanged(query: String) {
+        placeSearchJob?.cancel()
+        mutableUiState.update { it.copy(placeSearchQuery = query, placeSearchResults = emptyList(), placeSearchError = null) }
+        if (query.trim().length < 2) return
+        placeSearchJob = viewModelScope.launch {
+            delay(350)
+            try {
+                val results = placeSearchRepository.search(query)
+                mutableUiState.update { current -> if (current.placeSearchQuery == query) current.copy(placeSearchResults = results) else current }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: PlaceSearchException) {
+                val error = when (failure) {
+                    is PlaceSearchException.Network -> PlaceSearchError.Network
+                    is PlaceSearchException.RateLimited -> PlaceSearchError.RateLimited
+                    is PlaceSearchException.InvalidResponse -> PlaceSearchError.InvalidResponse
+                }
+                mutableUiState.update { current -> if (current.placeSearchQuery == query) current.copy(placeSearchError = error) else current }
+            }
+        }
     }
 
     fun saveFavorite(name: String, coordinate: Coordinate) {
@@ -93,8 +163,8 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                 .onSuccess { favorite ->
                     mutableUiState.update { it.copy(favoriteMessage = favorite.name, routeError = null) }
                 }
-                .onFailure { failure ->
-                    mutableUiState.update { it.copy(routeError = failure.message ?: "Unable to save favorite.") }
+                .onFailure {
+                    mutableUiState.update { it.copy(routeError = localized(R.string.favorite_save_failed)) }
                 }
         }
     }
@@ -102,8 +172,8 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     fun renameFavorite(id: Long, name: String) {
         viewModelScope.launch {
             runCatching { favoriteRepository.rename(id, name) }
-                .onFailure { failure ->
-                    mutableUiState.update { it.copy(routeError = failure.message ?: "Unable to rename favorite.") }
+                .onFailure {
+                    mutableUiState.update { it.copy(routeError = localized(R.string.favorite_rename_failed)) }
                 }
         }
     }
@@ -112,12 +182,21 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { favoriteRepository.delete(id) }
     }
 
+    fun clearFavorites() {
+        viewModelScope.launch { favoriteRepository.clearAll() }
+    }
+
+    fun clearRecentLocations() {
+        viewModelScope.launch { favoriteRepository.clearRecentLocations() }
+    }
+
     fun consumeFavoriteMessage() {
         mutableUiState.update { it.copy(favoriteMessage = null) }
     }
 
     fun savePlannedRoute(name: String) {
-        val route = mutableUiState.value.plannedRoute ?: return setRouteOperationError("Plan a route before saving it.")
+        val route = mutableUiState.value.plannedRoute
+            ?: return setRouteOperationError(localized(R.string.route_plan_before_save))
         viewModelScope.launch {
             runCatching { routeRepository.save(name, route.points) }
                 .onSuccess { saved ->
@@ -125,11 +204,11 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                         it.copy(
                             activeSavedRouteId = saved.id,
                             activeRouteName = saved.name,
-                            routeOperationResult = RouteOperationResult("Saved route \u201c${saved.name}\u201d."),
+                            routeOperationResult = RouteOperationResult(localized(R.string.route_saved, saved.name)),
                         )
                     }
                 }
-                .onFailure { failure -> setRouteOperationError(failure.message ?: "Unable to save route.") }
+                .onFailure { setRouteOperationError(localized(R.string.route_save_failed)) }
         }
     }
 
@@ -137,10 +216,10 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             runCatching { routeRepository.getSavedRoute(id) }
                 .onSuccess { route ->
-                    if (route == null) setRouteOperationError("Saved route is no longer available.")
+                    if (route == null) setRouteOperationError(localized(R.string.saved_route_unavailable))
                     else loadRoutePreview(route.points, route.distanceMeters, route.name, route.id)
                 }
-                .onFailure { failure -> setRouteOperationError(failure.message ?: "Unable to load saved route.") }
+                .onFailure { setRouteOperationError(localized(R.string.saved_route_load_failed)) }
         }
     }
 
@@ -148,10 +227,10 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             runCatching { routeRepository.getRecentRoute(id) }
                 .onSuccess { route ->
-                    if (route == null) setRouteOperationError("Recent route is no longer available.")
+                    if (route == null) setRouteOperationError(localized(R.string.recent_route_unavailable))
                     else loadRoutePreview(route.points, route.distanceMeters, route.name, route.savedRouteId)
                 }
-                .onFailure { failure -> setRouteOperationError(failure.message ?: "Unable to load recent route.") }
+                .onFailure { setRouteOperationError(localized(R.string.recent_route_load_failed)) }
         }
     }
 
@@ -163,13 +242,14 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                         current.copy(
                             activeSavedRouteId = current.activeSavedRouteId?.takeUnless { it == id },
                             routeOperationResult = RouteOperationResult(
-                                if (deleted) "Saved route deleted." else "Saved route is no longer available.",
+                                if (deleted) localized(R.string.saved_route_deleted)
+                                else localized(R.string.saved_route_unavailable),
                                 isError = !deleted,
                             ),
                         )
                     }
                 }
-                .onFailure { failure -> setRouteOperationError(failure.message ?: "Unable to delete saved route.") }
+                .onFailure { setRouteOperationError(localized(R.string.saved_route_delete_failed)) }
         }
     }
 
@@ -179,16 +259,17 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                 .onSuccess { reversed ->
                     loadRoutePreview(reversed.points, reversed.distanceMeters, reversed.name, reversed.id)
                     mutableUiState.update {
-                        it.copy(routeOperationResult = RouteOperationResult("Created reversed route \u201c${reversed.name}\u201d."))
+                        it.copy(routeOperationResult = RouteOperationResult(localized(R.string.route_reversed, reversed.name)))
                     }
                 }
-                .onFailure { failure -> setRouteOperationError(failure.message ?: "Unable to reverse saved route.") }
+                .onFailure { setRouteOperationError(localized(R.string.route_reverse_failed)) }
         }
     }
 
     fun recordPlannedRouteAsRecent(name: String? = null) {
         val state = mutableUiState.value
-        val route = state.plannedRoute ?: return setRouteOperationError("Plan a route before adding it to recents.")
+        val route = state.plannedRoute
+            ?: return setRouteOperationError(localized(R.string.route_plan_before_recent))
         viewModelScope.launch {
             runCatching {
                 routeRepository.recordRecent(
@@ -198,9 +279,9 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }.onSuccess { recent ->
                 mutableUiState.update {
-                    it.copy(routeOperationResult = RouteOperationResult("Added \u201c${recent.name}\u201d to recent routes."))
+                    it.copy(routeOperationResult = RouteOperationResult(localized(R.string.route_recent_added, recent.name)))
                 }
-            }.onFailure { failure -> setRouteOperationError(failure.message ?: "Unable to add route to recents.") }
+            }.onFailure { setRouteOperationError(localized(R.string.route_recent_add_failed)) }
         }
     }
 
@@ -211,13 +292,14 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                     mutableUiState.update {
                         it.copy(
                             routeOperationResult = RouteOperationResult(
-                                if (deleted) "Recent route deleted." else "Recent route is no longer available.",
+                                if (deleted) localized(R.string.recent_route_deleted)
+                                else localized(R.string.recent_route_unavailable),
                                 isError = !deleted,
                             ),
                         )
                     }
                 }
-                .onFailure { failure -> setRouteOperationError(failure.message ?: "Unable to delete recent route.") }
+                .onFailure { setRouteOperationError(localized(R.string.recent_route_delete_failed)) }
         }
     }
 
@@ -225,9 +307,11 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             runCatching { routeRepository.clearRecentRoutes() }
                 .onSuccess {
-                    mutableUiState.update { it.copy(routeOperationResult = RouteOperationResult("Recent routes cleared.")) }
+                    mutableUiState.update {
+                        it.copy(routeOperationResult = RouteOperationResult(localized(R.string.recent_routes_cleared)))
+                    }
                 }
-                .onFailure { failure -> setRouteOperationError(failure.message ?: "Unable to clear recent routes.") }
+                .onFailure { setRouteOperationError(localized(R.string.recent_routes_clear_failed)) }
         }
     }
 
@@ -238,13 +322,13 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                     mutableUiState.update {
                         it.copy(
                             routeOperationResult = RouteOperationResult(
-                                message = "Route backup is ready.",
+                                message = localized(R.string.route_backup_ready),
                                 export = RouteExport("application/json", "mock-gps-routes.json", json),
                             ),
                         )
                     }
                 }
-                .onFailure { failure -> setRouteOperationError(failure.message ?: "Unable to export route backup.") }
+                .onFailure { setRouteOperationError(localized(R.string.route_backup_export_failed)) }
         }
     }
 
@@ -255,18 +339,23 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                     mutableUiState.update {
                         it.copy(
                             routeOperationResult = RouteOperationResult(
-                                "Restored ${restored.savedRoutesRestored} saved routes and ${restored.recentRoutesRestored} recent routes.",
+                                localized(
+                                    R.string.route_backup_restored,
+                                    restored.savedRoutesRestored,
+                                    restored.recentRoutesRestored,
+                                ),
                             ),
                         )
                     }
                 }
-                .onFailure { failure -> setRouteOperationError(failure.message ?: "Unable to restore route backup.") }
+                .onFailure { setRouteOperationError(localized(R.string.route_backup_restore_failed)) }
         }
     }
 
     fun exportPlannedRouteGpx(name: String? = null) {
         val state = mutableUiState.value
-        val route = state.plannedRoute ?: return setRouteOperationError("Plan a route before exporting GPX.")
+        val route = state.plannedRoute
+            ?: return setRouteOperationError(localized(R.string.route_plan_before_gpx))
         viewModelScope.launch {
             runCatching {
                 val routeName = name ?: state.activeRouteName ?: defaultRouteName()
@@ -275,12 +364,12 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                 mutableUiState.update {
                     it.copy(
                         routeOperationResult = RouteOperationResult(
-                            message = "GPX export is ready.",
+                            message = localized(R.string.gpx_export_ready),
                             export = RouteExport("application/gpx+xml", routeName.safeFileName("gpx"), gpx),
                         ),
                     )
                 }
-            }.onFailure { failure -> setRouteOperationError(failure.message ?: "Unable to export GPX.") }
+            }.onFailure { setRouteOperationError(localized(R.string.gpx_export_failed)) }
         }
     }
 
@@ -289,9 +378,11 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
             runCatching { RouteGpxInterchange.import(serialized) }
                 .onSuccess { imported ->
                     loadRoutePreview(imported.points, routeDistance(imported.points), imported.name, null)
-                    mutableUiState.update { it.copy(routeOperationResult = RouteOperationResult("Imported GPX route \u201c${imported.name}\u201d.")) }
+                    mutableUiState.update {
+                        it.copy(routeOperationResult = RouteOperationResult(localized(R.string.gpx_imported, imported.name)))
+                    }
                 }
-                .onFailure { failure -> setRouteOperationError(failure.message ?: "Unable to import GPX.") }
+                .onFailure { setRouteOperationError(localized(R.string.gpx_import_failed)) }
         }
     }
 
@@ -546,6 +637,9 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     private fun defaultRouteName(): String =
         getApplication<Application>().getString(R.string.default_route_name)
 
+    private fun localized(@StringRes resourceId: Int, vararg formatArgs: Any): String =
+        getApplication<Application>().getString(resourceId, *formatArgs)
+
     private fun awaitMapLoad() {
         mapLoadTimeout?.cancel()
         mapLoadTimeout = viewModelScope.launch {
@@ -563,6 +657,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     override fun onCleared() {
         mapLoadTimeout?.cancel()
         routePlanningJob?.cancel()
+        placeSearchJob?.cancel()
         super.onCleared()
     }
 
@@ -580,68 +675,4 @@ private fun String.safeFileName(extension: String): String {
         .take(80)
         .ifBlank { "route" }
     return "$base.$extension"
-}
-
-/** Pure state transitions kept separate from Android lifecycle code for deterministic JVM tests. */
-internal object MapStateReducer {
-    fun cameraIdle(state: MapUiState, position: CameraPosition): MapUiState {
-        val coordinate = Coordinate(position.target.latitude, position.target.longitude)
-        if (!coordinate.isValid()) return state
-        if (
-            coordinate == state.pendingCoordinate &&
-            position.zoom.toFloat() == state.camera.zoom &&
-            position.bearing.toFloat() == state.camera.bearing &&
-            position.tilt.toFloat() == state.camera.tilt
-        ) return state
-        return state.copy(
-            pendingCoordinate = coordinate,
-            camera = MapCamera(
-                coordinate = coordinate,
-                zoom = position.zoom.toFloat(),
-                bearing = position.bearing.toFloat(),
-                tilt = position.tilt.toFloat(),
-            ),
-        )
-    }
-
-    fun mapLoaded(state: MapUiState): MapUiState =
-        state.copy(loadingState = MapLoadingState.Ready)
-
-    fun retry(state: MapUiState): MapUiState = state.copy(
-        loadingState = MapLoadingState.Loading,
-        mapRenderKey = state.mapRenderKey + 1,
-    )
-
-    fun toggleMapType(state: MapUiState): MapUiState = state.copy(
-        mapType = when (state.mapType) {
-            MapDisplayType.Light -> MapDisplayType.Dark
-            MapDisplayType.Dark -> MapDisplayType.Light
-        },
-        loadingState = MapLoadingState.Loading,
-    )
-
-    fun loadedRoutePreview(
-        state: MapUiState,
-        points: List<Coordinate>,
-        distanceMeters: Double,
-        name: String,
-        savedRouteId: Long?,
-    ): MapUiState {
-        require(points.size >= 2) { "A route preview needs at least two points." }
-        return state.copy(
-            isRoutePlanningMode = true,
-            routeOrigin = points.first(),
-            routeDestination = points.last(),
-            routeWaypoints = listOf(points.first(), points.last()),
-            plannedRoute = PlannedRoute(points, distanceMeters, providerDurationSeconds = 0.0),
-            isPlanningRoute = false,
-            routeError = null,
-            activeRouteName = name,
-            activeSavedRouteId = savedRouteId,
-        )
-    }
-
-    private fun Coordinate.isValid(): Boolean =
-        latitude.isFinite() && latitude in -90.0..90.0 &&
-            longitude.isFinite() && longitude in -180.0..180.0
 }

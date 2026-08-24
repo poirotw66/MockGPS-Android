@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.Flow
 interface FavoriteLocationRepository {
     /** Favorites ordered by most recently changed first. */
     val favorites: Flow<List<FavoriteLocation>>
+    val recentLocations: Flow<List<RecentLocation>>
 
     /**
      * Saves a favorite. A coordinate is rounded to six decimal places for de-duplication;
@@ -19,4 +20,7 @@ interface FavoriteLocationRepository {
 
     /** Returns false when the favorite has already been removed. */
     suspend fun delete(id: Long): Boolean
+    suspend fun clearAll()
+    suspend fun recordRecent(latitude: Double, longitude: Double): RecentLocation
+    suspend fun clearRecentLocations()
 }

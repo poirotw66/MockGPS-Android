@@ -6,6 +6,8 @@ import com.sora.mockgps.feature.routes.domain.RouteBackup
 import com.sora.mockgps.feature.routes.domain.RouteRepository
 import com.sora.mockgps.feature.routes.domain.RouteRestoreResult
 import com.sora.mockgps.feature.routes.domain.SavedRoute
+import com.sora.mockgps.feature.routes.domain.SavedRouteSummary
+import com.sora.mockgps.feature.routes.domain.RecentRouteSummary
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -17,11 +19,11 @@ class DefaultRouteRepository(
     private val dao: RouteDao,
     private val clock: RouteClock = RouteClock(System::currentTimeMillis),
 ) : RouteRepository {
-    override val savedRoutes: Flow<List<SavedRoute>> = dao.observeSavedRoutes().map { entities ->
-        entities.map(SavedRouteEntity::toDomain)
+    override val savedRoutes: Flow<List<SavedRouteSummary>> = dao.observeSavedRoutes().map { entities ->
+        entities.map { SavedRouteSummary(it.id, it.name, it.distanceMeters, it.updatedAt) }
     }
-    override val recentRoutes: Flow<List<RecentRoute>> = dao.observeRecentRoutes().map { entities ->
-        entities.map(RecentRouteEntity::toDomain)
+    override val recentRoutes: Flow<List<RecentRouteSummary>> = dao.observeRecentRoutes().map { entities ->
+        entities.map { RecentRouteSummary(it.id, it.name, it.distanceMeters, it.usedAt) }
     }
 
     override suspend fun save(name: String, points: List<Coordinate>): SavedRoute {
@@ -78,12 +80,18 @@ class DefaultRouteRepository(
         val normalizedName = RouteDataValidator.name(name)
         val normalizedPoints = RouteDataValidator.points(points)
         if (savedRouteId != null) requireNotNull(dao.getSavedRoute(savedRouteId)) { "Saved route does not exist." }
-        val id = dao.insertRecentRoute(
+        val geometry = RouteGeometryCodec.encode(normalizedPoints)
+        val now = clock.currentTimeMillis()
+        val existing = dao.getRecentRouteByGeometry(geometry)
+        val id = if (existing != null) {
+            dao.refreshRecentRoute(existing.id, normalizedName, now, savedRouteId)
+            existing.id
+        } else dao.insertRecentRoute(
             RecentRouteEntity(
                 name = normalizedName,
-                geometry = RouteGeometryCodec.encode(normalizedPoints),
+                geometry = geometry,
                 distanceMeters = RouteDataValidator.distanceMeters(normalizedPoints),
-                usedAt = clock.currentTimeMillis(),
+                usedAt = now,
                 savedRouteId = savedRouteId,
             ),
         )

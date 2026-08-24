@@ -1,11 +1,15 @@
 package com.sora.mockgps.route
 
 import com.sora.mockgps.core.model.Coordinate
+import com.sora.mockgps.core.io.readBoundedUtf8
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URL
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
@@ -52,6 +56,7 @@ data class RoutingProviderConfig(
     val userAgent: String = DEFAULT_USER_AGENT,
     val connectTimeoutMillis: Int = DEFAULT_TIMEOUT_MILLIS,
     val readTimeoutMillis: Int = DEFAULT_TIMEOUT_MILLIS,
+    val maxResponseBytes: Int = 512 * 1024,
 ) {
     init {
         val uri = runCatching { URI(baseUrl) }.getOrElse {
@@ -63,6 +68,7 @@ data class RoutingProviderConfig(
         require(userAgent.isNotBlank()) { "Routing provider user agent cannot be blank." }
         require(connectTimeoutMillis in 1..MAX_TIMEOUT_MILLIS) { "Connect timeout is out of range." }
         require(readTimeoutMillis in 1..MAX_TIMEOUT_MILLIS) { "Read timeout is out of range." }
+        require(maxResponseBytes in 1_024..1_048_576) { "Response size limit is out of range." }
     }
 
     internal val normalizedBaseUrl: String get() = baseUrl.trimEnd('/') + "/"
@@ -105,10 +111,12 @@ class BicycleRouteRequest(waypoints: List<Coordinate>) {
  */
 class FossgisBicycleRoutingRepository(
     private val providerConfig: RoutingProviderConfig = RoutingProviderConfig(),
+    private val throttle: FossgisRequestThrottle = FossgisRequestThrottle(),
 ) : RoutingRepository {
     override suspend fun planBicycleRoute(
         waypoints: List<Coordinate>,
     ): PlannedRoute = withContext(Dispatchers.IO) {
+        throttle.awaitTurn()
         val endpoint = buildOsrmBicycleRouteUrl(BicycleRouteRequest(waypoints), providerConfig)
         val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
@@ -125,7 +133,7 @@ class FossgisBicycleRoutingRepository(
                 }
                 throw RoutingException("Routing service returned HTTP $status.")
             }
-            val body = connection.inputStream.bufferedReader().use { it.readText() }
+            val body = connection.inputStream.readBoundedUtf8(providerConfig.maxResponseBytes)
             parseOsrmRoute(body)
         } catch (failure: RoutingException) {
             throw failure
@@ -136,6 +144,22 @@ class FossgisBicycleRoutingRepository(
         }
     }
 
+}
+
+/** FOSSGIS is a shared community endpoint: one explicit route request per second at most. */
+class FossgisRequestThrottle(
+    private val now: () -> Long = System::currentTimeMillis,
+) {
+    private val mutex = Mutex()
+    private var nextAllowedAt = 0L
+
+    suspend fun awaitTurn() = mutex.withLock {
+        val waitMillis = (nextAllowedAt - now()).coerceAtLeast(0L)
+        if (waitMillis > 0) delay(waitMillis)
+        nextAllowedAt = now() + MINIMUM_INTERVAL_MILLIS
+    }
+
+    private companion object { const val MINIMUM_INTERVAL_MILLIS = 1_000L }
 }
 
 /** Visible for JVM tests and future repository adapters; no network work is performed here. */

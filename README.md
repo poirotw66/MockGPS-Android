@@ -9,15 +9,14 @@ Android Mock Location 工具。目前已完成靜態選點、喜愛地點，以�
 - 已完成：LocationManager GPS test provider、Fused Location mock mode、原子化 coordinator、前景服務、持續通知與 Stop action
 - Map UI：Taipei 101 預設位置、中央準星選點、權限流程、開發人員選項入口、繁中／英文資源
 - 地圖切片：MapLibre + OpenFreeMap、中央準星、明亮／深色樣式、完整 camera state、loading/error/retry、Active 明確套用新位置
-- 喜愛地點：Room 本機儲存、新增、重新命名、選取、刪除與刪除確認
+- 喜愛地點與最近位置：Room 本機儲存、Active 後寫入、六位小數去重、50 筆上限與清除確認
 - 路線規劃：FOSSGIS OpenStreetMap 路由、A/B 與中繼點、排序／刪除／交換端點、道路 polyline
 - 路線模擬：步行／跑步／自行車／駕車／自訂速度、平滑加減速、停止／循環／原路返回、可選 GPS 漂移
 - 路線 UX：權威 Running/Paused/Completed/Failed 狀態、通知暫停／繼續、地圖即時位置、距離／時間／進度
 - 路線資料：Room 儲存與最近使用、反向路線、GPX 匯入匯出、JSON 備份還原
 - 韌性：有界路線快取、網路失敗 stale fallback、可替換 routing provider 設定與 service session token
-- 自動驗證：46 個 unit tests、`assembleDebug`、`lintDebug`（0 errors）
-- 實機驗證：Sony XQ-BC72（Android 13 / API 33）靜態與路線 GPS + FLP 注入、背景持續、暫停／繼續、通知 Stop、20/20 次靜態啟停與完整清理均通過
-- 待驗證：API 26/34/36 裝置矩陣與獨立 LocationManager/FLP client 的跨 App 讀值
+- 自動驗證：49 個 JVM tests、Room migration／service instrumentation tests、`assembleDebug`、`lintDebug` 與 R8 release 組裝；CI 另執行 API 34 instrumentation
+- 實機驗證：本次變更未在實機或 emulator 執行；仍需驗證 API 26/34/36 與獨立 LocationManager／FLP client 的跨 App 讀值
 
 Debug APK：`app/build/outputs/apk/debug/app-debug.apk`
 
@@ -79,11 +78,39 @@ Debug APK：`app/build/outputs/apk/debug/app-debug.apk`
 
 需要 JDK 17 與 Android SDK Platform 36，並在不進版控的 `local.properties` 設定 `sdk.dir`。
 
+macOS／Linux：
+
+```bash
+./gradlew testDebugUnitTest assembleDebug lintDebug
+./gradlew assembleRelease
+```
+
+Windows PowerShell（保留原本驗證方式）：
+
 ```powershell
 .\gradlew.bat testDebugUnitTest assembleDebug lintDebug
+.\gradlew.bat assembleRelease
+```
+
+正式簽署只從 CI／本機環境變數讀取，不將 keystore 或密碼提交進版控：
+
+```bash
+export MOCKGPS_KEYSTORE_FILE=/absolute/path/release.jks
+export MOCKGPS_KEYSTORE_PASSWORD='...'
+export MOCKGPS_KEY_ALIAS='...'
+export MOCKGPS_KEY_PASSWORD='...'
+./gradlew assembleRelease
 ```
 
 安裝到已連線裝置：
+
+macOS／Linux：
+
+```bash
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+Windows PowerShell：
 
 ```powershell
 adb install -r app\build\outputs\apk\debug\app-debug.apk

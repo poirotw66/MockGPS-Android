@@ -57,26 +57,26 @@ UX／效能更新（2026-08-24）：改為 edge-to-edge 滿版地圖與安全區
 
 ## Milestone 3：設定與權限 UX（1–2 天）
 
-- [ ] Setup screen：開發人員選項步驟與開啟設定
-- [ ] Current-location shortcut 與 coarse/fine permission 流程
-- [ ] API 33+ notification permission 說明
-- [ ] FGS 啟動例外與 rollback
+- [x] 首次 Setup／權限引導：定位與通知權限、開發人員選項入口與可恢復錯誤
+- [x] Current-location shortcut 與 coarse/fine permission 流程
+- [x] API 33+ notification permission 說明
+- [x] FGS 啟動例外與 rollback
 - [ ] Google Play services unavailable 狀態
-- [ ] 地圖／搜尋服務的網路與供應商錯誤分類
-- [ ] DataStore：map type、interval、accuracy、show coordinates、last coordinate
-- [ ] 通知內容跟隨座標與設定更新
-- [ ] 繁中／英文 string resources
+- [x] 地圖／搜尋服務的網路與供應商錯誤分類
+- [x] DataStore：map type、interval、accuracy、show coordinates、last coordinate
+- [x] 通知內容跟隨座標更新；設定資料層獨立保存
+- [x] 繁中／英文 string resources（174 個鍵 parity）
 
 出口條件：首次使用者能自行完成設定；拒絕任一可拒絕權限不造成 crash 或半 Active。
 
 ## Milestone 4：地點搜尋（1–2 天）
 
-- [ ] 建立 `PlaceSearchRepository` 與 fake implementation
-- [ ] 整合選定的 OSM 相容搜尋服務
-- [ ] 管理 debounce、流量限制與取消過期請求
-- [ ] 只要求名稱、地址、座標所需欄位
+- [x] 建立可注入 `PlaceSearchRepository`
+- [x] 整合 Nominatim OSM 相容搜尋服務
+- [x] 管理 debounce、每秒一請求限制與取消過期結果
+- [x] 只要求顯示名稱與座標所需欄位
 - [ ] 搜尋建議 UI、鍵盤操作、loading/empty/error
-- [ ] 點結果後 animate camera 並更新 selection
+- [x] 點結果後 animate camera 並更新 selection
 - [ ] 測試快速輸入、清空、離線、rate-limit/error
 
 出口條件：可搜尋 Tokyo Station 並成功開始該座標的靜態模擬。
@@ -85,14 +85,14 @@ UX／效能更新（2026-08-24）：改為 edge-to-edge 滿版地圖與安全區
 
 - [x] Room database、entities、DAO、repository
 - [x] 收藏新增、命名、重新命名、刪除、選取
-- [ ] 成功 Active 後才 upsert recent
-- [ ] 最近位置排序、去重、最多 50 筆
+- [x] 成功 Active 後才 upsert recent
+- [x] 最近位置排序、去重、最多 50 筆
 - [x] 刪除單一收藏確認流程
-- [ ] 清除全部收藏／歷史確認流程
+- [x] 清除全部收藏／歷史確認流程
 - [x] 收藏重啟 persistence 測試
-- [ ] 最近位置第 51 筆裁切測試
+- [x] 最近位置第 51 筆裁切測試
 
-實作進度（2026-08-24）：喜愛地點以 Room 完成本機持久化，支援新增、命名、重新命名、地圖選取與二次確認刪除；相同六位小數座標會更新既有項目。Sony 實機已通過儲存、force-stop 後保留與刪除確認。最近位置尚未實作，因此本 Milestone 尚未關閉。
+實作進度（2026-08-24）：喜愛地點與最近位置以 Room 完成本機持久化；最近位置只在靜態服務進入 Active 後寫入，相同六位小數座標會刷新時間，並在同一 transaction 保留最新 50 筆。本次變更已通過 JVM 測試與 instrumentation 編譯，尚未宣稱新的實機結果。
 
 出口條件：AC-08 通過，資料完全 local-only。
 
@@ -103,10 +103,10 @@ UX／效能更新（2026-08-24）：改為 edge-to-edge 滿版地圖與安全區
 - [ ] 非 Pixel 實體裝置背景與省電測試
 - [ ] 8 小時 static mock soak test
 - [ ] Start/Stop 20 次、鎖屏、Activity swipe-away、force-stop 測試
-- [ ] lint、dependency/license review、release build
-- [ ] release signing key 與第三方服務設定審查
-- [ ] README：安裝、地圖供應、Developer Options、疑難排解
-- [ ] Privacy/Data safety 草稿
+- [x] lint、license notice、R8 release build
+- [x] release signing 僅由環境變數注入；無 key／secret 進版控
+- [x] README：Unix／Windows 驗證、安裝、地圖供應、Developer Options、疑難排解
+- [x] Privacy/Data safety 草稿
 - [ ] Play Console foreground-service declaration/policy spike
 - [ ] 關閉所有 P0/P1 問題並完成 MVP AC-01 至 AC-09
 

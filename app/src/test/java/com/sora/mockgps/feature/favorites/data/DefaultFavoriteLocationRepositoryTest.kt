@@ -56,6 +56,24 @@ class DefaultFavoriteLocationRepositoryTest {
         }
     }
 
+    @Test
+    fun `recent locations de-duplicate and retain newest fifty`() = runBlocking {
+        val clock = MutableClock(1_000)
+        val repository = DefaultFavoriteLocationRepository(InMemoryFavoriteLocationDao(), clock)
+        repository.recordRecent(25.0339641, 121.5644681)
+        clock.now++
+        repository.recordRecent(25.0339644, 121.5644684)
+        repeat(50) { index ->
+            clock.now++
+            repository.recordRecent(index.toDouble(), 100.0)
+        }
+
+        val recent = repository.recentLocations.first()
+        assertEquals(50, recent.size)
+        assertEquals(49.0, recent.first().latitude, 0.0)
+        assertTrue(recent.none { it.latitude == 25.033964 })
+    }
+
     private class MutableClock(var now: Long) : FavoriteLocationClock {
         override fun currentTimeMillis(): Long = now
     }
@@ -63,9 +81,13 @@ class DefaultFavoriteLocationRepositoryTest {
     private class InMemoryFavoriteLocationDao : FavoriteLocationDao {
         private val rows = linkedMapOf<Long, FavoriteLocationEntity>()
         private val state = MutableStateFlow(emptyList<FavoriteLocationEntity>())
+        private val recentRows = linkedMapOf<Long, RecentLocationEntity>()
+        private val recentState = MutableStateFlow(emptyList<RecentLocationEntity>())
         private var nextId = 1L
+        private var nextRecentId = 1L
 
         override fun observeAll(): Flow<List<FavoriteLocationEntity>> = state
+        override fun observeRecentLocations(): Flow<List<RecentLocationEntity>> = recentState
 
         override suspend fun getById(id: Long): FavoriteLocationEntity? = rows[id]
 
@@ -97,9 +119,66 @@ class DefaultFavoriteLocationRepositoryTest {
             return if (removed.id == id) 1 else 0
         }
 
+        override suspend fun clearAll(): Int {
+            val removed = rows.size
+            rows.clear()
+            publish()
+            return removed
+        }
+
+        override suspend fun getRecentLocationByCoordinate(
+            normalizedLatitude: Long,
+            normalizedLongitude: Long,
+        ): RecentLocationEntity? = recentRows.values.firstOrNull {
+            it.normalizedLatitude == normalizedLatitude && it.normalizedLongitude == normalizedLongitude
+        }
+
+        override suspend fun insertRecentLocation(entity: RecentLocationEntity): Long {
+            if (getRecentLocationByCoordinate(entity.normalizedLatitude, entity.normalizedLongitude) != null) return -1
+            val id = nextRecentId++
+            recentRows[id] = entity.copy(id = id)
+            publishRecent()
+            return id
+        }
+
+        override suspend fun refreshRecentLocation(
+            id: Long,
+            latitude: Double,
+            longitude: Double,
+            usedAt: Long,
+        ): Int {
+            val current = recentRows[id] ?: return 0
+            recentRows[id] = current.copy(latitude = latitude, longitude = longitude, usedAt = usedAt)
+            publishRecent()
+            return 1
+        }
+
+        override suspend fun trimRecentLocations(maximumRows: Int): Int {
+            val retainedIds = recentRows.values.sortedWith(
+                compareByDescending<RecentLocationEntity> { it.usedAt }.thenByDescending { it.id },
+            ).take(maximumRows).mapTo(mutableSetOf(), RecentLocationEntity::id)
+            val before = recentRows.size
+            recentRows.keys.retainAll(retainedIds)
+            publishRecent()
+            return before - recentRows.size
+        }
+
+        override suspend fun clearRecentLocations(): Int {
+            val removed = recentRows.size
+            recentRows.clear()
+            publishRecent()
+            return removed
+        }
+
         private fun publish() {
             state.value = rows.values.sortedWith(
                 compareByDescending<FavoriteLocationEntity> { it.updatedAt }.thenByDescending { it.id },
+            )
+        }
+
+        private fun publishRecent() {
+            recentState.value = recentRows.values.sortedWith(
+                compareByDescending<RecentLocationEntity> { it.usedAt }.thenByDescending { it.id },
             )
         }
     }
