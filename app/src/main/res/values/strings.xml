@@ -2,7 +2,7 @@
     <string name="app_name">Mock GPS</string>
     <string name="spike_title">Mock GPS spike</string>
     <string name="map_title">Choose mock location</string>
-    <string name="map_picker_description">Interactive map. Drag or zoom to select the location beneath the centre target.</string>
+    <string name="map_picker_description">Interactive map. Tap a point to jump there, or drag or zoom to select the location beneath the centre target.</string>
     <string name="map_reticle_description">Selected map location target</string>
     <string name="selected_coordinate">Selected: %1$s, %2$s</string>
     <string name="active_coordinate">Mocking: %1$s, %2$s</string>

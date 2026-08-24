@@ -76,6 +76,7 @@ import org.maplibre.compose.layers.SymbolLayer
 import org.maplibre.compose.sources.GeoJsonData
 import org.maplibre.compose.sources.rememberGeoJsonSource
 import org.maplibre.compose.style.BaseStyle
+import org.maplibre.compose.util.ClickResult
 import org.maplibre.spatialk.geojson.Position
 
 /** A full-screen map picker with controls kept clear of the map's centre. */
@@ -580,6 +581,7 @@ private fun MapPicker(
     onRetry: () -> Unit,
 ) {
     val mapDescription = stringResource(R.string.map_picker_description)
+    val tapScope = rememberCoroutineScope()
     Box(modifier = modifier.semantics { contentDescription = mapDescription }) {
         key(mapRenderKey) {
             MaplibreMap(
@@ -588,6 +590,11 @@ private fun MapPicker(
                 cameraState = cameraState,
                 onMapLoadFinished = onMapLoaded,
                 onMapLoadFailed = { onMapLoadFailed() },
+                onMapClick = { position, _ ->
+                    // Jump the camera straight to the tapped point instead of requiring a drag.
+                    tapScope.launch { cameraState.animateTo(cameraState.position.copy(target = position)) }
+                    ClickResult.Consume
+                },
             ) {
                 if (routePoints.size >= 2) RouteLine(routePoints)
                 routeOrigin?.let { RouteEndpointMarker("route-start", "A", it, Color(0xFF2E7D32)) }
