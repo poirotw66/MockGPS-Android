@@ -40,11 +40,23 @@ sealed interface RoutingCacheStatus {
 
 interface RoutingRepository {
     /** Plans one ordered route: origin, zero or more intermediate waypoints, then destination. */
-    suspend fun planBicycleRoute(waypoints: List<Coordinate>): PlannedRoute
+    suspend fun planRoute(
+        waypoints: List<Coordinate>,
+        transportMode: RouteTransportMode = RouteTransportMode.Bicycle,
+    ): PlannedRoute
+
+    suspend fun planBicycleRoute(waypoints: List<Coordinate>): PlannedRoute =
+        planRoute(waypoints, RouteTransportMode.Bicycle)
 
     /** Compatibility convenience for the existing two-point flow. */
     suspend fun planBicycleRoute(origin: Coordinate, destination: Coordinate): PlannedRoute =
         planBicycleRoute(listOf(origin, destination))
+}
+
+enum class RouteTransportMode(val providerBaseUrl: String) {
+    Walk(RoutingProviderConfig.FOSSGIS_FOOT_BASE_URL),
+    Bicycle(RoutingProviderConfig.FOSSGIS_BICYCLE_BASE_URL),
+    Drive(RoutingProviderConfig.FOSSGIS_DRIVING_BASE_URL),
 }
 
 /**
@@ -74,7 +86,9 @@ data class RoutingProviderConfig(
     internal val normalizedBaseUrl: String get() = baseUrl.trimEnd('/') + "/"
 
     companion object {
+        const val FOSSGIS_FOOT_BASE_URL = "https://routing.openstreetmap.de/routed-foot/route/v1/driving/"
         const val FOSSGIS_BICYCLE_BASE_URL = "https://routing.openstreetmap.de/routed-bike/route/v1/driving/"
+        const val FOSSGIS_DRIVING_BASE_URL = "https://routing.openstreetmap.de/routed-car/route/v1/driving/"
         const val DEFAULT_USER_AGENT = "MockGPS-Android/0.1 (https://github.com/poirotw66/MockGPS-Android)"
         const val DEFAULT_TIMEOUT_MILLIS = 12_000
         private const val MAX_TIMEOUT_MILLIS = 60_000
@@ -113,11 +127,13 @@ class FossgisBicycleRoutingRepository(
     private val providerConfig: RoutingProviderConfig = RoutingProviderConfig(),
     private val throttle: FossgisRequestThrottle = FossgisRequestThrottle(),
 ) : RoutingRepository {
-    override suspend fun planBicycleRoute(
+    override suspend fun planRoute(
         waypoints: List<Coordinate>,
+        transportMode: RouteTransportMode,
     ): PlannedRoute = withContext(Dispatchers.IO) {
         throttle.awaitTurn()
-        val endpoint = buildOsrmBicycleRouteUrl(BicycleRouteRequest(waypoints), providerConfig)
+        val modeProviderConfig = providerConfig.copy(baseUrl = transportMode.providerBaseUrl)
+        val endpoint = buildOsrmBicycleRouteUrl(BicycleRouteRequest(waypoints), modeProviderConfig)
         val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
             connectTimeout = providerConfig.connectTimeoutMillis
@@ -217,7 +233,7 @@ class RoutingNetworkException(message: String, cause: Throwable? = null) : Routi
 /** No fresh provider result and no usable stale cached route were available. */
 class RoutingUnavailableException(message: String, cause: RoutingNetworkException) : RoutingException(message, cause)
 
-private const val MAX_ROUTE_POINTS = 1_000
+private const val MAX_ROUTE_POINTS = 5_000
 private const val MAX_ROUTE_DISTANCE_METERS = 100_000.0
 
 private fun isRoutingCoordinateValid(coordinate: Coordinate): Boolean =

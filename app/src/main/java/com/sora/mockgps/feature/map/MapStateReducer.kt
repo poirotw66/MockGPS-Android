@@ -2,6 +2,7 @@ package com.sora.mockgps.feature.map
 
 import com.sora.mockgps.core.model.Coordinate
 import com.sora.mockgps.route.PlannedRoute
+import com.sora.mockgps.route.RouteTransportMode
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.spatialk.geojson.Position
 
@@ -61,6 +62,8 @@ internal object MapStateReducer {
             routeDestination = points.last(),
             routeWaypoints = listOf(points.first(), points.last()),
             plannedRoute = PlannedRoute(points, distanceMeters, providerDurationSeconds = 0.0),
+            routeTransportMode = RouteTransportMode.Bicycle,
+            showRouteControlPoints = true,
             isPlanningRoute = false,
             routeError = null,
             activeRouteName = name,

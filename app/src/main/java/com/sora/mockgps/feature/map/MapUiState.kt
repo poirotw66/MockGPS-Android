@@ -3,6 +3,7 @@ package com.sora.mockgps.feature.map
 import com.sora.mockgps.core.model.Coordinate
 import com.sora.mockgps.service.MockLocationForegroundService
 import com.sora.mockgps.route.PlannedRoute
+import com.sora.mockgps.route.RouteTransportMode
 import com.sora.mockgps.feature.search.PlaceSearchResult
 
 /** Immutable state rendered by the map selection screen. */
@@ -21,6 +22,8 @@ data class MapUiState(
     /** Ordered routing controls: start, optional intermediate stops, destination. */
     val routeWaypoints: List<Coordinate> = emptyList(),
     val plannedRoute: PlannedRoute? = null,
+    val routeTransportMode: RouteTransportMode = RouteTransportMode.Bicycle,
+    val showRouteControlPoints: Boolean = true,
     val isPlanningRoute: Boolean = false,
     val routeError: String? = null,
     val favoriteMessage: String? = null,

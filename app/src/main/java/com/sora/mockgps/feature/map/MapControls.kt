@@ -150,6 +150,8 @@ internal fun MapControlPanel(
     onSaveRoute: () -> Unit,
     onExportGpx: () -> Unit,
     onBeginRoutePlanning: () -> Unit,
+    onShowAutoJourney: () -> Unit,
+    onShowShapeRoute: () -> Unit,
     onPlanRoute: () -> Unit,
     onEditRouteOrigin: () -> Unit,
     onEditRouteDestination: () -> Unit,
@@ -359,18 +361,36 @@ internal fun MapControlPanel(
                 }
                 if (detailGroup == MapDetailGroup.Route && !isStarting && !isActive) {
                     Button(
+                        onClick = {
+                            activeDetail = null
+                            onShowAutoJourney()
+                        },
+                        enabled = isMapReady,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    ) { Text(stringResource(R.string.action_auto_journey), maxLines = 1) }
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = {
+                                activeDetail = null
+                                onBeginRoutePlanning()
+                            },
+                            enabled = isMapReady,
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                        ) { Text(stringResource(R.string.action_plan_bicycle_route), maxLines = 1) }
+                        OutlinedButton(
+                            onClick = {
+                                activeDetail = null
+                                onShowShapeRoute()
+                            },
+                            enabled = isMapReady,
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                        ) { Text(stringResource(R.string.action_shape_route), maxLines = 1) }
+                    }
+                    Button(
                         onClick = onStart,
                         enabled = isMapReady,
                         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                     ) { Text(stringResource(R.string.action_start_mock), maxLines = 1) }
-                    OutlinedButton(
-                        onClick = {
-                            activeDetail = null
-                            onBeginRoutePlanning()
-                        },
-                        enabled = isMapReady,
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                    ) { Text(stringResource(R.string.action_plan_bicycle_route), maxLines = 1) }
                 }
                 if (detailGroup == MapDetailGroup.Route && isActive && !isRouteSession && activeCoordinate != pendingCoordinate) {
                     Button(onClick = onApply, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {

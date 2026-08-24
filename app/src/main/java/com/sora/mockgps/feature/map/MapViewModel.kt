@@ -14,6 +14,7 @@ import com.sora.mockgps.feature.routes.domain.RecentRouteSummary
 import com.sora.mockgps.feature.routes.domain.SavedRouteSummary
 import com.sora.mockgps.route.PlannedRoute
 import com.sora.mockgps.route.RoutePolyline
+import com.sora.mockgps.route.RouteTransportMode
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -403,6 +404,8 @@ class MapViewModel @JvmOverloads constructor(
                 routeDestination = null,
                 routeWaypoints = emptyList(),
                 plannedRoute = null,
+                routeTransportMode = RouteTransportMode.Bicycle,
+                showRouteControlPoints = true,
                 activeSavedRouteId = null,
                 activeRouteName = null,
                 isPlanningRoute = false,
@@ -420,6 +423,7 @@ class MapViewModel @JvmOverloads constructor(
                 routeDestination = null,
                 routeWaypoints = listOf(coordinate),
                 plannedRoute = null,
+                showRouteControlPoints = true,
                 routeError = null,
                 isPlanningRoute = false,
                 activeSavedRouteId = null,
@@ -441,6 +445,7 @@ class MapViewModel @JvmOverloads constructor(
                 routeDestination = coordinate,
                 routeWaypoints = listOfNotNull(it.routeOrigin, coordinate),
                 plannedRoute = null,
+                showRouteControlPoints = true,
                 routeError = null,
                 isPlanningRoute = false,
                 activeSavedRouteId = null,
@@ -448,6 +453,51 @@ class MapViewModel @JvmOverloads constructor(
             )
         }
         planBicycleRoute()
+    }
+
+    internal fun generateAutomaticJourney(options: AutoJourneyOptions) {
+        routePlanningJob?.cancel()
+        val points = JourneyPlanner.automaticControlPoints(options)
+        mutableUiState.update {
+            it.copy(
+                isRoutePlanningMode = true,
+                routeOrigin = points.first(),
+                routeDestination = points.last(),
+                routeWaypoints = points,
+                plannedRoute = null,
+                routeTransportMode = options.transportMode,
+                showRouteControlPoints = true,
+                isPlanningRoute = false,
+                routeError = null,
+                activeSavedRouteId = null,
+                activeRouteName = null,
+            )
+        }
+        planBicycleRoute()
+    }
+
+    internal fun generateShapeRoute(center: Coordinate, shape: RouteShape) {
+        routePlanningJob?.cancel()
+        val points = JourneyPlanner.shapePoints(center, shape)
+        val route = PlannedRoute(
+            points = points,
+            distanceMeters = RoutePolyline(points).totalDistanceMeters,
+            providerDurationSeconds = 0.0,
+        )
+        mutableUiState.update {
+            it.copy(
+                isRoutePlanningMode = true,
+                routeOrigin = points.first(),
+                routeDestination = points.last(),
+                routeWaypoints = emptyList(),
+                plannedRoute = route,
+                showRouteControlPoints = false,
+                isPlanningRoute = false,
+                routeError = null,
+                activeSavedRouteId = null,
+                activeRouteName = null,
+            )
+        }
     }
 
     fun addRouteWaypoint(coordinate: Coordinate) {
@@ -461,6 +511,7 @@ class MapViewModel @JvmOverloads constructor(
                 state.copy(
                     routeWaypoints = points,
                     plannedRoute = null,
+                    showRouteControlPoints = true,
                     isPlanningRoute = false,
                     activeSavedRouteId = null,
                     activeRouteName = null,
@@ -544,7 +595,7 @@ class MapViewModel @JvmOverloads constructor(
         mutableUiState.update { it.copy(isPlanningRoute = true, plannedRoute = null, routeError = null) }
         routePlanningJob = viewModelScope.launch {
             try {
-                val route = routingRepository.planBicycleRoute(waypoints)
+                val route = routingRepository.planRoute(waypoints, state.routeTransportMode)
                 mutableUiState.update { current ->
                     if (current.isRoutePlanningMode &&
                         current.routeOrigin == origin && current.routeDestination == destination &&
@@ -582,6 +633,7 @@ class MapViewModel @JvmOverloads constructor(
                 routeDestination = null,
                 routeWaypoints = it.routeOrigin?.let(::listOf).orEmpty(),
                 plannedRoute = null,
+                showRouteControlPoints = true,
                 isPlanningRoute = false,
                 activeSavedRouteId = null,
                 activeRouteName = null,
@@ -598,6 +650,8 @@ class MapViewModel @JvmOverloads constructor(
                 routeDestination = null,
                 routeWaypoints = emptyList(),
                 plannedRoute = null,
+                routeTransportMode = RouteTransportMode.Bicycle,
+                showRouteControlPoints = true,
                 isPlanningRoute = false,
                 activeSavedRouteId = null,
                 activeRouteName = null,
@@ -615,6 +669,8 @@ class MapViewModel @JvmOverloads constructor(
                 routeDestination = null,
                 routeWaypoints = emptyList(),
                 plannedRoute = null,
+                routeTransportMode = RouteTransportMode.Bicycle,
+                showRouteControlPoints = true,
                 isPlanningRoute = false,
                 activeSavedRouteId = null,
                 activeRouteName = null,

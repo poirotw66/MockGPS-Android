@@ -87,9 +87,13 @@ class CachingRoutingRepository(
     private val clock: RoutingCacheClock = RoutingCacheClock(System::currentTimeMillis),
     private val cache: RoutingCache = InMemoryRoutingCache(policy.maximumEntries),
 ) : RoutingRepository {
-    override suspend fun planBicycleRoute(waypoints: List<Coordinate>): PlannedRoute {
+    override suspend fun planRoute(
+        waypoints: List<Coordinate>,
+        transportMode: RouteTransportMode,
+    ): PlannedRoute {
         val request = BicycleRouteRequest(waypoints)
-        val key = RoutingCacheKey.create(providerConfig, request.waypoints)
+        val modeProviderConfig = providerConfig.copy(baseUrl = transportMode.providerBaseUrl)
+        val key = RoutingCacheKey.create(modeProviderConfig, request.waypoints)
         val now = clock.currentTimeMillis()
         val cached = cache.get(key)
         if (cached != null && ageMillis(now, cached) <= policy.freshTtlMillis) {
@@ -97,7 +101,7 @@ class CachingRoutingRepository(
         }
 
         return try {
-            val planned = delegate.planBicycleRoute(request.waypoints).withoutCacheStatus()
+            val planned = delegate.planRoute(request.waypoints, transportMode).withoutCacheStatus()
             cache.put(key, CachedRoute(planned, now))
             planned
         } catch (failure: RoutingNetworkException) {

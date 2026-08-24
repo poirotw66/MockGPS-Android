@@ -66,6 +66,13 @@ class BicycleRoutingRepositoryTest {
     }
 
     @Test
+    fun `transport modes select matching FOSSGIS profiles`() {
+        assertEquals(RoutingProviderConfig.FOSSGIS_FOOT_BASE_URL, RouteTransportMode.Walk.providerBaseUrl)
+        assertEquals(RoutingProviderConfig.FOSSGIS_BICYCLE_BASE_URL, RouteTransportMode.Bicycle.providerBaseUrl)
+        assertEquals(RoutingProviderConfig.FOSSGIS_DRIVING_BASE_URL, RouteTransportMode.Drive.providerBaseUrl)
+    }
+
+    @Test
     fun `route request rejects too few repeated or invalid waypoints`() {
         val valid = com.sora.mockgps.core.model.Coordinate(25.0, 121.0)
         assertThrows(IllegalArgumentException::class.java) { BicycleRouteRequest(listOf(valid)) }
@@ -77,5 +84,18 @@ class BicycleRoutingRepositoryTest {
             RoutingProviderConfig(baseUrl = "ftp://router.example.test/route/")
         }
         assertTrue(BicycleRouteRequest.MAXIMUM_WAYPOINTS >= 3)
+    }
+
+    @Test
+    fun `long urban route geometry can exceed one thousand points`() {
+        val coordinates = (0 until 2_200).joinToString(",") { index ->
+            val offset = index / 100_000.0
+            "[139.${70000 + index},${35.0 + offset}]"
+        }
+        val route = parseOsrmRoute(
+            """{"code":"Ok","routes":[{"distance":72905.6,"duration":7200.0,"geometry":{"coordinates":[$coordinates]}}]}""",
+        )
+
+        assertEquals(2_200, route.points.size)
     }
 }

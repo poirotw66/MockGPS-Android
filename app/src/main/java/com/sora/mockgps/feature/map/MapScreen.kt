@@ -106,6 +106,8 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     var pendingRouteExport by remember { mutableStateOf<RouteExport?>(null) }
     var pendingRecentRoute by remember { mutableStateOf(false) }
     var selectingRouteWaypoint by rememberSaveable { mutableStateOf(false) }
+    var showAutoJourney by rememberSaveable { mutableStateOf(false) }
+    var showShapeRoute by rememberSaveable { mutableStateOf(false) }
     var confirmClearFavorites by remember { mutableStateOf(false) }
     var confirmClearRecentLocations by remember { mutableStateOf(false) }
     var confirmClearRecents by remember { mutableStateOf(false) }
@@ -352,6 +354,27 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             },
         )
     }
+    if (showAutoJourney) AutoJourneyDialog(
+        onDismiss = { showAutoJourney = false },
+        onGenerate = { options ->
+            showAutoJourney = false
+            routeOptions = routeOptions.copy(
+                preset = when (options.transportMode) {
+                    com.sora.mockgps.route.RouteTransportMode.Walk -> MovementPreset.Walk
+                    com.sora.mockgps.route.RouteTransportMode.Bicycle -> MovementPreset.Bicycle
+                    com.sora.mockgps.route.RouteTransportMode.Drive -> MovementPreset.Drive
+                },
+            )
+            viewModel.generateAutomaticJourney(options)
+        },
+    )
+    if (showShapeRoute) ShapeRouteDialog(
+        onDismiss = { showShapeRoute = false },
+        onGenerate = { shape ->
+            showShapeRoute = false
+            viewModel.generateShapeRoute(uiState.pendingCoordinate, shape)
+        },
+    )
     if (confirmClearFavorites) ConfirmClearDialog(
         title = stringResource(R.string.clear_favorites_title),
         message = stringResource(R.string.clear_favorites_message),
@@ -421,6 +444,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             routeOrigin = uiState.routeOrigin,
             routeDestination = uiState.routeDestination,
             routeWaypoints = uiState.routeWaypoints,
+            showRouteControlPoints = uiState.showRouteControlPoints,
             activeRouteCoordinate = activeCoordinate.takeIf { isRouteSession },
             cameraState = cameraState,
             onMapLoaded = viewModel::onMapLoaded,
@@ -550,6 +574,8 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             onSaveRoute = { saveRouteName = true },
             onExportGpx = viewModel::exportPlannedRouteGpx,
             onBeginRoutePlanning = viewModel::beginRoutePlanning,
+            onShowAutoJourney = { showAutoJourney = true },
+            onShowShapeRoute = { showShapeRoute = true },
             onPlanRoute = viewModel::planBicycleRoute,
             onEditRouteOrigin = viewModel::editRouteOrigin,
             onEditRouteDestination = viewModel::editRouteDestination,
@@ -634,6 +660,7 @@ private fun MapPicker(
     routeOrigin: Coordinate?,
     routeDestination: Coordinate?,
     routeWaypoints: List<Coordinate>,
+    showRouteControlPoints: Boolean,
     activeRouteCoordinate: Coordinate?,
     cameraState: CameraState,
     onMapLoaded: () -> Unit,
@@ -663,18 +690,19 @@ private fun MapPicker(
                 activeRouteCoordinate?.let { RouteActiveMarker(it) }
             }
         }
-        if (loadingState == MapLoadingState.Ready) {
+        if (loadingState == MapLoadingState.Ready && showRouteControlPoints) {
             val controlPoints = routeWaypoints.takeIf { it.size >= 2 }
                 ?: listOfNotNull(routeOrigin, routeDestination)
+            val visibleControlPoints = controlPoints.dropClosingDuplicate()
             cameraState.position
             cameraState.projection?.let { projection ->
-                controlPoints.forEachIndexed { index, coordinate ->
+                visibleControlPoints.forEachIndexed { index, coordinate ->
                     val position = projection.screenLocationFromPosition(coordinate.toPosition())
                     RouteControlMarker(
                         label = routePointLabel(index),
                         color = when (index) {
                             0 -> Color(0xFF2E7D32)
-                            controlPoints.lastIndex -> Color(0xFFC62828)
+                            visibleControlPoints.lastIndex -> Color(0xFFC62828)
                             else -> Color(0xFF6A1B9A)
                         },
                         modifier = Modifier.offset(x = position.x - 14.dp, y = position.y - 14.dp),
@@ -819,6 +847,8 @@ internal fun routePointLabel(index: Int): String {
     require(index in 0 until 26) { "Route point index must fit A-Z" }
     return ('A'.code + index).toChar().toString()
 }
+private fun List<Coordinate>.dropClosingDuplicate(): List<Coordinate> =
+    if (size > 2 && first() == last()) dropLast(1) else this
 internal fun Double.formatCoordinate(): String = String.format(Locale.US, "%.6f", this)
 internal fun Double.formatDuration(): String {
     val totalMinutes = (this / 60.0).toInt().coerceAtLeast(1)

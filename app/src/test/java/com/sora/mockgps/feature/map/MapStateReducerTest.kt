@@ -6,6 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertThrows
 import org.junit.Test
+import com.sora.mockgps.route.RouteTransportMode
 
 class MapStateReducerTest {
     @Test
@@ -104,6 +105,8 @@ class MapStateReducerTest {
         assertEquals("Morning ride", result.activeRouteName)
         assertEquals(42L, result.activeSavedRouteId)
         assertEquals(points, result.plannedRoute?.points)
+        assertEquals(RouteTransportMode.Bicycle, result.routeTransportMode)
+        assertEquals(true, result.showRouteControlPoints)
     }
 
     @Test

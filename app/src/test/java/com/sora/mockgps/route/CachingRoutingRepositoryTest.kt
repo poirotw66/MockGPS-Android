@@ -102,7 +102,10 @@ class CachingRoutingRepositoryTest {
     ) : RoutingRepository {
         var calls = 0
 
-        override suspend fun planBicycleRoute(waypoints: List<Coordinate>): PlannedRoute {
+        override suspend fun planRoute(
+            waypoints: List<Coordinate>,
+            transportMode: RouteTransportMode,
+        ): PlannedRoute {
             calls++
             return response(waypoints)
         }
