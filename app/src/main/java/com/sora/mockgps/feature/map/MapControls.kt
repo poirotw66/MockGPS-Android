@@ -47,7 +47,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
@@ -67,82 +66,6 @@ import org.maplibre.compose.expressions.dsl.format
 
 
 @Composable
-internal fun MapHeader(
-    title: String,
-    serviceState: String,
-    mapType: MapDisplayType,
-    mapControlsEnabled: Boolean,
-    onToggleMapType: () -> Unit,
-    onOpenDeveloperOptions: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier.widthIn(max = 560.dp).fillMaxWidth(),
-        shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
-        tonalElevation = 4.dp,
-        shadowElevation = 8.dp,
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    modifier = Modifier.size(40.dp),
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.LocationOn,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(9.dp),
-                    )
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        title,
-                        modifier = Modifier.padding(start = 10.dp),
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1,
-                    )
-                    Text(
-                        serviceState,
-                        modifier = Modifier.padding(start = 10.dp),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.tertiary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                TextButton(
-                    onClick = onToggleMapType,
-                    enabled = mapControlsEnabled,
-                    modifier = Modifier.heightIn(min = 48.dp),
-                ) {
-                    Text(
-                        stringResource(
-                            if (mapType == MapDisplayType.Light) R.string.action_dark_map
-                            else R.string.action_light_map,
-                        ),
-                    )
-                }
-                TextButton(
-                    onClick = onOpenDeveloperOptions,
-                    modifier = Modifier.heightIn(min = 48.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Settings,
-                        contentDescription = stringResource(R.string.action_open_developer_options),
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
 @OptIn(ExperimentalMaterial3Api::class)
 internal fun MapControlPanel(
     pendingCoordinate: Coordinate,
@@ -151,6 +74,7 @@ internal fun MapControlPanel(
     permissionMessage: String?,
     compactLayout: Boolean,
     panelMaxWidth: Dp,
+    mapType: MapDisplayType,
     isMapReady: Boolean,
     isStarting: Boolean,
     isActive: Boolean,
@@ -180,6 +104,8 @@ internal fun MapControlPanel(
     accuracyMeters: Float,
     onUpdateIntervalChange: (Long) -> Unit,
     onAccuracyChange: (Float) -> Unit,
+    onToggleMapType: () -> Unit,
+    onOpenDeveloperOptions: () -> Unit,
     onUseCurrentLocation: () -> Unit,
     onSaveFavorite: () -> Unit,
     onShowFavorites: () -> Unit,
@@ -378,6 +304,35 @@ internal fun MapControlPanel(
                             Text(stringResource(R.string.setting_accuracy, accuracyMeters.toInt()))
                         }
                     }
+                    OutlinedButton(
+                        onClick = onToggleMapType,
+                        enabled = isMapReady,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    ) {
+                        Text(
+                            stringResource(
+                                if (mapType == MapDisplayType.Light) R.string.action_dark_map
+                                else R.string.action_light_map,
+                            ),
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = onOpenDeveloperOptions,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    ) {
+                        Icon(Icons.Filled.Settings, contentDescription = null)
+                        Text(
+                            stringResource(R.string.action_open_developer_options),
+                            modifier = Modifier.padding(start = 8.dp),
+                        )
+                    }
+                    if (!compactLayout) {
+                        Text(
+                            stringResource(R.string.mock_app_setup_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
                 if (detailGroup == MapDetailGroup.Places) {
                     Row(
@@ -446,13 +401,6 @@ internal fun MapControlPanel(
                     OutlinedButton(onClick = onStop, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                         Text(stringResource(R.string.action_stop), maxLines = 1)
                     }
-                }
-                if (!compactLayout) {
-                    Text(
-                        stringResource(R.string.mock_app_setup_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                 }
             } else if (detailGroup == MapDetailGroup.Route) {
                 Row(verticalAlignment = Alignment.CenterVertically) {

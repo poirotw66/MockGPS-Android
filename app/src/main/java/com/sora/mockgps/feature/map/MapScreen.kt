@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -68,6 +71,8 @@ import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.camera.CameraState
 import org.maplibre.compose.camera.rememberCameraState
 import org.maplibre.compose.map.MaplibreMap
+import org.maplibre.compose.map.MapOptions
+import org.maplibre.compose.map.OrnamentOptions
 import org.maplibre.compose.expressions.dsl.const
 import org.maplibre.compose.layers.CircleLayer
 import org.maplibre.compose.layers.LineLayer
@@ -204,19 +209,6 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     val isStarting = serviceState is MockServiceState.Starting || isRouteStarting
     val isActive = serviceState is MockServiceState.Active
     val isMapReady = uiState.loadingState == MapLoadingState.Ready
-    val serviceStateText = when (val currentRouteState = routeState) {
-        is RouteStarting -> stringResource(R.string.route_state_starting)
-        is RouteRunning -> stringResource(R.string.route_state_running)
-        is RoutePaused -> stringResource(R.string.route_state_paused)
-        is RouteCompleted -> stringResource(R.string.route_state_completed)
-        is RouteFailed -> stringResource(R.string.route_state_failed, currentRouteState.message)
-        RouteServiceState.Idle -> when (val state = serviceState) {
-        MockServiceState.Idle -> stringResource(R.string.state_idle)
-        is MockServiceState.Starting -> stringResource(R.string.state_starting)
-        is MockServiceState.Active -> stringResource(R.string.state_active)
-        is MockServiceState.Error -> stringResource(R.string.state_error, state.message)
-        }
-    }
     val routeProgress = routeState.progressOrNull()
     val activeCoordinate = routeProgress?.coordinate ?: (serviceState as? MockServiceState.Active)?.coordinate
     val favoriteSavedMessage = uiState.favoriteMessage?.let {
@@ -471,22 +463,6 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             },
             onRetry = viewModel::retryMap,
         )
-        MapHeader(
-            title = stringResource(R.string.map_title),
-            serviceState = serviceStateText,
-            mapType = uiState.mapType,
-            mapControlsEnabled = isMapReady,
-            onToggleMapType = viewModel::toggleMapType,
-            onOpenDeveloperOptions = {
-                runCatching {
-                    context.startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS))
-                }.onFailure { permissionMessage = developerOptionsUnavailable }
-            },
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .statusBarsPadding()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-        )
         val routeMapPrompt = when {
             selectingRouteWaypoint -> stringResource(R.string.route_map_prompt_stop)
             uiState.routeError != null -> uiState.routeError
@@ -501,7 +477,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .statusBarsPadding()
-                    .padding(top = 76.dp, start = 16.dp, end = 16.dp),
+                    .padding(top = 8.dp, start = 16.dp, end = 16.dp),
                 shape = MaterialTheme.shapes.large,
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
                 tonalElevation = 3.dp,
@@ -526,6 +502,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             permissionMessage = permissionMessage,
             compactLayout = compactLayout,
             panelMaxWidth = panelMaxWidth,
+            mapType = uiState.mapType,
             isMapReady = isMapReady,
             isStarting = isStarting,
             isActive = isActive,
@@ -558,6 +535,12 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             accuracyMeters = uiState.accuracyMeters,
             onUpdateIntervalChange = viewModel::setUpdateIntervalMillis,
             onAccuracyChange = viewModel::setAccuracyMeters,
+            onToggleMapType = viewModel::toggleMapType,
+            onOpenDeveloperOptions = {
+                runCatching {
+                    context.startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS))
+                }.onFailure { permissionMessage = developerOptionsUnavailable }
+            },
             onUseCurrentLocation = {
                 if (!context.hasLocationPermission()) {
                     pendingCurrentLocation = true
@@ -678,12 +661,18 @@ private fun MapPicker(
 ) {
     val mapDescription = stringResource(R.string.map_picker_description)
     val tapScope = rememberCoroutineScope()
+    val mapOptions = MapOptions(
+        ornamentOptions = OrnamentOptions(
+            padding = WindowInsets.safeDrawing.asPaddingValues(),
+        ),
+    )
     Box(modifier = modifier.semantics { contentDescription = mapDescription }) {
         key(mapRenderKey) {
             MaplibreMap(
                 modifier = Modifier.fillMaxSize(),
                 baseStyle = BaseStyle.Uri(mapType.styleUrl),
                 cameraState = cameraState,
+                options = mapOptions,
                 onMapLoadFinished = onMapLoaded,
                 onMapLoadFailed = { onMapLoadFailed() },
                 onMapClick = { position, _ ->
