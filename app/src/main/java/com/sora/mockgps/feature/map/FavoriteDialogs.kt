@@ -29,6 +29,7 @@ import java.util.Locale
 internal fun FavoriteNameDialog(
     title: String,
     initialName: String,
+    fieldLabelResource: Int = R.string.favorite_name,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
 ) {
@@ -41,7 +42,7 @@ internal fun FavoriteNameDialog(
             OutlinedTextField(
                 value = name,
                 onValueChange = { if (it.length <= 100) name = it },
-                label = { Text(stringResource(R.string.favorite_name)) },
+                label = { Text(stringResource(fieldLabelResource)) },
                 singleLine = true,
             )
         },

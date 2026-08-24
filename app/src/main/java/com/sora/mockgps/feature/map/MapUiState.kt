@@ -17,10 +17,18 @@ data class MapUiState(
     val isRoutePlanningMode: Boolean = false,
     val routeOrigin: Coordinate? = null,
     val routeDestination: Coordinate? = null,
+    /** Ordered routing controls: start, optional intermediate stops, destination. */
+    val routeWaypoints: List<Coordinate> = emptyList(),
     val plannedRoute: PlannedRoute? = null,
     val isPlanningRoute: Boolean = false,
     val routeError: String? = null,
     val favoriteMessage: String? = null,
+    /** The saved route that supplied [plannedRoute], if it was loaded from storage. */
+    val activeSavedRouteId: Long? = null,
+    /** A human-readable route name retained while it is being previewed. */
+    val activeRouteName: String? = null,
+    /** One-shot success/failure/export event for route persistence and interchange UI. */
+    val routeOperationResult: RouteOperationResult? = null,
 ) {
     val routePlanningStep: RoutePlanningStep
         get() = when {
@@ -32,6 +40,18 @@ data class MapUiState(
             else -> RoutePlanningStep.ReadyToPreview
         }
 }
+
+data class RouteOperationResult(
+    val message: String,
+    val isError: Boolean = false,
+    val export: RouteExport? = null,
+)
+
+data class RouteExport(
+    val mimeType: String,
+    val fileName: String,
+    val content: String,
+)
 
 enum class RoutePlanningStep {
     Inactive,

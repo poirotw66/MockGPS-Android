@@ -68,4 +68,27 @@ class MapStateReducerTest {
         assertEquals(MapLoadingState.Loading, result.loadingState)
         assertEquals(5, result.mapRenderKey)
     }
+
+    @Test
+    fun `loaded saved route becomes a ready preview with endpoint metadata`() {
+        val points = listOf(
+            com.sora.mockgps.core.model.Coordinate(25.033964, 121.564468),
+            com.sora.mockgps.core.model.Coordinate(25.047675, 121.517055),
+        )
+
+        val result = MapStateReducer.loadedRoutePreview(
+            state = MapUiState(),
+            points = points,
+            distanceMeters = 5_000.0,
+            name = "Morning ride",
+            savedRouteId = 42,
+        )
+
+        assertEquals(RoutePlanningStep.Preview, result.routePlanningStep)
+        assertEquals(points.first(), result.routeOrigin)
+        assertEquals(points.last(), result.routeDestination)
+        assertEquals("Morning ride", result.activeRouteName)
+        assertEquals(42L, result.activeSavedRouteId)
+        assertEquals(points, result.plannedRoute?.points)
+    }
 }

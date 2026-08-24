@@ -11,6 +11,27 @@ class MockLocationForegroundServiceTest {
         assertEquals("com.sora.mockgps.action.START", MockLocationForegroundService.ACTION_START)
         assertEquals("com.sora.mockgps.action.STOP", MockLocationForegroundService.ACTION_STOP)
         assertEquals("com.sora.mockgps.action.UPDATE", MockLocationForegroundService.ACTION_UPDATE)
+        assertEquals("com.sora.mockgps.action.START_ROUTE", MockLocationForegroundService.ACTION_START_ROUTE)
+        assertEquals("com.sora.mockgps.action.PAUSE_ROUTE", MockLocationForegroundService.ACTION_PAUSE_ROUTE)
+        assertEquals("com.sora.mockgps.action.RESUME_ROUTE", MockLocationForegroundService.ACTION_RESUME_ROUTE)
+        assertEquals("com.sora.mockgps.action.STOP_ROUTE", MockLocationForegroundService.ACTION_STOP_ROUTE)
+        assertEquals(
+            "com.sora.mockgps.extra.ROUTE_MOVEMENT_PROFILE",
+            MockLocationForegroundService.EXTRA_ROUTE_MOVEMENT_PROFILE,
+        )
+        assertEquals(
+            "com.sora.mockgps.extra.ROUTE_EXECUTION_MODE",
+            MockLocationForegroundService.EXTRA_ROUTE_EXECUTION_MODE,
+        )
+        assertEquals(
+            "com.sora.mockgps.extra.ROUTE_GPS_DRIFT_METERS",
+            MockLocationForegroundService.EXTRA_ROUTE_GPS_DRIFT_METERS,
+        )
+        assertEquals("com.sora.mockgps.extra.SESSION_ID", MockLocationForegroundService.EXTRA_SESSION_ID)
+        assertEquals(
+            "com.sora.mockgps.extra.SESSION_GENERATION",
+            MockLocationForegroundService.EXTRA_SESSION_GENERATION,
+        )
         assertEquals(1_000L, MockLocationForegroundService.UPDATE_INTERVAL_MILLIS)
     }
 }

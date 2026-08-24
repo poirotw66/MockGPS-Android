@@ -1,6 +1,6 @@
 # GPS 定位模擬 App
 
-Android Mock Location 工具。目前已完成靜態選點、喜愛地點，以及以 18 km/h 模擬自行車路線的可執行切片。
+Android Mock Location 工具。目前已完成靜態選點、喜愛地點，以及可編輯、儲存與自訂移動行為的路線模擬。
 
 ## 目前狀態
 
@@ -10,8 +10,12 @@ Android Mock Location 工具。目前已完成靜態選點、喜愛地點，以�
 - Map UI：Taipei 101 預設位置、中央準星選點、權限流程、開發人員選項入口、繁中／英文資源
 - 地圖切片：MapLibre + OpenFreeMap、中央準星、明亮／深色樣式、完整 camera state、loading/error/retry、Active 明確套用新位置
 - 喜愛地點：Room 本機儲存、新增、重新命名、選取、刪除與刪除確認
-- 自行車路線：FOSSGIS OpenStreetMap 路由、道路 polyline、18 km/h 移動、暫停、繼續與停止
-- 自動驗證：21 個 unit tests、`assembleDebug`、`lintDebug`（0 errors）
+- 路線規劃：FOSSGIS OpenStreetMap 路由、A/B 與中繼點、排序／刪除／交換端點、道路 polyline
+- 路線模擬：步行／跑步／自行車／駕車／自訂速度、平滑加減速、停止／循環／原路返回、可選 GPS 漂移
+- 路線 UX：權威 Running/Paused/Completed/Failed 狀態、通知暫停／繼續、地圖即時位置、距離／時間／進度
+- 路線資料：Room 儲存與最近使用、反向路線、GPX 匯入匯出、JSON 備份還原
+- 韌性：有界路線快取、網路失敗 stale fallback、可替換 routing provider 設定與 service session token
+- 自動驗證：46 個 unit tests、`assembleDebug`、`lintDebug`（0 errors）
 - 實機驗證：Sony XQ-BC72（Android 13 / API 33）靜態與路線 GPS + FLP 注入、背景持續、暫停／繼續、通知 Stop、20/20 次靜態啟停與完整清理均通過
 - 待驗證：API 26/34/36 裝置矩陣與獨立 LocationManager/FLP client 的跨 App 讀值
 
@@ -30,7 +34,7 @@ Debug APK：`app/build/outputs/apk/debug/app-debug.apk`
 - MapLibre Compose 顯示 OpenFreeMap 向量地圖，不需要 Google Cloud、Billing 或 API key
 - Android `LocationManager` 與 Google Play services Fused Location Provider 組成 Mock Location coordinator
 - 使用前景服務維持模擬，通知提供立即停止操作
-- Room 儲存喜愛地點；最近使用地點與 DataStore 偏好設定仍在後續里程碑
+- Room 儲存喜愛地點、已儲存路線與最近路線
 - 只採用 Android 官方 Mock Location 機制，不隱藏 Mock 狀態、不繞過第三方偵測
 
 ## 開工前需確定
@@ -51,7 +55,9 @@ Debug APK：`app/build/outputs/apk/debug/app-debug.apk`
 
 ## 自行車路由服務
 
-路線規劃使用 FOSSGIS 維護的 OpenStreetMap bicycle demo router，不需要 API key。只有使用者按下「規劃自行車路線」時，起點與終點座標才會送往該服務；App 不會自動重試。公共 demo 服務限制每秒最多一次請求、要求可識別的 User-Agent，且不提供正式 SLA，因此目前只適合開發與輕量測試，正式大量使用前應改為自架或採用具 SLA 的服務。
+路線規劃預設使用 FOSSGIS 維護的 OpenStreetMap bicycle demo router，不需要 API key。只有使用者按下規劃時，依序排列的路線座標才會送往該服務。App 會使用短期記憶體快取，網路失敗時可回退至同一組路線點的舊快取。公共 demo 不提供正式 SLA，因此目前只適合開發與輕量測試。
+
+`RoutingProviderConfig` 可換成自架 OSRM bicycle-compatible endpoint，並可設定 User-Agent 與 timeout；`CachingRoutingRepository` 以 provider URL 與 ordered waypoints 隔離 cache key。正式大量使用時，應在 `MapViewModel` 的 composition root 注入自架 endpoint 或具 SLA 的供應商。
 
 ## 第一個可交付切片
 

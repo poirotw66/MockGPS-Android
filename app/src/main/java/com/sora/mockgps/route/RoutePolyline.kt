@@ -116,6 +116,22 @@ internal object GeoMath {
         return ((bearing + 360.0) % 360.0).toFloat()
     }
 
+    fun destination(origin: Coordinate, bearingDegrees: Double, distanceMeters: Double): Coordinate {
+        if (distanceMeters == 0.0) return origin
+        val angularDistance = distanceMeters / EARTH_RADIUS_METERS
+        val bearing = radians(bearingDegrees)
+        val latitude = radians(origin.latitude)
+        val longitude = radians(origin.longitude)
+        val destinationLatitude = asin(
+            sin(latitude) * cos(angularDistance) + cos(latitude) * sin(angularDistance) * cos(bearing),
+        )
+        val destinationLongitude = longitude + atan2(
+            sin(bearing) * sin(angularDistance) * cos(latitude),
+            cos(angularDistance) - sin(latitude) * sin(destinationLatitude),
+        )
+        return Coordinate(degrees(destinationLatitude), normalizeLongitude(degrees(destinationLongitude)))
+    }
+
     private fun radians(degrees: Double): Double = degrees * PI / 180.0
     private fun degrees(radians: Double): Double = radians * 180.0 / PI
     private fun normalizeLongitude(longitude: Double): Double = ((longitude + 540.0) % 360.0) - 180.0
