@@ -155,7 +155,7 @@ App 未被選為 Mock Location App 時，按 Start 不 crash、不留下 ongoing
 
 ## 9. MVP Definition of Done
 
-- 自動測試通過（目前 61 JVM + 13 instrumentation）；裝置/跨 App AC 依 release checklist 記錄後才可宣稱通過
+- 自動測試通過（目前 62 JVM + 13 instrumentation）；裝置/跨 App AC 依 release checklist 記錄後才可宣稱通過
 - `assembleDebug`、unit tests、lint 通過
 - API 26、API 34、API 36 完成啟停 smoke test
 - 至少一台實體 Android 裝置完成 8 小時穩定測試

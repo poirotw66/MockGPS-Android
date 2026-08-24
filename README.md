@@ -13,6 +13,7 @@ Android Mock Location 工具。目前已完成靜態選點、喜愛地點，以�
 - 路線規劃：FOSSGIS OpenStreetMap 路由、A/B 與中繼點、排序／刪除／交換端點、道路 polyline
 - 路線模擬：步行／跑步／自行車／駕車／自訂速度、平滑加減速、停止／循環／原路返回、可選 GPS 漂移
 - 路線 UX：權威 Running/Paused/Completed/Failed 狀態、通知暫停／繼續、地圖即時位置、距離／時間／進度
+- 自動旅程：從台灣、日本、韓國的著名景點抽樣，以趣味形狀控制點交由 FOSSGIS 規劃真實道路近似路線
 - 路線資料：Room 儲存與最近使用、反向路線、GPX 匯入匯出、JSON 備份還原
 - 韌性：有界路線快取、網路失敗 stale fallback、可替換 routing provider 設定與 service session token
 - 自動驗證：JVM、Room migration／Compose/service instrumentation tests、`assembleDebug`、`lintDebug`、R8 release APK/AAB；CI 以 API 26、34、36 Google APIs emulator matrix 執行 instrumentation

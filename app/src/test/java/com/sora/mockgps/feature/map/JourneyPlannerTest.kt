@@ -2,6 +2,7 @@ package com.sora.mockgps.feature.map
 
 import com.sora.mockgps.core.model.Coordinate
 import com.sora.mockgps.route.GeoMath
+import com.sora.mockgps.route.BicycleRouteRequest
 import com.sora.mockgps.route.RoutePolyline
 import com.sora.mockgps.route.RouteTransportMode
 import org.junit.Assert.assertEquals
@@ -64,6 +65,26 @@ class JourneyPlannerTest {
         assertTrue(centers.any { center ->
             GeoMath.distanceMeters(center, JourneyRegion.Taiwan.landmarks.first().coordinate) > 50_000.0
         })
+    }
+
+    @Test
+    fun `automatic journey control points satisfy the road routing contract`() {
+        val random = Random(19)
+
+        repeat(100) {
+            val journey = JourneyPlanner.automaticJourney(
+                AutoJourneyOptions(
+                    region = JourneyRegion.entries[it % JourneyRegion.entries.size],
+                    duration = JourneyDuration.entries[it % JourneyDuration.entries.size],
+                    transportMode = RouteTransportMode.entries[it % RouteTransportMode.entries.size],
+                ),
+                random,
+            )
+            val request = BicycleRouteRequest(journey.points)
+
+            assertEquals(journey.points, request.waypoints)
+            assertEquals(journey.points.first(), journey.points.last())
+        }
     }
 
     @Test

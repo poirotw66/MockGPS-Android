@@ -98,7 +98,7 @@ UX／效能更新（2026-08-24）：改為 edge-to-edge 滿版地圖與安全區
 
 ## Milestone 6：穩定化與 Release Candidate（3–5 天 + 8 小時 soak）
 
-- [x] 61 JVM tests、13 instrumentation tests、Compose/Room/fake engine failure coverage
+- [x] 62 JVM tests、13 instrumentation tests、Compose/Room/fake engine failure coverage
 - [ ] API 26/34/36 完整 smoke matrix
 - [ ] 非 Pixel 實體裝置背景與省電測試
 - [ ] 8 小時 static mock soak test
@@ -122,6 +122,7 @@ UX／效能更新（2026-08-24）：改為 edge-to-edge 滿版地圖與安全區
 - [x] 背景 route movement 與通知 Stop
 - [x] Walking/Running/Driving/custom speed、smooth acceleration、end modes、GPS drift
 - [x] Notification Pause/Resume/Stop route controls
+- [x] 自動旅程以形狀控制點交由 FOSSGIS 規劃真實道路近似路線；無法規劃時沿用可重試錯誤
 
 自行車路線切片（2026-08-24）：使用者設定起點與終點後，App 明確提示座標會送往 FOSSGIS，取得道路幾何並以 5.0 m/s（18 km/h）沿線注入 GPS + FLP。Sony 實機已驗證開始、持續移動、暫停座標不變、繼續移動、停止後移除服務／通知／mock provider；公共 demo router 沒有 SLA，正式流量仍需替換或自架。
 

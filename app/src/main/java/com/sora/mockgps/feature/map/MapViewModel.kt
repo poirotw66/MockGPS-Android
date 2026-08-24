@@ -508,21 +508,16 @@ class MapViewModel @JvmOverloads constructor(
     internal fun generateAutomaticJourney(options: AutoJourneyOptions) {
         routePlanningJob?.cancel()
         val journey = JourneyPlanner.automaticJourney(options)
-        val route = PlannedRoute(
-            points = journey.points,
-            distanceMeters = RoutePolyline(journey.points).totalDistanceMeters,
-            providerDurationSeconds = 0.0,
-        )
         mutableUiState.update {
             it.copy(
                 isRoutePlanningMode = true,
                 routeOrigin = journey.points.first(),
                 routeDestination = journey.points.last(),
-                routeWaypoints = emptyList(),
-                plannedRoute = route,
+                routeWaypoints = journey.points,
+                plannedRoute = null,
                 routeTransportMode = options.transportMode,
                 showRouteControlPoints = false,
-                isPlanningRoute = false,
+                isPlanningRoute = true,
                 routeError = null,
                 activeSavedRouteId = null,
                 activeRouteName = localized(
@@ -532,6 +527,7 @@ class MapViewModel @JvmOverloads constructor(
                 ),
             )
         }
+        planBicycleRoute()
     }
 
     internal fun generateShapeRoute(center: Coordinate, shape: RouteShape) {
