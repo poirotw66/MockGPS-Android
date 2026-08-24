@@ -242,8 +242,8 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
         }
     }
 
-    LaunchedEffect(uiState.routeWaypoints) {
-        uiState.routeWaypoints.takeIf { it.size >= 2 }?.let { points ->
+    LaunchedEffect(uiState.routeWaypoints, uiState.plannedRoute) {
+        uiState.routeWaypoints.takeIf { it.size >= 2 && uiState.plannedRoute == null }?.let { points ->
             cameraState.animateTo(points.previewCameraPosition(cameraState.position))
         }
     }
@@ -545,6 +545,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             isPlanningRoute = uiState.isPlanningRoute,
             routeError = uiState.routeError,
             placeSearchQuery = uiState.placeSearchQuery,
+            isPlaceSearching = uiState.isPlaceSearching,
             placeSearchResults = uiState.placeSearchResults,
             placeSearchError = uiState.placeSearchError,
             onPlaceSearchQueryChanged = viewModel::onPlaceSearchQueryChanged,

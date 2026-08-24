@@ -35,20 +35,28 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import com.sora.mockgps.R
 import com.sora.mockgps.core.model.Coordinate
+import com.sora.mockgps.feature.search.PlaceSearchResult
 import com.sora.mockgps.route.PlannedRoute
 import com.sora.mockgps.service.RouteCompleted
 import com.sora.mockgps.service.RouteFailed
@@ -123,7 +131,12 @@ internal fun MapHeader(
                 TextButton(
                     onClick = onOpenDeveloperOptions,
                     modifier = Modifier.heightIn(min = 48.dp),
-                ) { Text(stringResource(R.string.action_developer_settings)) }
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Settings,
+                        contentDescription = stringResource(R.string.action_open_developer_options),
+                    )
+                }
             }
         }
     }
@@ -157,6 +170,7 @@ internal fun MapControlPanel(
     isPlanningRoute: Boolean,
     routeError: String?,
     placeSearchQuery: String,
+    isPlaceSearching: Boolean,
     placeSearchResults: List<com.sora.mockgps.feature.search.PlaceSearchResult>,
     placeSearchError: PlaceSearchError?,
     onPlaceSearchQueryChanged: (String) -> Unit,
@@ -334,26 +348,17 @@ internal fun MapControlPanel(
                         stringResource(R.string.selected_coordinate, pendingCoordinate.latitude.formatCoordinate(), pendingCoordinate.longitude.formatCoordinate()),
                         style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
-                    OutlinedTextField(
-                        value = placeSearchQuery,
-                        onValueChange = onPlaceSearchQueryChanged,
-                        label = { Text(stringResource(R.string.place_search_label)) },
-                        supportingText = { Text(stringResource(R.string.place_search_privacy)) },
-                        modifier = Modifier.fillMaxWidth(), singleLine = true,
-                    )
-                    placeSearchError?.let { error -> Text(stringResource(when (error) {
-                        PlaceSearchError.Network -> R.string.place_search_error_network
-                        PlaceSearchError.RateLimited -> R.string.place_search_error_rate
-                        PlaceSearchError.InvalidResponse -> R.string.place_search_error_invalid
-                    }), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-                    placeSearchResults.forEach { result ->
-                        TextButton(onClick = {
+                    PlaceSearchContent(
+                        query = placeSearchQuery,
+                        isSearching = isPlaceSearching,
+                        results = placeSearchResults,
+                        error = placeSearchError,
+                        onQueryChanged = onPlaceSearchQueryChanged,
+                        onPlaceSelected = { result ->
                             activeDetail = null
                             onPlaceSelected(result)
-                        }, modifier = Modifier.fillMaxWidth()) {
-                            Text(result.name, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        }
-                    }
+                        },
+                    )
                     TextButton(onClick = { onShowCoordinatesChange(!showCoordinates) }, modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(if (showCoordinates) R.string.action_hide_coordinates else R.string.action_show_coordinates))
                     }
@@ -558,6 +563,21 @@ internal fun MapControlPanel(
                                 options = routeOptions,
                                 onOptionsChange = onRouteOptionsChange,
                             )
+                            Text(
+                                stringResource(R.string.route_replace_title),
+                                style = MaterialTheme.typography.labelLarge,
+                            )
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                TextButton(onClick = onBeginRoutePlanning, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                                    Text(stringResource(R.string.action_plan_bicycle_route), maxLines = 1)
+                                }
+                                TextButton(onClick = onShowAutoJourney, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                                    Text(stringResource(R.string.action_auto_journey), maxLines = 1)
+                                }
+                                TextButton(onClick = onShowShapeRoute, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                                    Text(stringResource(R.string.action_shape_route), maxLines = 1)
+                                }
+                            }
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 TextButton(onClick = {
                                     activeDetail = null
@@ -658,6 +678,89 @@ private enum class MapDetailGroup {
     Places,
     Route,
     More,
+}
+
+@Composable
+internal fun PlaceSearchContent(
+    query: String,
+    isSearching: Boolean,
+    results: List<PlaceSearchResult>,
+    error: PlaceSearchError?,
+    onQueryChanged: (String) -> Unit,
+    onPlaceSelected: (PlaceSearchResult) -> Unit,
+) {
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChanged,
+        label = { Text(stringResource(R.string.place_search_label)) },
+        supportingText = { Text(stringResource(R.string.place_search_privacy)) },
+        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+        trailingIcon = if (query.isNotEmpty()) {
+            {
+                IconButton(onClick = { onQueryChanged("") }) {
+                    Icon(
+                        Icons.Filled.Close,
+                        contentDescription = stringResource(R.string.action_clear_search),
+                    )
+                }
+            }
+        } else {
+            null
+        },
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(
+            onSearch = {
+                keyboardController?.hide()
+                focusManager.clearFocus()
+            },
+        ),
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true,
+    )
+    if (isSearching) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+            Text(
+                stringResource(R.string.place_search_loading),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    } else if (query.trim().length >= 2 && results.isEmpty() && error == null) {
+        Text(
+            stringResource(R.string.place_search_empty),
+            modifier = Modifier.padding(vertical = 8.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    error?.let { searchError ->
+        Text(
+            stringResource(
+                when (searchError) {
+                    PlaceSearchError.Network -> R.string.place_search_error_network
+                    PlaceSearchError.RateLimited -> R.string.place_search_error_rate
+                    PlaceSearchError.InvalidResponse -> R.string.place_search_error_invalid
+                },
+            ),
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+    results.forEach { result ->
+        TextButton(
+            onClick = { onPlaceSelected(result) },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(result.name, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+    }
 }
 
 @Composable

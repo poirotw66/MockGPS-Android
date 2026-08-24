@@ -142,13 +142,27 @@ class MapViewModel @JvmOverloads constructor(
     /** Debounced, cancellable query entry point. Provider requests remain rate limited at 1/s. */
     fun onPlaceSearchQueryChanged(query: String) {
         placeSearchJob?.cancel()
-        mutableUiState.update { it.copy(placeSearchQuery = query, placeSearchResults = emptyList(), placeSearchError = null) }
-        if (query.trim().length < 2) return
+        val normalizedQuery = query.trim()
+        mutableUiState.update {
+            it.copy(
+                placeSearchQuery = query,
+                isPlaceSearching = normalizedQuery.length >= MINIMUM_SEARCH_QUERY_LENGTH,
+                placeSearchResults = emptyList(),
+                placeSearchError = null,
+            )
+        }
+        if (normalizedQuery.length < MINIMUM_SEARCH_QUERY_LENGTH) return
         placeSearchJob = viewModelScope.launch {
             delay(350)
             try {
-                val results = placeSearchRepository.search(query)
-                mutableUiState.update { current -> if (current.placeSearchQuery == query) current.copy(placeSearchResults = results) else current }
+                val results = placeSearchRepository.search(normalizedQuery)
+                mutableUiState.update { current ->
+                    if (current.placeSearchQuery == query) {
+                        current.copy(isPlaceSearching = false, placeSearchResults = results)
+                    } else {
+                        current
+                    }
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: PlaceSearchException) {
@@ -157,7 +171,13 @@ class MapViewModel @JvmOverloads constructor(
                     is PlaceSearchException.RateLimited -> PlaceSearchError.RateLimited
                     is PlaceSearchException.InvalidResponse -> PlaceSearchError.InvalidResponse
                 }
-                mutableUiState.update { current -> if (current.placeSearchQuery == query) current.copy(placeSearchError = error) else current }
+                mutableUiState.update { current ->
+                    if (current.placeSearchQuery == query) {
+                        current.copy(isPlaceSearching = false, placeSearchError = error)
+                    } else {
+                        current
+                    }
+                }
             }
         }
     }
@@ -764,6 +784,7 @@ class MapViewModel @JvmOverloads constructor(
     private companion object {
         const val MAP_LOAD_TIMEOUT_MILLIS = 12_000L
         const val MAX_LETTERED_ROUTE_POINTS = 26
+        const val MINIMUM_SEARCH_QUERY_LENGTH = 2
     }
 }
 

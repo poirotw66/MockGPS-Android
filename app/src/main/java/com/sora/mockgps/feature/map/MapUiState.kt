@@ -34,6 +34,7 @@ data class MapUiState(
     /** One-shot success/failure/export event for route persistence and interchange UI. */
     val routeOperationResult: RouteOperationResult? = null,
     val placeSearchQuery: String = "",
+    val isPlaceSearching: Boolean = false,
     val placeSearchResults: List<PlaceSearchResult> = emptyList(),
     val placeSearchError: PlaceSearchError? = null,
     val showCoordinates: Boolean = true,
