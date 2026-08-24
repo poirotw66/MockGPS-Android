@@ -7,7 +7,7 @@ import com.sora.mockgps.feature.search.PlaceSearchResult
 
 /** Immutable state rendered by the map selection screen. */
 data class MapUiState(
-    /** The coordinate currently under the centre reticle, not necessarily the injected one. */
+    /** The explicitly selected coordinate, not necessarily the injected or camera-centre coordinate. */
     val pendingCoordinate: Coordinate = MockLocationForegroundService.DEFAULT_COORDINATE,
     /** Full camera state is retained by the ViewModel across Activity recreation. */
     val camera: MapCamera = MapCamera.from(MockLocationForegroundService.DEFAULT_COORDINATE),

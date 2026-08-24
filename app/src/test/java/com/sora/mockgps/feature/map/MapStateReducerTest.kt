@@ -4,11 +4,13 @@ import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.spatialk.geojson.Position
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class MapStateReducerTest {
     @Test
-    fun `camera idle saves coordinate and full camera position`() {
+    fun `camera idle saves camera without changing selected coordinate`() {
+        val state = MapUiState()
         val position = CameraPosition(
             target = Position(latitude = 35.681236, longitude = 139.767125),
             zoom = 17.5,
@@ -16,13 +18,25 @@ class MapStateReducerTest {
             bearing = 91.0,
         )
 
-        val result = MapStateReducer.cameraIdle(MapUiState(), position)
+        val result = MapStateReducer.cameraIdle(state, position)
 
-        assertEquals(35.681236, result.pendingCoordinate.latitude, 0.0)
-        assertEquals(139.767125, result.pendingCoordinate.longitude, 0.0)
+        assertEquals(state.pendingCoordinate, result.pendingCoordinate)
+        assertEquals(35.681236, result.camera.coordinate.latitude, 0.0)
+        assertEquals(139.767125, result.camera.coordinate.longitude, 0.0)
         assertEquals(17.5f, result.camera.zoom)
         assertEquals(32f, result.camera.tilt)
         assertEquals(91f, result.camera.bearing)
+    }
+
+    @Test
+    fun `explicit selection changes pending coordinate without moving camera`() {
+        val state = MapUiState()
+        val coordinate = com.sora.mockgps.core.model.Coordinate(35.681236, 139.767125)
+
+        val result = MapStateReducer.selectCoordinate(state, coordinate)
+
+        assertEquals(coordinate, result.pendingCoordinate)
+        assertEquals(state.camera, result.camera)
     }
 
     @Test
@@ -90,5 +104,13 @@ class MapStateReducerTest {
         assertEquals("Morning ride", result.activeRouteName)
         assertEquals(42L, result.activeSavedRouteId)
         assertEquals(points, result.plannedRoute?.points)
+    }
+
+    @Test
+    fun `route point labels span A through Z`() {
+        assertEquals("A", routePointLabel(0))
+        assertEquals("B", routePointLabel(1))
+        assertEquals("Z", routePointLabel(25))
+        assertThrows(IllegalArgumentException::class.java) { routePointLabel(26) }
     }
 }

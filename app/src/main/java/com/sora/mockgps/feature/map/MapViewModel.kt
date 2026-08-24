@@ -88,6 +88,10 @@ class MapViewModel @JvmOverloads constructor(
         mutableUiState.update { MapStateReducer.cameraIdle(it, position) }
     }
 
+    fun selectCoordinate(coordinate: Coordinate) {
+        mutableUiState.update { MapStateReducer.selectCoordinate(it, coordinate) }
+    }
+
     fun onMapLoaded() {
         mapLoadTimeout?.cancel()
         mutableUiState.update(MapStateReducer::mapLoaded)
@@ -426,6 +430,12 @@ class MapViewModel @JvmOverloads constructor(
 
     fun setRouteDestination(coordinate: Coordinate) {
         routePlanningJob?.cancel()
+        if (mutableUiState.value.routeOrigin == coordinate) {
+            mutableUiState.update {
+                it.copy(routeError = getApplication<Application>().getString(R.string.route_error_same_point))
+            }
+            return
+        }
         mutableUiState.update {
             it.copy(
                 routeDestination = coordinate,
@@ -437,12 +447,12 @@ class MapViewModel @JvmOverloads constructor(
                 activeRouteName = null,
             )
         }
+        planBicycleRoute()
     }
 
     fun addRouteWaypoint(coordinate: Coordinate) {
-        routePlanningJob?.cancel()
-        mutableUiState.update { state ->
-            if (state.routeOrigin == null || state.routeDestination == null || state.routeWaypoints.size >= 25) {
+        updateRouteAndPlan { state ->
+            if (state.routeOrigin == null || state.routeDestination == null || state.routeWaypoints.size >= MAX_LETTERED_ROUTE_POINTS) {
                 state
             } else {
                 val points = state.routeWaypoints.ifEmpty { listOf(state.routeOrigin, state.routeDestination) }
@@ -461,8 +471,7 @@ class MapViewModel @JvmOverloads constructor(
     }
 
     fun removeRouteWaypoint(index: Int) {
-        routePlanningJob?.cancel()
-        mutableUiState.update { state ->
+        updateRouteAndPlan { state ->
             if (index !in 1 until state.routeWaypoints.lastIndex) state else state.copy(
                 routeWaypoints = state.routeWaypoints.toMutableList().also { it.removeAt(index) },
                 plannedRoute = null,
@@ -475,8 +484,7 @@ class MapViewModel @JvmOverloads constructor(
     }
 
     fun moveRouteWaypoint(index: Int, delta: Int) {
-        routePlanningJob?.cancel()
-        mutableUiState.update { state ->
+        updateRouteAndPlan { state ->
             val destination = index + delta
             if (index !in 1 until state.routeWaypoints.lastIndex ||
                 destination !in 1 until state.routeWaypoints.lastIndex
@@ -491,8 +499,7 @@ class MapViewModel @JvmOverloads constructor(
     }
 
     fun swapRouteEndpoints() {
-        routePlanningJob?.cancel()
-        mutableUiState.update { state ->
+        updateRouteAndPlan { state ->
             if (state.routeWaypoints.size < 2) state else {
                 val points = state.routeWaypoints.toMutableList().also {
                     val first = it.first()
@@ -511,6 +518,15 @@ class MapViewModel @JvmOverloads constructor(
                 )
             }
         }
+    }
+
+    private fun updateRouteAndPlan(update: (MapUiState) -> MapUiState) {
+        routePlanningJob?.cancel()
+        var changed = false
+        mutableUiState.update { state ->
+            update(state).also { changed = it !== state }
+        }
+        if (changed) planBicycleRoute()
     }
 
     fun planBicycleRoute() {
@@ -663,6 +679,7 @@ class MapViewModel @JvmOverloads constructor(
 
     private companion object {
         const val MAP_LOAD_TIMEOUT_MILLIS = 12_000L
+        const val MAX_LETTERED_ROUTE_POINTS = 26
     }
 }
 

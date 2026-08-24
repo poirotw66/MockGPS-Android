@@ -11,13 +11,12 @@ internal object MapStateReducer {
         val coordinate = Coordinate(position.target.latitude, position.target.longitude)
         if (!coordinate.isValid()) return state
         if (
-            coordinate == state.pendingCoordinate &&
+            coordinate == state.camera.coordinate &&
             position.zoom.toFloat() == state.camera.zoom &&
             position.bearing.toFloat() == state.camera.bearing &&
             position.tilt.toFloat() == state.camera.tilt
         ) return state
         return state.copy(
-            pendingCoordinate = coordinate,
             camera = MapCamera(
                 coordinate = coordinate,
                 zoom = position.zoom.toFloat(),
@@ -25,6 +24,11 @@ internal object MapStateReducer {
                 tilt = position.tilt.toFloat(),
             ),
         )
+    }
+
+    fun selectCoordinate(state: MapUiState, coordinate: Coordinate): MapUiState {
+        if (!coordinate.isValid() || coordinate == state.pendingCoordinate) return state
+        return state.copy(pendingCoordinate = coordinate)
     }
 
     fun mapLoaded(state: MapUiState): MapUiState =

@@ -8,7 +8,6 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -16,9 +15,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -37,13 +38,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sora.mockgps.R
@@ -68,11 +67,8 @@ import org.maplibre.compose.camera.CameraState
 import org.maplibre.compose.camera.rememberCameraState
 import org.maplibre.compose.map.MaplibreMap
 import org.maplibre.compose.expressions.dsl.const
-import org.maplibre.compose.expressions.dsl.format
-import org.maplibre.compose.expressions.dsl.span
 import org.maplibre.compose.layers.CircleLayer
 import org.maplibre.compose.layers.LineLayer
-import org.maplibre.compose.layers.SymbolLayer
 import org.maplibre.compose.sources.GeoJsonData
 import org.maplibre.compose.sources.rememberGeoJsonSource
 import org.maplibre.compose.style.BaseStyle
@@ -109,6 +105,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     var saveRouteName by remember { mutableStateOf(false) }
     var pendingRouteExport by remember { mutableStateOf<RouteExport?>(null) }
     var pendingRecentRoute by remember { mutableStateOf(false) }
+    var selectingRouteWaypoint by rememberSaveable { mutableStateOf(false) }
     var confirmClearFavorites by remember { mutableStateOf(false) }
     var confirmClearRecentLocations by remember { mutableStateOf(false) }
     var confirmClearRecents by remember { mutableStateOf(false) }
@@ -163,6 +160,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 if (coordinate == null) {
                     permissionMessage = currentLocationUnavailable
                 } else {
+                    viewModel.selectCoordinate(coordinate)
                     coroutineScope.launch {
                         cameraState.animateTo(cameraState.position.copy(target = coordinate.toPosition()))
                     }
@@ -238,6 +236,11 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
         }
     }
 
+    LaunchedEffect(uiState.routeWaypoints) {
+        uiState.routeWaypoints.takeIf { it.size >= 2 }?.let { points ->
+            cameraState.animateTo(points.previewCameraPosition(cameraState.position))
+        }
+    }
     LaunchedEffect(uiState.plannedRoute) {
         uiState.plannedRoute?.points?.let { points ->
             cameraState.animateTo(points.previewCameraPosition(cameraState.position))
@@ -279,6 +282,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             onSelect = { favorite ->
                 showFavorites = false
                 val favoriteCoordinate = Coordinate(favorite.latitude, favorite.longitude)
+                viewModel.selectCoordinate(favoriteCoordinate)
                 when (uiState.routePlanningStep) {
                     RoutePlanningStep.SelectStart -> viewModel.setRouteOrigin(favoriteCoordinate)
                     RoutePlanningStep.SelectDestination -> viewModel.setRouteDestination(favoriteCoordinate)
@@ -295,6 +299,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             onSelectRecent = { recent ->
                 showFavorites = false
                 val coordinate = Coordinate(recent.latitude, recent.longitude)
+                viewModel.selectCoordinate(coordinate)
                 when (uiState.routePlanningStep) {
                     RoutePlanningStep.SelectStart -> viewModel.setRouteOrigin(coordinate)
                     RoutePlanningStep.SelectDestination -> viewModel.setRouteDestination(coordinate)
@@ -370,9 +375,12 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     )
 
     BackHandler(
-        enabled = uiState.isRoutePlanningMode &&
+        enabled = (selectingRouteWaypoint || uiState.isRoutePlanningMode) &&
             !isRouteSession && !showFavorites && renameFavorite == null && deleteFavorite == null,
-        onBack = viewModel::navigateBackRoutePlanning,
+        onBack = {
+            if (selectingRouteWaypoint) selectingRouteWaypoint = false
+            else viewModel.navigateBackRoutePlanning()
+        },
     )
     renameFavorite?.let { favorite ->
         FavoriteNameDialog(
@@ -408,7 +416,8 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             mapType = uiState.mapType,
             mapRenderKey = uiState.mapRenderKey,
             loadingState = uiState.loadingState,
-            routePoints = uiState.plannedRoute?.points.orEmpty(),
+            pendingCoordinate = uiState.pendingCoordinate,
+            routePoints = uiState.plannedRoute?.points ?: uiState.routeWaypoints,
             routeOrigin = uiState.routeOrigin,
             routeDestination = uiState.routeDestination,
             routeWaypoints = uiState.routeWaypoints,
@@ -417,6 +426,21 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             onMapLoaded = viewModel::onMapLoaded,
             onMapLoadFailed = viewModel::onMapLoadFailed,
             onCameraIdle = viewModel::onCameraIdle,
+            onCoordinateSelected = { coordinate ->
+                viewModel.selectCoordinate(coordinate)
+                when {
+                    selectingRouteWaypoint -> {
+                        selectingRouteWaypoint = false
+                        viewModel.addRouteWaypoint(coordinate)
+                    }
+                    uiState.routePlanningStep == RoutePlanningStep.SelectStart -> {
+                        viewModel.setRouteOrigin(coordinate)
+                    }
+                    uiState.routePlanningStep == RoutePlanningStep.SelectDestination -> {
+                        viewModel.setRouteDestination(coordinate)
+                    }
+                }
+            },
             onRetry = viewModel::retryMap,
         )
         MapHeader(
@@ -435,6 +459,36 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 .statusBarsPadding()
                 .padding(horizontal = 12.dp, vertical = 8.dp),
         )
+        val routeMapPrompt = when {
+            selectingRouteWaypoint -> stringResource(R.string.route_map_prompt_stop)
+            uiState.routeError != null -> uiState.routeError
+            uiState.routePlanningStep == RoutePlanningStep.SelectStart -> stringResource(R.string.route_map_prompt_start)
+            uiState.routePlanningStep == RoutePlanningStep.SelectDestination -> stringResource(R.string.route_map_prompt_destination)
+            uiState.routePlanningStep == RoutePlanningStep.Planning -> stringResource(R.string.route_map_prompt_planning)
+            else -> null
+        }
+        routeMapPrompt?.let { prompt ->
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(top = 72.dp, start = 16.dp, end = 16.dp)
+                    .shadow(4.dp, MaterialTheme.shapes.small),
+                shape = MaterialTheme.shapes.small,
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+            ) {
+                Text(
+                    text = prompt,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (uiState.routeError != null) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                )
+            }
+        }
         MapControlPanel(
             pendingCoordinate = uiState.pendingCoordinate,
             activeCoordinate = activeCoordinate,
@@ -449,6 +503,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             routePaused = isRoutePaused,
             routeProgress = routeProgress,
             routeResult = routeState.takeIf { it is RouteCompleted || it is RouteFailed },
+            isSelectingRouteWaypoint = selectingRouteWaypoint,
             routeOptions = routeOptions,
             onRouteOptionsChange = { routeOptions = it },
             favoritesCount = favorites.size,
@@ -463,7 +518,10 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             placeSearchResults = uiState.placeSearchResults,
             placeSearchError = uiState.placeSearchError,
             onPlaceSearchQueryChanged = viewModel::onPlaceSearchQueryChanged,
-            onPlaceSelected = { result -> coroutineScope.launch { cameraState.animateTo(cameraState.position.copy(target = result.coordinate.toPosition())) } },
+            onPlaceSelected = { result ->
+                viewModel.selectCoordinate(result.coordinate)
+                coroutineScope.launch { cameraState.animateTo(cameraState.position.copy(target = result.coordinate.toPosition())) }
+            },
             onShowCoordinatesChange = viewModel::setShowCoordinates,
             updateIntervalMillis = uiState.updateIntervalMillis,
             accuracyMeters = uiState.accuracyMeters,
@@ -478,8 +536,11 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 } else {
                     val coordinate = context.lastKnownCoordinate()
                     if (coordinate == null) permissionMessage = currentLocationUnavailable
-                    else coroutineScope.launch {
-                        cameraState.animateTo(cameraState.position.copy(target = coordinate.toPosition()))
+                    else {
+                        viewModel.selectCoordinate(coordinate)
+                        coroutineScope.launch {
+                            cameraState.animateTo(cameraState.position.copy(target = coordinate.toPosition()))
+                        }
                     }
                 }
             },
@@ -489,12 +550,11 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             onSaveRoute = { saveRouteName = true },
             onExportGpx = viewModel::exportPlannedRouteGpx,
             onBeginRoutePlanning = viewModel::beginRoutePlanning,
-            onSetRouteOrigin = { viewModel.setRouteOrigin(uiState.pendingCoordinate) },
-            onSetRouteDestination = { viewModel.setRouteDestination(uiState.pendingCoordinate) },
             onPlanRoute = viewModel::planBicycleRoute,
             onEditRouteOrigin = viewModel::editRouteOrigin,
             onEditRouteDestination = viewModel::editRouteDestination,
-            onAddRouteWaypoint = { viewModel.addRouteWaypoint(uiState.pendingCoordinate) },
+            onAddRouteWaypoint = { selectingRouteWaypoint = true },
+            onCancelRouteWaypointSelection = { selectingRouteWaypoint = false },
             onRemoveRouteWaypoint = viewModel::removeRouteWaypoint,
             onMoveRouteWaypoint = viewModel::moveRouteWaypoint,
             onSwapRouteEndpoints = viewModel::swapRouteEndpoints,
@@ -569,6 +629,7 @@ private fun MapPicker(
     mapType: MapDisplayType,
     mapRenderKey: Int,
     loadingState: MapLoadingState,
+    pendingCoordinate: Coordinate,
     routePoints: List<Coordinate>,
     routeOrigin: Coordinate?,
     routeDestination: Coordinate?,
@@ -578,6 +639,7 @@ private fun MapPicker(
     onMapLoaded: () -> Unit,
     onMapLoadFailed: () -> Unit,
     onCameraIdle: (CameraPosition) -> Unit,
+    onCoordinateSelected: (Coordinate) -> Unit,
     onRetry: () -> Unit,
 ) {
     val mapDescription = stringResource(R.string.map_picker_description)
@@ -591,21 +653,35 @@ private fun MapPicker(
                 onMapLoadFinished = onMapLoaded,
                 onMapLoadFailed = { onMapLoadFailed() },
                 onMapClick = { position, _ ->
-                    // Jump the camera straight to the tapped point instead of requiring a drag.
+                        onCoordinateSelected(Coordinate(position.latitude, position.longitude))
                     tapScope.launch { cameraState.animateTo(cameraState.position.copy(target = position)) }
                     ClickResult.Consume
                 },
             ) {
                 if (routePoints.size >= 2) RouteLine(routePoints)
-                routeOrigin?.let { RouteEndpointMarker("route-start", "A", it, Color(0xFF2E7D32)) }
-                routeDestination?.let { RouteEndpointMarker("route-destination", "B", it, Color(0xFFC62828)) }
-                routeWaypoints.drop(1).dropLast(1).forEachIndexed { index, coordinate ->
-                    RouteEndpointMarker("route-waypoint-$index", "${index + 1}", coordinate, Color(0xFF6A1B9A))
-                }
+                SelectedLocationMarker(pendingCoordinate)
                 activeRouteCoordinate?.let { RouteActiveMarker(it) }
             }
         }
-        CenterReticle(modifier = Modifier.align(Alignment.Center))
+        if (loadingState == MapLoadingState.Ready) {
+            val controlPoints = routeWaypoints.takeIf { it.size >= 2 }
+                ?: listOfNotNull(routeOrigin, routeDestination)
+            cameraState.position
+            cameraState.projection?.let { projection ->
+                controlPoints.forEachIndexed { index, coordinate ->
+                    val position = projection.screenLocationFromPosition(coordinate.toPosition())
+                    RouteControlMarker(
+                        label = routePointLabel(index),
+                        color = when (index) {
+                            0 -> Color(0xFF2E7D32)
+                            controlPoints.lastIndex -> Color(0xFFC62828)
+                            else -> Color(0xFF6A1B9A)
+                        },
+                        modifier = Modifier.offset(x = position.x - 14.dp, y = position.y - 14.dp),
+                    )
+                }
+            }
+        }
         when (loadingState) {
             MapLoadingState.Loading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             MapLoadingState.Error -> Surface(
@@ -657,7 +733,9 @@ internal fun List<Coordinate>.previewCameraPosition(fallback: CameraPosition): C
 @Composable
 private fun RouteLine(points: List<Coordinate>) {
     val geoJson = remember(points) { points.toLineStringGeoJson() }
-    val source = rememberGeoJsonSource(GeoJsonData.JsonString(geoJson))
+    val data = remember(geoJson) { GeoJsonData.JsonString(geoJson) }
+    val source = rememberGeoJsonSource(data)
+    LaunchedEffect(source, data) { source.setData(data) }
     LineLayer(
         id = "planned-bicycle-route-casing",
         source = source,
@@ -673,30 +751,25 @@ private fun RouteLine(points: List<Coordinate>) {
 }
 
 @Composable
-private fun RouteEndpointMarker(id: String, label: String, coordinate: Coordinate, color: Color) {
-    val source = rememberGeoJsonSource(GeoJsonData.JsonString(coordinate.toPointGeoJson()))
-    CircleLayer(
-        id = "$id-circle",
-        source = source,
-        color = const(color),
-        radius = const(12.dp),
-        strokeColor = const(Color.White),
-        strokeWidth = const(3.dp),
-    )
-    SymbolLayer(
-        id = "$id-label",
-        source = source,
-        textField = format(span(label)),
-        textColor = const(Color.White),
-        textSize = const(12.sp),
-        textAllowOverlap = const(true),
-        textIgnorePlacement = const(true),
-    )
+private fun RouteControlMarker(label: String, color: Color, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.size(28.dp),
+        shape = CircleShape,
+        color = color,
+        contentColor = Color.White,
+        shadowElevation = 3.dp,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(label, style = MaterialTheme.typography.labelLarge)
+        }
+    }
 }
 
 @Composable
 private fun RouteActiveMarker(coordinate: Coordinate) {
-    val source = rememberGeoJsonSource(GeoJsonData.JsonString(coordinate.toPointGeoJson()))
+    val data = remember(coordinate) { GeoJsonData.JsonString(coordinate.toPointGeoJson()) }
+    val source = rememberGeoJsonSource(data)
+    LaunchedEffect(source, data) { source.setData(data) }
     CircleLayer(
         id = "route-active-position",
         source = source,
@@ -708,23 +781,26 @@ private fun RouteActiveMarker(coordinate: Coordinate) {
 }
 
 @Composable
-private fun CenterReticle(modifier: Modifier = Modifier) {
-    val accent = MaterialTheme.colorScheme.primary
-    val reticleDescription = stringResource(R.string.map_reticle_description)
-    Canvas(
-        modifier = modifier.size(42.dp).semantics { contentDescription = reticleDescription },
-    ) {
-        val center = this.center
-        val lineLength = 18.dp.toPx()
-        val shadow = Color.Black.copy(alpha = 0.52f)
-        drawCircle(shadow, radius = 10.dp.toPx(), style = Stroke(width = 5.dp.toPx()))
-        drawLine(shadow, androidx.compose.ui.geometry.Offset(center.x - lineLength, center.y), androidx.compose.ui.geometry.Offset(center.x + lineLength, center.y), 5.dp.toPx())
-        drawLine(shadow, androidx.compose.ui.geometry.Offset(center.x, center.y - lineLength), androidx.compose.ui.geometry.Offset(center.x, center.y + lineLength), 5.dp.toPx())
-        drawCircle(Color.White, radius = 10.dp.toPx(), style = Stroke(width = 2.dp.toPx()))
-        drawLine(Color.White, androidx.compose.ui.geometry.Offset(center.x - lineLength, center.y), androidx.compose.ui.geometry.Offset(center.x + lineLength, center.y), 2.dp.toPx())
-        drawLine(Color.White, androidx.compose.ui.geometry.Offset(center.x, center.y - lineLength), androidx.compose.ui.geometry.Offset(center.x, center.y + lineLength), 2.dp.toPx())
-        drawCircle(accent, radius = 3.dp.toPx())
-    }
+private fun SelectedLocationMarker(coordinate: Coordinate) {
+    val data = remember(coordinate) { GeoJsonData.JsonString(coordinate.toPointGeoJson()) }
+    val source = rememberGeoJsonSource(data)
+    LaunchedEffect(source, data) { source.setData(data) }
+    CircleLayer(
+        id = "selected-location-halo",
+        source = source,
+        color = const(Color(0xFFFFC107).copy(alpha = 0.32f)),
+        radius = const(18.dp),
+        strokeColor = const(Color.Black.copy(alpha = 0.8f)),
+        strokeWidth = const(2.dp),
+    )
+    CircleLayer(
+        id = "selected-location-marker",
+        source = source,
+        color = const(Color(0xFFFFC107)),
+        radius = const(9.dp),
+        strokeColor = const(Color.Black),
+        strokeWidth = const(3.dp),
+    )
 }
 
 @Composable
@@ -738,6 +814,11 @@ private fun rememberMapCameraState(camera: MapCamera): CameraState = rememberCam
 )
 
 private fun Coordinate.toPosition(): Position = Position(latitude = latitude, longitude = longitude)
+
+internal fun routePointLabel(index: Int): String {
+    require(index in 0 until 26) { "Route point index must fit A-Z" }
+    return ('A'.code + index).toChar().toString()
+}
 internal fun Double.formatCoordinate(): String = String.format(Locale.US, "%.6f", this)
 internal fun Double.formatDuration(): String {
     val totalMinutes = (this / 60.0).toInt().coerceAtLeast(1)

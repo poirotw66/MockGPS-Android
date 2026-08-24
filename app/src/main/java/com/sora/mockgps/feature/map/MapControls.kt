@@ -1,5 +1,6 @@
 package com.sora.mockgps.feature.map
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -13,15 +14,22 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -31,6 +39,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Search
 import com.sora.mockgps.R
 import com.sora.mockgps.core.model.Coordinate
 import com.sora.mockgps.route.PlannedRoute
@@ -94,6 +107,7 @@ internal fun MapHeader(
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 internal fun MapControlPanel(
     pendingCoordinate: Coordinate,
     activeCoordinate: Coordinate?,
@@ -108,6 +122,7 @@ internal fun MapControlPanel(
     routePaused: Boolean,
     routeProgress: RouteProgress?,
     routeResult: RouteServiceState?,
+    isSelectingRouteWaypoint: Boolean,
     routeOptions: RouteSimulationOptions,
     onRouteOptionsChange: (RouteSimulationOptions) -> Unit,
     favoritesCount: Int,
@@ -135,12 +150,11 @@ internal fun MapControlPanel(
     onSaveRoute: () -> Unit,
     onExportGpx: () -> Unit,
     onBeginRoutePlanning: () -> Unit,
-    onSetRouteOrigin: () -> Unit,
-    onSetRouteDestination: () -> Unit,
     onPlanRoute: () -> Unit,
     onEditRouteOrigin: () -> Unit,
     onEditRouteDestination: () -> Unit,
     onAddRouteWaypoint: () -> Unit,
+    onCancelRouteWaypointSelection: () -> Unit,
     onRemoveRouteWaypoint: (Int) -> Unit,
     onMoveRouteWaypoint: (Int, Int) -> Unit,
     onSwapRouteEndpoints: () -> Unit,
@@ -153,21 +167,110 @@ internal fun MapControlPanel(
     modifier: Modifier = Modifier,
 ) {
     val uriHandler = LocalUriHandler.current
+    var activeDetail by remember { mutableStateOf<MapDetailGroup?>(null) }
+    val primaryActionIsStop = routePlanningStep == RoutePlanningStep.Inactive &&
+        isActive && activeCoordinate == pendingCoordinate
+    val primaryActionEnabled = isSelectingRouteWaypoint || isMapReady && !isStarting && !isPlanningRoute &&
+        !(routePlanningStep == RoutePlanningStep.Preview && isActive && !isRouteSession)
+    BackHandler(enabled = activeDetail != null) { activeDetail = null }
     Surface(
         modifier = modifier
             .widthIn(max = panelMaxWidth)
             .fillMaxWidth()
             .shadow(10.dp, MaterialTheme.shapes.large),
-        shape = MaterialTheme.shapes.large,
+        shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
     ) {
+        Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                MapDockButton(Icons.Filled.Search, R.string.map_group_search) { activeDetail = MapDetailGroup.Search }
+                MapDockButton(Icons.Filled.Favorite, R.string.map_group_places) { activeDetail = MapDetailGroup.Places }
+                MapDockButton(Icons.Filled.PlayArrow, R.string.map_group_route) { activeDetail = MapDetailGroup.Route }
+                MapDockButton(Icons.Filled.MoreVert, R.string.map_group_more) { activeDetail = MapDetailGroup.More }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Button(
+                    onClick = {
+                        if (isSelectingRouteWaypoint) {
+                            onCancelRouteWaypointSelection()
+                        } else when (routePlanningStep) {
+                            RoutePlanningStep.SelectStart,
+                            RoutePlanningStep.SelectDestination,
+                            -> onClearRoute()
+                            RoutePlanningStep.ReadyToPreview, RoutePlanningStep.Planning -> onPlanRoute()
+                            RoutePlanningStep.Preview -> when {
+                                isRouteSession -> onPauseResumeRoute()
+                                else -> onStartRoute()
+                            }
+                            RoutePlanningStep.Inactive -> when {
+                                isActive && activeCoordinate != pendingCoordinate -> onApply()
+                                isActive -> onStop()
+                                else -> onStart()
+                            }
+                        }
+                    },
+                    enabled = primaryActionEnabled,
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                ) {
+                    if (isPlanningRoute && !isSelectingRouteWaypoint) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    } else Text(
+                        stringResource(
+                            if (isSelectingRouteWaypoint) {
+                                R.string.action_cancel_route_stop_selection
+                            } else when (routePlanningStep) {
+                                RoutePlanningStep.SelectStart,
+                                RoutePlanningStep.SelectDestination,
+                                -> R.string.action_cancel
+                                RoutePlanningStep.ReadyToPreview, RoutePlanningStep.Planning -> R.string.action_preview_bicycle_route
+                                RoutePlanningStep.Preview -> if (isRouteSession) {
+                                    if (routePaused) R.string.action_resume_route else R.string.action_pause_route
+                                } else R.string.action_start_route_simulation
+                                RoutePlanningStep.Inactive -> when {
+                                    isActive && activeCoordinate != pendingCoordinate -> R.string.action_apply_new_location
+                                    isActive -> R.string.action_stop
+                                    else -> R.string.action_start_mock
+                                }
+                            },
+                        ),
+                        maxLines = 1,
+                    )
+                }
+                if (isActive && !primaryActionIsStop) {
+                    OutlinedButton(onClick = onStop, modifier = Modifier.heightIn(min = 48.dp)) {
+                        Text(stringResource(R.string.action_stop))
+                    }
+                }
+            }
+        }
+    }
+    activeDetail?.let { detailGroup ->
+        ModalBottomSheet(onDismissRequest = { activeDetail = null }) {
         Column(
             modifier = Modifier
-                .heightIn(max = if (compactLayout) 360.dp else 520.dp)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+                Text(
+                    stringResource(
+                        when (detailGroup) {
+                            MapDetailGroup.Search -> R.string.map_group_search
+                            MapDetailGroup.Places -> R.string.map_group_places
+                            MapDetailGroup.Route -> R.string.map_group_route
+                            MapDetailGroup.More -> R.string.map_group_more
+                        },
+                    ),
+                    style = MaterialTheme.typography.titleMedium,
+                )
             activeCoordinate?.let {
                 Text(
                     stringResource(R.string.active_coordinate, it.latitude.formatCoordinate(), it.longitude.formatCoordinate()),
@@ -184,73 +287,97 @@ internal fun MapControlPanel(
                 Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
             if (routePlanningStep == RoutePlanningStep.Inactive) {
-                if (showCoordinates) Text(
-                    stringResource(R.string.selected_coordinate, pendingCoordinate.latitude.formatCoordinate(), pendingCoordinate.longitude.formatCoordinate()),
-                    style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                )
-                OutlinedTextField(
-                    value = placeSearchQuery,
-                    onValueChange = onPlaceSearchQueryChanged,
-                    label = { Text(stringResource(R.string.place_search_label)) },
-                    supportingText = { Text(stringResource(R.string.place_search_privacy)) },
-                    modifier = Modifier.fillMaxWidth(), singleLine = true,
-                )
-                placeSearchError?.let { error -> Text(stringResource(when (error) {
-                    PlaceSearchError.Network -> R.string.place_search_error_network
-                    PlaceSearchError.RateLimited -> R.string.place_search_error_rate
-                    PlaceSearchError.InvalidResponse -> R.string.place_search_error_invalid
-                }), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-                placeSearchResults.forEach { result ->
-                    TextButton(onClick = { onPlaceSelected(result) }, modifier = Modifier.fillMaxWidth()) {
-                        Text(result.name, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (detailGroup == MapDetailGroup.Search) {
+                    if (showCoordinates) Text(
+                        stringResource(R.string.selected_coordinate, pendingCoordinate.latitude.formatCoordinate(), pendingCoordinate.longitude.formatCoordinate()),
+                        style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    )
+                    OutlinedTextField(
+                        value = placeSearchQuery,
+                        onValueChange = onPlaceSearchQueryChanged,
+                        label = { Text(stringResource(R.string.place_search_label)) },
+                        supportingText = { Text(stringResource(R.string.place_search_privacy)) },
+                        modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    )
+                    placeSearchError?.let { error -> Text(stringResource(when (error) {
+                        PlaceSearchError.Network -> R.string.place_search_error_network
+                        PlaceSearchError.RateLimited -> R.string.place_search_error_rate
+                        PlaceSearchError.InvalidResponse -> R.string.place_search_error_invalid
+                    }), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+                    placeSearchResults.forEach { result ->
+                        TextButton(onClick = {
+                            activeDetail = null
+                            onPlaceSelected(result)
+                        }, modifier = Modifier.fillMaxWidth()) {
+                            Text(result.name, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                    TextButton(onClick = { onShowCoordinatesChange(!showCoordinates) }, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(if (showCoordinates) R.string.action_hide_coordinates else R.string.action_show_coordinates))
+                    }
+                    TextButton(onClick = {
+                        activeDetail = null
+                        onUseCurrentLocation()
+                    }, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.action_use_current_location))
                     }
                 }
-                TextButton(onClick = { onShowCoordinatesChange(!showCoordinates) }, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(if (showCoordinates) R.string.action_hide_coordinates else R.string.action_show_coordinates))
-                }
-                TextButton(onClick = onUseCurrentLocation, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.action_use_current_location))
-                }
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = { onUpdateIntervalChange(if (updateIntervalMillis >= 2_000L) 1_000L else 2_000L) }, modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.setting_update_interval, updateIntervalMillis / 1_000L))
-                    }
-                    TextButton(onClick = { onAccuracyChange(if (accuracyMeters >= 10f) 5f else 10f) }, modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.setting_accuracy, accuracyMeters.toInt()))
+                if (detailGroup == MapDetailGroup.More) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = { onUpdateIntervalChange(if (updateIntervalMillis >= 2_000L) 1_000L else 2_000L) }, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.setting_update_interval, updateIntervalMillis / 1_000L))
+                        }
+                        TextButton(onClick = { onAccuracyChange(if (accuracyMeters >= 10f) 5f else 10f) }, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.setting_accuracy, accuracyMeters.toInt()))
+                        }
                     }
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    TextButton(onClick = onSaveFavorite, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
-                        Text(stringResource(R.string.action_save_place), maxLines = 1)
+                if (detailGroup == MapDetailGroup.Places) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        TextButton(onClick = {
+                            activeDetail = null
+                            onSaveFavorite()
+                        }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                            Text(stringResource(R.string.action_save_place), maxLines = 1)
+                        }
+                        TextButton(onClick = {
+                            activeDetail = null
+                            onShowFavorites()
+                        }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                            Text(stringResource(R.string.action_favorites, favoritesCount), maxLines = 1)
+                        }
                     }
-                    TextButton(onClick = onShowFavorites, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
-                        Text(stringResource(R.string.action_favorites, favoritesCount), maxLines = 1)
+                    TextButton(onClick = {
+                        activeDetail = null
+                        onShowRouteLibrary()
+                    }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                        Text(stringResource(R.string.action_route_library))
                     }
                 }
-                TextButton(onClick = onShowRouteLibrary, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                    Text(stringResource(R.string.action_route_library))
-                }
-                if (!isStarting && !isActive) {
+                if (detailGroup == MapDetailGroup.Route && !isStarting && !isActive) {
                     Button(
                         onClick = onStart,
                         enabled = isMapReady,
                         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                     ) { Text(stringResource(R.string.action_start_mock), maxLines = 1) }
                     OutlinedButton(
-                        onClick = onBeginRoutePlanning,
+                        onClick = {
+                            activeDetail = null
+                            onBeginRoutePlanning()
+                        },
                         enabled = isMapReady,
                         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                     ) { Text(stringResource(R.string.action_plan_bicycle_route), maxLines = 1) }
                 }
-                if (isActive && !isRouteSession && activeCoordinate != pendingCoordinate) {
+                if (detailGroup == MapDetailGroup.Route && isActive && !isRouteSession && activeCoordinate != pendingCoordinate) {
                     Button(onClick = onApply, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                         Text(stringResource(R.string.action_apply_new_location), maxLines = 1)
                     }
                 }
-                if (isStarting || isActive) {
+                if (detailGroup == MapDetailGroup.Route && (isStarting || isActive)) {
                     OutlinedButton(onClick = onStop, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                         Text(stringResource(R.string.action_stop), maxLines = 1)
                     }
@@ -262,7 +389,7 @@ internal fun MapControlPanel(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-            } else {
+            } else if (detailGroup == MapDetailGroup.Route) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(stringResource(R.string.route_panel_title), style = MaterialTheme.typography.titleMedium)
@@ -286,10 +413,6 @@ internal fun MapControlPanel(
                             coordinate = pendingCoordinate,
                             supportingText = stringResource(R.string.route_move_reticle_start),
                         )
-                        Button(
-                            onClick = onSetRouteOrigin,
-                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                        ) { Text(stringResource(R.string.action_use_as_route_start), maxLines = 1) }
                         OutlinedButton(
                             onClick = onShowFavorites,
                             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
@@ -305,10 +428,6 @@ internal fun MapControlPanel(
                             coordinate = pendingCoordinate,
                             supportingText = stringResource(R.string.route_move_reticle_destination),
                         )
-                        Button(
-                            onClick = onSetRouteDestination,
-                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                        ) { Text(stringResource(R.string.action_use_as_route_destination), maxLines = 1) }
                         OutlinedButton(
                             onClick = onShowFavorites,
                             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
@@ -336,7 +455,10 @@ internal fun MapControlPanel(
                         }
                         if (!isPlanningRoute) {
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                TextButton(onClick = onAddRouteWaypoint, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                                TextButton(onClick = {
+                                    activeDetail = null
+                                    onAddRouteWaypoint()
+                                }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
                                     Text(stringResource(R.string.action_add_route_stop))
                                 }
                                 TextButton(onClick = onSwapRouteEndpoints, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
@@ -369,12 +491,18 @@ internal fun MapControlPanel(
                             )
                         }
                         if (!isRouteSession) {
+                            RouteWaypointEditor(routeWaypoints, onRemoveRouteWaypoint, onMoveRouteWaypoint)
+                        }
+                        if (!isRouteSession) {
                             RouteSimulationControls(
                                 options = routeOptions,
                                 onOptionsChange = onRouteOptionsChange,
                             )
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                TextButton(onClick = onAddRouteWaypoint, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                                TextButton(onClick = {
+                                    activeDetail = null
+                                    onAddRouteWaypoint()
+                                }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
                                     Text(stringResource(R.string.action_add_route_stop))
                                 }
                                 TextButton(onClick = onSwapRouteEndpoints, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
@@ -461,6 +589,32 @@ internal fun MapControlPanel(
                 ) { Text(stringResource(R.string.route_provider_attribution), style = MaterialTheme.typography.labelSmall) }
             }
         }
+    }
+}
+}
+
+private enum class MapDetailGroup {
+    Search,
+    Places,
+    Route,
+    More,
+}
+
+@Composable
+private fun MapDockButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: Int,
+    onClick: () -> Unit,
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        IconButton(onClick = onClick, modifier = Modifier.size(48.dp)) {
+            Icon(imageVector = icon, contentDescription = stringResource(label))
+        }
+        Text(
+            text = stringResource(label),
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+        )
     }
 }
 
@@ -550,7 +704,7 @@ private fun RouteWaypointEditor(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(stringResource(R.string.route_stop_label, visibleIndex + 1), style = MaterialTheme.typography.labelLarge)
+                    Text(stringResource(R.string.route_stop_label, routePointLabel(routeIndex)), style = MaterialTheme.typography.labelLarge)
                     Text(
                         "${coordinate.latitude.formatCoordinate()}, ${coordinate.longitude.formatCoordinate()}",
                         style = MaterialTheme.typography.bodySmall,
