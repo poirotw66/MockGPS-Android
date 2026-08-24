@@ -3,6 +3,7 @@ package com.sora.mockgps.feature.map
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
@@ -68,7 +69,7 @@ internal fun ShapeRouteDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(stringResource(R.string.shape_route_notice))
-                OptionRow(RouteShape.entries, shape, { it.label() }) { shape = it }
+                ShapeOptionGrid(shape) { shape = it }
             }
         },
         confirmButton = {
@@ -80,6 +81,25 @@ internal fun ShapeRouteDialog(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
         },
     )
+}
+
+@Composable
+private fun ShapeOptionGrid(selected: RouteShape, onSelected: (RouteShape) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        RouteShape.entries.chunked(3).forEach { rowShapes ->
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                rowShapes.forEach { shape ->
+                    FilterChip(
+                        selected = selected == shape,
+                        onClick = { onSelected(shape) },
+                        label = { Text(shape.label()) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                repeat(3 - rowShapes.size) { Spacer(modifier = Modifier.weight(1f)) }
+            }
+        }
+    }
 }
 
 @Composable
@@ -139,5 +159,11 @@ private fun RouteShape.label(): String = stringResource(
         RouteShape.Heart -> R.string.shape_heart
         RouteShape.Star -> R.string.shape_star
         RouteShape.Circle -> R.string.shape_circle
+        RouteShape.Cat -> R.string.shape_cat
+        RouteShape.Dog -> R.string.shape_dog
+        RouteShape.Rabbit -> R.string.shape_rabbit
+        RouteShape.Fish -> R.string.shape_fish
+        RouteShape.Butterfly -> R.string.shape_butterfly
+        RouteShape.ChristmasTree -> R.string.shape_christmas_tree
     },
 )

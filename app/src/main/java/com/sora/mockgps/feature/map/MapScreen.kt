@@ -489,6 +489,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             uiState.routePlanningStep == RoutePlanningStep.SelectStart -> stringResource(R.string.route_map_prompt_start)
             uiState.routePlanningStep == RoutePlanningStep.SelectDestination -> stringResource(R.string.route_map_prompt_destination)
             uiState.routePlanningStep == RoutePlanningStep.Planning -> stringResource(R.string.route_map_prompt_planning)
+            uiState.routePlanningStep == RoutePlanningStep.Preview && !uiState.showRouteControlPoints -> uiState.activeRouteName
             else -> null
         }
         routeMapPrompt?.let { prompt ->

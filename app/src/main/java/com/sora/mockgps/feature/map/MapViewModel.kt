@@ -457,23 +457,31 @@ class MapViewModel @JvmOverloads constructor(
 
     internal fun generateAutomaticJourney(options: AutoJourneyOptions) {
         routePlanningJob?.cancel()
-        val points = JourneyPlanner.automaticControlPoints(options)
+        val journey = JourneyPlanner.automaticJourney(options)
+        val route = PlannedRoute(
+            points = journey.points,
+            distanceMeters = RoutePolyline(journey.points).totalDistanceMeters,
+            providerDurationSeconds = 0.0,
+        )
         mutableUiState.update {
             it.copy(
                 isRoutePlanningMode = true,
-                routeOrigin = points.first(),
-                routeDestination = points.last(),
-                routeWaypoints = points,
-                plannedRoute = null,
+                routeOrigin = journey.points.first(),
+                routeDestination = journey.points.last(),
+                routeWaypoints = emptyList(),
+                plannedRoute = route,
                 routeTransportMode = options.transportMode,
-                showRouteControlPoints = true,
+                showRouteControlPoints = false,
                 isPlanningRoute = false,
                 routeError = null,
                 activeSavedRouteId = null,
-                activeRouteName = null,
+                activeRouteName = localized(
+                    R.string.generated_journey_name,
+                    localized(options.region.labelResource()),
+                    localized(journey.shape.labelResource()),
+                ),
             )
         }
-        planBicycleRoute()
     }
 
     internal fun generateShapeRoute(center: Coordinate, shape: RouteShape) {
@@ -495,7 +503,7 @@ class MapViewModel @JvmOverloads constructor(
                 isPlanningRoute = false,
                 routeError = null,
                 activeSavedRouteId = null,
-                activeRouteName = null,
+                activeRouteName = localized(shape.labelResource()),
             )
         }
     }
@@ -711,6 +719,26 @@ class MapViewModel @JvmOverloads constructor(
 
     private fun localized(@StringRes resourceId: Int, vararg formatArgs: Any): String =
         getApplication<Application>().getString(resourceId, *formatArgs)
+
+    @StringRes
+    private fun JourneyRegion.labelResource(): Int = when (this) {
+        JourneyRegion.Taiwan -> R.string.region_taiwan
+        JourneyRegion.Japan -> R.string.region_japan
+        JourneyRegion.SouthKorea -> R.string.region_south_korea
+    }
+
+    @StringRes
+    private fun RouteShape.labelResource(): Int = when (this) {
+        RouteShape.Heart -> R.string.shape_heart
+        RouteShape.Star -> R.string.shape_star
+        RouteShape.Circle -> R.string.shape_circle
+        RouteShape.Cat -> R.string.shape_cat
+        RouteShape.Dog -> R.string.shape_dog
+        RouteShape.Rabbit -> R.string.shape_rabbit
+        RouteShape.Fish -> R.string.shape_fish
+        RouteShape.Butterfly -> R.string.shape_butterfly
+        RouteShape.ChristmasTree -> R.string.shape_christmas_tree
+    }
 
     private fun awaitMapLoad() {
         mapLoadTimeout?.cancel()
