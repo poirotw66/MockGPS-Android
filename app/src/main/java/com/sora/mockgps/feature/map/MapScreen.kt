@@ -96,7 +96,9 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     var notificationPermissionHandled by rememberSaveable { mutableStateOf(false) }
     var pendingRouteStart by rememberSaveable { mutableStateOf(false) }
     var pendingCurrentLocation by rememberSaveable { mutableStateOf(false) }
-    var routeOptions by remember { mutableStateOf(RouteSimulationOptions()) }
+    var routeOptions by rememberSaveable(stateSaver = RouteSimulationOptionsSaver) {
+        mutableStateOf(RouteSimulationOptions())
+    }
     var saveFavoriteCoordinate by remember { mutableStateOf<Coordinate?>(null) }
     var showFavorites by remember { mutableStateOf(false) }
     var renameFavorite by remember { mutableStateOf<FavoriteLocation?>(null) }

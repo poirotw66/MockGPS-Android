@@ -1,6 +1,6 @@
 <resources>
-    <string name="app_name">模擬定位</string>
-    <string name="spike_title">Mock GPS 核心驗證</string>
+    <string name="app_name">花路漫步 GPS</string>
+    <string name="spike_title">花路漫步 GPS 核心驗證</string>
     <string name="map_title">選擇模擬位置</string>
     <string name="map_picker_description">互動式地圖。點擊地圖上的任一點即可選定位置；拖曳或縮放地圖只會瀏覽，不會改變選定位置。</string>
     <string name="map_group_search">搜尋</string>

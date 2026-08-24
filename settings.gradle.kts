@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Mock GPS"
+rootProject.name = "BloomWalk GPS"
 include(":app")

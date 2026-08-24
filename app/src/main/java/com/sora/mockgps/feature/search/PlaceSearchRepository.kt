@@ -28,7 +28,7 @@ interface PlaceSearchRepository {
 
 data class PlaceSearchProviderConfig(
     val baseUrl: String = "https://nominatim.openstreetmap.org/search",
-    val userAgent: String = "MockGPS-Android/0.1 (https://github.com/poirotw66/MockGPS-Android)",
+    val userAgent: String = "BloomWalk-GPS/0.1 (https://github.com/poirotw66/MockGPS-Android)",
     val requestIntervalMillis: Long = 1_000L,
     val maxResponseBytes: Int = 256 * 1024,
 ) {

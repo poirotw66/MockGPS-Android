@@ -89,7 +89,7 @@ data class RoutingProviderConfig(
         const val FOSSGIS_FOOT_BASE_URL = "https://routing.openstreetmap.de/routed-foot/route/v1/driving/"
         const val FOSSGIS_BICYCLE_BASE_URL = "https://routing.openstreetmap.de/routed-bike/route/v1/driving/"
         const val FOSSGIS_DRIVING_BASE_URL = "https://routing.openstreetmap.de/routed-car/route/v1/driving/"
-        const val DEFAULT_USER_AGENT = "MockGPS-Android/0.1 (https://github.com/poirotw66/MockGPS-Android)"
+        const val DEFAULT_USER_AGENT = "BloomWalk-GPS/0.1 (https://github.com/poirotw66/MockGPS-Android)"
         const val DEFAULT_TIMEOUT_MILLIS = 12_000
         private const val MAX_TIMEOUT_MILLIS = 60_000
     }

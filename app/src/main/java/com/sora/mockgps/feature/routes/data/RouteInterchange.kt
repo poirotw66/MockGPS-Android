@@ -87,7 +87,7 @@ object RouteGpxInterchange {
         val safePoints = RouteDataValidator.points(points)
         return buildString {
             append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
-            append("<gpx version=\"1.1\" creator=\"MockGPS-Android\" xmlns=\"http://www.topografix.com/GPX/1/1\">")
+            append("<gpx version=\"1.1\" creator=\"BloomWalk GPS\" xmlns=\"http://www.topografix.com/GPX/1/1\">")
             append("<trk><name>").append(safeName.xmlEscape()).append("</name><trkseg>")
             safePoints.forEach { point ->
                 append("<trkpt lat=\"").append(point.latitude)

@@ -11,6 +11,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -60,6 +61,27 @@ internal data class RouteSimulationOptions(
         GpsDriftConfiguration()
     }
 }
+
+internal val RouteSimulationOptionsSaver = listSaver<RouteSimulationOptions, Any>(
+    save = { options ->
+        listOf(
+            options.preset.name,
+            options.customSpeedText,
+            options.mode.name,
+            options.smoothMovement,
+            options.gpsDriftEnabled,
+        )
+    },
+    restore = { values ->
+        RouteSimulationOptions(
+            preset = MovementPreset.valueOf(values[0] as String),
+            customSpeedText = values[1] as String,
+            mode = RouteExecutionMode.valueOf(values[2] as String),
+            smoothMovement = values[3] as Boolean,
+            gpsDriftEnabled = values[4] as Boolean,
+        )
+    },
+)
 
 @Composable
 internal fun RouteSimulationControls(

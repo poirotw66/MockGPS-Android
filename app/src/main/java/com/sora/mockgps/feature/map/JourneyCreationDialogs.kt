@@ -12,7 +12,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -25,7 +27,9 @@ internal fun AutoJourneyDialog(
     onDismiss: () -> Unit,
     onGenerate: (AutoJourneyOptions) -> Unit,
 ) {
-    var options by remember { mutableStateOf(AutoJourneyOptions()) }
+    var options by rememberSaveable(stateSaver = AutoJourneyOptionsSaver) {
+        mutableStateOf(AutoJourneyOptions())
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.auto_journey_title)) },
@@ -62,7 +66,9 @@ internal fun ShapeRouteDialog(
     onDismiss: () -> Unit,
     onGenerate: (RouteShape) -> Unit,
 ) {
-    var shape by remember { mutableStateOf(RouteShape.Heart) }
+    var shape by rememberSaveable(stateSaver = RouteShapeSaver) {
+        mutableStateOf(RouteShape.Heart)
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.shape_route_title)) },
@@ -82,6 +88,24 @@ internal fun ShapeRouteDialog(
         },
     )
 }
+
+private val AutoJourneyOptionsSaver = listSaver<AutoJourneyOptions, String>(
+    save = { options ->
+        listOf(options.region.name, options.duration.name, options.transportMode.name)
+    },
+    restore = { values ->
+        AutoJourneyOptions(
+            region = JourneyRegion.valueOf(values[0]),
+            duration = JourneyDuration.valueOf(values[1]),
+            transportMode = RouteTransportMode.valueOf(values[2]),
+        )
+    },
+)
+
+private val RouteShapeSaver = Saver<RouteShape, String>(
+    save = { shape -> shape.name },
+    restore = { name -> RouteShape.valueOf(name) },
+)
 
 @Composable
 private fun ShapeOptionGrid(selected: RouteShape, onSelected: (RouteShape) -> Unit) {

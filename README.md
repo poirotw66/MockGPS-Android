@@ -1,10 +1,10 @@
-# GPS 定位模擬 App
+# BloomWalk GPS
 
 Android Mock Location 工具。目前已完成靜態選點、喜愛地點，以及可編輯、儲存與自訂移動行為的路線模擬。
 
 ## 目前狀態
 
-- Android 專案：Kotlin、Jetpack Compose、`com.sora.mockgps`
+- Android 專案：Kotlin、Jetpack Compose、application ID `com.bloss0m.bloomwalk`
 - SDK：min 26、compile/target 36
 - 已完成：LocationManager GPS test provider、Fused Location mock mode、原子化 coordinator、前景服務、持續通知與 Stop action
 - Map UI：Taipei 101 預設位置、中央準星選點、權限流程、開發人員選項入口、繁中／英文資源
@@ -40,11 +40,9 @@ Debug APK：`app/build/outputs/apk/debug/app-debug.apk`
 
 以下選項不妨礙規劃，但在 Release Candidate 前必須定案：
 
-1. App 顯示名稱
-2. 永久 `applicationId`（目前：`com.sora.mockgps`）
-3. 地點搜尋服務的供應商與使用政策
-4. OpenFreeMap 可用性監控與未來自架策略
-5. 至少一台可開啟「開發人員選項 → 選取模擬位置應用程式」的測試裝置
+1. 地點搜尋服務的供應商與使用政策
+2. OpenFreeMap 可用性監控與未來自架策略
+3. 至少一台可開啟「開發人員選項 → 選取模擬位置應用程式」的測試裝置
 
 目前地圖不需要 API key。畫面保留 MapLibre／OpenStreetMap attribution；若未來搜尋服務需要 token，仍必須放在未追蹤的本機設定並限制使用範圍。
 
