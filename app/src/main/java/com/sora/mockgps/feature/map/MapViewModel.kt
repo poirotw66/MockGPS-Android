@@ -586,7 +586,7 @@ class MapViewModel @JvmOverloads constructor(
                 transportMode = options.transportMode,
                 routeName = localized(
                     R.string.generated_journey_name,
-                    journey.landmark.name,
+                    journey.landmark.displayName(currentSearchLocale().usesTraditionalChinese()),
                     localized(options.region.labelResource()),
                     localized(journey.shape.labelResource()),
                 ),
