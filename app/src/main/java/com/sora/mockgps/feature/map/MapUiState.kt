@@ -26,6 +26,7 @@ data class MapUiState(
     val showRouteControlPoints: Boolean = true,
     val isPlanningRoute: Boolean = false,
     val routeError: String? = null,
+    val automaticJourneyRecoveryAvailable: Boolean = false,
     val favoriteMessage: String? = null,
     /** The saved route that supplied [plannedRoute], if it was loaded from storage. */
     val activeSavedRouteId: Long? = null,

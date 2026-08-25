@@ -57,11 +57,16 @@ class MapViewModel @JvmOverloads constructor(
         initialValue = emptyList(),
     )
     private val routingRepository = dependencies.routingRepository
+    private val automaticJourneyRoutePlanner = AutomaticJourneyRoutePlanner(
+        routingRepository,
+        dependencies.journeyRandom,
+    )
     private val settingsRepository = dependencies.settingsRepository
     private val placeSearchRepository = dependencies.placeSearchRepository
 
     private var mapLoadTimeout: Job? = null
     private var routePlanningJob: Job? = null
+    private var automaticJourneyOptions: AutoJourneyOptions? = null
     private var placeSearchJob: Job? = null
     private var initialSettingsApplied = false
 
@@ -460,6 +465,7 @@ class MapViewModel @JvmOverloads constructor(
                 activeRouteName = null,
                 isPlanningRoute = false,
                 routeError = null,
+                automaticJourneyRecoveryAvailable = false,
             )
         }
     }
@@ -475,6 +481,7 @@ class MapViewModel @JvmOverloads constructor(
                 plannedRoute = null,
                 showRouteControlPoints = true,
                 routeError = null,
+                automaticJourneyRecoveryAvailable = false,
                 isPlanningRoute = false,
                 activeSavedRouteId = null,
                 activeRouteName = null,
@@ -497,6 +504,7 @@ class MapViewModel @JvmOverloads constructor(
                 plannedRoute = null,
                 showRouteControlPoints = true,
                 routeError = null,
+                automaticJourneyRecoveryAvailable = false,
                 isPlanningRoute = false,
                 activeSavedRouteId = null,
                 activeRouteName = null,
@@ -507,27 +515,26 @@ class MapViewModel @JvmOverloads constructor(
 
     internal fun generateAutomaticJourney(options: AutoJourneyOptions) {
         routePlanningJob?.cancel()
-        val journey = JourneyPlanner.automaticJourney(options)
+        automaticJourneyOptions = options
+        val journey = automaticJourneyRoutePlanner.generate(options)
         mutableUiState.update {
-            it.copy(
-                isRoutePlanningMode = true,
-                routeOrigin = journey.points.first(),
-                routeDestination = journey.points.last(),
-                routeWaypoints = journey.points,
-                plannedRoute = null,
-                routeTransportMode = options.transportMode,
-                showRouteControlPoints = false,
-                isPlanningRoute = true,
-                routeError = null,
-                activeSavedRouteId = null,
-                activeRouteName = localized(
+            AutomaticJourneyStateReducer.planning(
+                state = it,
+                journey = journey,
+                transportMode = options.transportMode,
+                routeName = localized(
                     R.string.generated_journey_name,
+                    journey.landmark.name,
                     localized(options.region.labelResource()),
                     localized(journey.shape.labelResource()),
                 ),
             )
         }
-        planBicycleRoute()
+        planAutomaticJourney(journey, options.transportMode)
+    }
+
+    fun regenerateAutomaticJourney() {
+        automaticJourneyOptions?.let(::generateAutomaticJourney)
     }
 
     internal fun generateShapeRoute(center: Coordinate, shape: RouteShape) {
@@ -548,6 +555,7 @@ class MapViewModel @JvmOverloads constructor(
                 showRouteControlPoints = false,
                 isPlanningRoute = false,
                 routeError = null,
+                automaticJourneyRecoveryAvailable = false,
                 activeSavedRouteId = null,
                 activeRouteName = localized(shape.labelResource()),
             )
@@ -584,6 +592,7 @@ class MapViewModel @JvmOverloads constructor(
                 activeSavedRouteId = null,
                 activeRouteName = null,
                 routeError = null,
+                automaticJourneyRecoveryAvailable = false,
             )
         }
     }
@@ -599,6 +608,7 @@ class MapViewModel @JvmOverloads constructor(
                 },
                 plannedRoute = null,
                 routeError = null,
+                automaticJourneyRecoveryAvailable = false,
             )
         }
     }
@@ -646,7 +656,14 @@ class MapViewModel @JvmOverloads constructor(
             return
         }
         routePlanningJob?.cancel()
-        mutableUiState.update { it.copy(isPlanningRoute = true, plannedRoute = null, routeError = null) }
+        mutableUiState.update {
+            it.copy(
+                isPlanningRoute = true,
+                plannedRoute = null,
+                routeError = null,
+                automaticJourneyRecoveryAvailable = false,
+            )
+        }
         routePlanningJob = viewModelScope.launch {
             try {
                 val route = routingRepository.planRoute(waypoints, state.routeTransportMode)
@@ -680,6 +697,41 @@ class MapViewModel @JvmOverloads constructor(
         }
     }
 
+    private fun planAutomaticJourney(journey: GeneratedJourney, transportMode: RouteTransportMode) {
+        val origin = journey.points.first()
+        val destination = journey.points.last()
+        val waypoints = journey.points
+        routePlanningJob = viewModelScope.launch {
+            try {
+                val route = automaticJourneyRoutePlanner.plan(journey, transportMode)
+                mutableUiState.update { current ->
+                    if (current.isRoutePlanningMode && current.routeOrigin == origin &&
+                        current.routeDestination == destination && current.routeWaypoints == waypoints
+                    ) {
+                        AutomaticJourneyStateReducer.success(current, route)
+                    } else {
+                        current
+                    }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Throwable) {
+                mutableUiState.update { current ->
+                    if (current.isRoutePlanningMode && current.routeOrigin == origin &&
+                        current.routeDestination == destination && current.routeWaypoints == waypoints
+                    ) {
+                        AutomaticJourneyStateReducer.failure(
+                            current,
+                            localized(R.string.auto_journey_route_error),
+                        )
+                    } else {
+                        current
+                    }
+                }
+            }
+        }
+    }
+
     fun editRouteDestination() {
         routePlanningJob?.cancel()
         mutableUiState.update {
@@ -692,6 +744,7 @@ class MapViewModel @JvmOverloads constructor(
                 activeSavedRouteId = null,
                 activeRouteName = null,
                 routeError = null,
+                automaticJourneyRecoveryAvailable = false,
             )
         }
     }
@@ -710,6 +763,7 @@ class MapViewModel @JvmOverloads constructor(
                 activeSavedRouteId = null,
                 activeRouteName = null,
                 routeError = null,
+                automaticJourneyRecoveryAvailable = false,
             )
         }
     }
@@ -729,6 +783,7 @@ class MapViewModel @JvmOverloads constructor(
                 activeSavedRouteId = null,
                 activeRouteName = null,
                 routeError = null,
+                automaticJourneyRecoveryAvailable = false,
             )
         }
     }

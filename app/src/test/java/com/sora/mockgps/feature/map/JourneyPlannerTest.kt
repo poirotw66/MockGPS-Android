@@ -25,7 +25,7 @@ class JourneyPlannerTest {
         assertEquals(shortWalk.first(), shortWalk.last())
         assertEquals(longDrive.first(), longDrive.last())
         assertTrue(RoutePolyline(longDrive).totalDistanceMeters > RoutePolyline(shortWalk).totalDistanceMeters)
-        assertTrue(RoutePolyline(longDrive).totalDistanceMeters in 95_000.0..105_000.0)
+        assertTrue(RoutePolyline(longDrive).totalDistanceMeters in 35_000.0..70_000.0)
     }
 
     @Test
@@ -65,6 +65,49 @@ class JourneyPlannerTest {
         assertTrue(centers.any { center ->
             GeoMath.distanceMeters(center, JourneyRegion.Taiwan.landmarks.first().coordinate) > 50_000.0
         })
+    }
+
+    @Test
+    fun `automatic journey retains landmark and can exclude the previous selection`() {
+        val random = Random(7)
+        val first = JourneyPlanner.automaticJourney(AutoJourneyOptions(), random)
+        val second = JourneyPlanner.automaticJourney(
+            AutoJourneyOptions(),
+            random,
+            excludedLandmark = first.landmark,
+        )
+
+        assertTrue(first.landmark in JourneyRegion.Taiwan.landmarks)
+        assertTrue(GeoMath.distanceMeters(first.center, first.landmark.coordinate) <= 1_000.0)
+        assertTrue(second.landmark != first.landmark)
+    }
+
+    @Test
+    fun `transport mode conservatively caps automatic journey radius`() {
+        RouteTransportMode.entries.forEach { mode ->
+            val journey = JourneyPlanner.automaticJourney(
+                AutoJourneyOptions(duration = JourneyDuration.Long, transportMode = mode),
+                Random(23),
+            )
+            val maximumRadius = journey.points.maxOf { GeoMath.distanceMeters(it, journey.center) }
+            val expectedLimit = when (mode) {
+                RouteTransportMode.Walk -> 1_500.0
+                RouteTransportMode.Bicycle -> 4_000.0
+                RouteTransportMode.Drive -> 8_000.0
+            }
+
+            assertTrue(maximumRadius <= expectedLimit + 1.0)
+        }
+    }
+
+    @Test
+    fun `coastal and mountain landmarks use tighter radius limits`() {
+        val constrained = JourneyRegion.entries.flatMap { it.landmarks }
+            .filter { it.maximumShapeRadiusMeters <= 1_500.0 }
+
+        assertTrue(constrained.size >= 10)
+        assertTrue(constrained.any { it.name == "Taroko National Park Gate" })
+        assertTrue(constrained.any { it.name == "Yehliu Geopark" })
     }
 
     @Test

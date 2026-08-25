@@ -27,6 +27,8 @@
     <string name="invalid_coordinate">緯度須介於 -90 至 90，經度須介於 -180 至 180。</string>
     <string name="location_permission_required">啟動前景服務前必須允許定位權限。</string>
     <string name="notification_permission_denied">通知權限遭拒，Android 可能不會在通知欄顯示持續通知。</string>
+    <string name="foreground_service_start_not_allowed">Android 已阻止啟動此前景服務。請返回 App 後重試。</string>
+    <string name="foreground_service_security_failed">前景服務缺少必要權限或模擬位置設定。請檢查 App 權限與開發人員選項。</string>
     <string name="foreground_service_start_failed">Android 不允許啟動前景服務。請確認定位服務與開發人員選項後重試。</string>
     <string name="action_start_mock">開始模擬定位</string>
     <string name="action_stop">停止</string>
@@ -63,8 +65,10 @@
     <string name="auto_journey_duration">旅程時長</string>
     <string name="auto_journey_transport">交通工具</string>
     <string name="auto_journey_notice">每次會挑選著名景點，並將形狀控制點傳送至 FOSSGIS OpenStreetMap 路線服務。結果會沿著真實道路，因此每次形狀都會自然不同，也不會過度完美。</string>
-    <string name="generated_journey_name">%1$s · %2$s旅程</string>
+    <string name="generated_journey_name">%1$s · %2$s · %3$s旅程</string>
     <string name="action_generate_journey">產生旅程</string>
+    <string name="action_try_another_landmark">改用其他景點</string>
+    <string name="auto_journey_route_error">此景點無法產生道路路線。請改用其他景點。</string>
     <string name="region_taiwan">台灣</string>
     <string name="region_japan">日本</string>
     <string name="region_south_korea">韓國</string>

@@ -13,6 +13,7 @@ import com.sora.mockgps.feature.search.PlaceSearchRepository
 import com.sora.mockgps.route.CachingRoutingRepository
 import com.sora.mockgps.route.FossgisBicycleRoutingRepository
 import com.sora.mockgps.route.RoutingRepository
+import kotlin.random.Random
 
 /** Production composition root; tests can replace every I/O dependency. */
 data class MapDependencies(
@@ -21,6 +22,7 @@ data class MapDependencies(
     val routingRepository: RoutingRepository,
     val settingsRepository: AppSettingsRepository,
     val placeSearchRepository: PlaceSearchRepository,
+    val journeyRandom: Random = Random.Default,
 ) {
     companion object {
         fun from(application: Application): MapDependencies {

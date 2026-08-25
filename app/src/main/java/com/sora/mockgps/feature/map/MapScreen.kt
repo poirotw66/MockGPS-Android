@@ -134,6 +134,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     val cameraState = rememberMapCameraState(uiState.camera)
     val coroutineScope = rememberCoroutineScope()
     var permissionMessage by remember { mutableStateOf<String?>(null) }
+    var serviceStartErrorMessage by remember { mutableStateOf<String?>(null) }
     var notificationPermissionHandled by rememberSaveable { mutableStateOf(false) }
     var pendingRouteStart by rememberSaveable { mutableStateOf(false) }
     var pendingCurrentLocation by rememberSaveable { mutableStateOf(false) }
@@ -185,8 +186,18 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
 
     val locationPermissionRequired = stringResource(R.string.location_permission_required)
     val notificationPermissionDenied = stringResource(R.string.notification_permission_denied)
+    val serviceStartNotAllowed = stringResource(R.string.foreground_service_start_not_allowed)
+    val serviceStartSecurityFailed = stringResource(R.string.foreground_service_security_failed)
     val serviceStartFailed = stringResource(R.string.foreground_service_start_failed)
     val developerOptionsUnavailable = stringResource(R.string.developer_options_unavailable)
+    fun applyServiceStartOutcome(outcome: ForegroundServiceStartOutcome) {
+        serviceStartErrorMessage = when (outcome) {
+            ForegroundServiceStartOutcome.Started -> null
+            is ForegroundServiceStartOutcome.NotAllowed -> serviceStartNotAllowed
+            is ForegroundServiceStartOutcome.SecurityOrSetup -> serviceStartSecurityFailed
+            is ForegroundServiceStartOutcome.Failed -> serviceStartFailed
+        }
+    }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) {
@@ -213,26 +224,27 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     }
                 }
             } else if (!shouldStartRoute) {
-                context.startMockService(
-                    uiState.pendingCoordinate,
-                    uiState.updateIntervalMillis,
-                    uiState.accuracyMeters,
-                ) { permissionMessage = serviceStartFailed }
+                serviceStartErrorMessage = null
+                applyServiceStartOutcome(context.startMockService(
+                    uiState.pendingCoordinate, uiState.updateIntervalMillis, uiState.accuracyMeters,
+                ))
             } else {
                 val route = uiState.plannedRoute?.points
                 if (route == null) {
-                    permissionMessage = serviceStartFailed
+                    serviceStartErrorMessage = serviceStartFailed
                 } else {
                     pendingRecentRoute = true
-                    context.startRouteService(
+                    serviceStartErrorMessage = null
+                    val outcome = context.startRouteService(
                         route,
                         routeOptions,
                         uiState.updateIntervalMillis,
                         uiState.accuracyMeters,
-                    ) {
+                    )
+                    if (outcome != ForegroundServiceStartOutcome.Started) {
                         pendingRecentRoute = false
-                        permissionMessage = serviceStartFailed
                     }
+                    applyServiceStartOutcome(outcome)
                 }
             }
         }
@@ -251,6 +263,10 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
         stringResource(R.string.favorite_saved, it)
     }
     val serviceError = serviceState as? MockServiceState.Error
+
+    LaunchedEffect(isStarting, isActive) {
+        if (isStarting || isActive) serviceStartErrorMessage = null
+    }
 
     LaunchedEffect(favoriteSavedMessage) {
         favoriteSavedMessage?.let { message ->
@@ -574,7 +590,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             pendingCoordinate = uiState.pendingCoordinate,
             activeCoordinate = activeCoordinate,
             showCoordinates = uiState.showCoordinates,
-            permissionMessage = permissionMessage,
+            permissionMessage = serviceStartErrorMessage ?: permissionMessage,
             compactLayout = compactLayout,
             panelMaxWidth = panelMaxWidth,
             mapType = uiState.mapType,
@@ -596,6 +612,8 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             plannedRoute = uiState.plannedRoute,
             isPlanningRoute = uiState.isPlanningRoute,
             routeError = uiState.routeError,
+            automaticJourneyRecoveryAvailable = uiState.automaticJourneyRecoveryAvailable,
+            activeRouteName = uiState.activeRouteName,
             placeSearchQuery = uiState.placeSearchQuery,
             isPlaceSearching = uiState.isPlaceSearching,
             placeSearchResults = uiState.placeSearchResults,
@@ -640,6 +658,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             onExportGpx = viewModel::exportPlannedRouteGpx,
             onBeginRoutePlanning = viewModel::beginRoutePlanning,
             onShowAutoJourney = { showAutoJourney = true },
+            onRegenerateAutomaticJourney = viewModel::regenerateAutomaticJourney,
             onShowShapeRoute = { showShapeRoute = true },
             onPlanRoute = viewModel::planBicycleRoute,
             onEditRouteOrigin = viewModel::editRouteOrigin,
@@ -654,11 +673,10 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 pendingRouteStart = false
                 val permissions = context.requiredRuntimePermissions(notificationPermissionHandled)
                 if (permissions.isEmpty()) {
-                    context.startMockService(
-                        uiState.pendingCoordinate,
-                        uiState.updateIntervalMillis,
-                        uiState.accuracyMeters,
-                    ) { permissionMessage = serviceStartFailed }
+                    serviceStartErrorMessage = null
+                    applyServiceStartOutcome(context.startMockService(
+                        uiState.pendingCoordinate, uiState.updateIntervalMillis, uiState.accuracyMeters,
+                    ))
                 } else {
                     permissionLauncher.launch(permissions.toTypedArray())
                 }
@@ -668,15 +686,17 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     val permissions = context.requiredRuntimePermissions(notificationPermissionHandled)
                     if (permissions.isEmpty()) {
                         pendingRecentRoute = true
-                        context.startRouteService(
+                        serviceStartErrorMessage = null
+                        val outcome = context.startRouteService(
                             points,
                             routeOptions,
                             uiState.updateIntervalMillis,
                             uiState.accuracyMeters,
-                        ) {
+                        )
+                        if (outcome != ForegroundServiceStartOutcome.Started) {
                             pendingRecentRoute = false
-                            permissionMessage = serviceStartFailed
                         }
+                        applyServiceStartOutcome(outcome)
                     } else {
                         pendingRouteStart = true
                         permissionLauncher.launch(permissions.toTypedArray())

@@ -96,6 +96,8 @@ internal fun MapControlPanel(
     plannedRoute: PlannedRoute?,
     isPlanningRoute: Boolean,
     routeError: String?,
+    automaticJourneyRecoveryAvailable: Boolean,
+    activeRouteName: String?,
     placeSearchQuery: String,
     isPlaceSearching: Boolean,
     placeSearchResults: List<com.sora.mockgps.feature.search.PlaceSearchResult>,
@@ -117,6 +119,7 @@ internal fun MapControlPanel(
     onExportGpx: () -> Unit,
     onBeginRoutePlanning: () -> Unit,
     onShowAutoJourney: () -> Unit,
+    onRegenerateAutomaticJourney: () -> Unit,
     onShowShapeRoute: () -> Unit,
     onPlanRoute: () -> Unit,
     onEditRouteOrigin: () -> Unit,
@@ -271,6 +274,14 @@ internal fun MapControlPanel(
             routeError?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
+            if (automaticJourneyRecoveryAvailable &&
+                (activeDetail == null || activeDetail == MapDetailGroup.Route)
+            ) {
+                OutlinedButton(
+                    onClick = onRegenerateAutomaticJourney,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                ) { Text(stringResource(R.string.action_try_another_landmark)) }
+            }
             if (routePlanningStep == RoutePlanningStep.Inactive) {
                 if (detailGroup == MapDetailGroup.Search) {
                     if (showCoordinates) Text(
@@ -406,6 +417,13 @@ internal fun MapControlPanel(
                     }
                 }
             } else if (detailGroup == MapDetailGroup.Route) {
+                activeRouteName?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(stringResource(R.string.route_panel_title), style = MaterialTheme.typography.titleMedium)

@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.location.LocationManager
 import android.net.Uri
 import android.os.Build
+import android.app.ForegroundServiceStartNotAllowedException
 import androidx.core.content.ContextCompat
 import com.sora.mockgps.core.io.readBoundedUtf8
 import com.sora.mockgps.core.model.Coordinate
@@ -38,13 +39,10 @@ internal fun Context.startMockService(
     coordinate: Coordinate,
     updateIntervalMillis: Long,
     accuracyMeters: Float,
-    onFailure: () -> Unit,
-) {
-    runCatching {
+): ForegroundServiceStartOutcome = foregroundServiceStartOutcome {
         startForegroundService(
             MockLocationForegroundService.startIntent(this, coordinate, updateIntervalMillis, accuracyMeters),
         )
-    }.onFailure { onFailure() }
 }
 
 internal fun Context.startRouteService(
@@ -52,9 +50,7 @@ internal fun Context.startRouteService(
     options: RouteSimulationOptions,
     updateIntervalMillis: Long,
     accuracyMeters: Float,
-    onFailure: () -> Unit,
-) {
-    runCatching {
+): ForegroundServiceStartOutcome = foregroundServiceStartOutcome {
         startForegroundService(
             MockLocationForegroundService.startRouteIntent(
                 context = this,
@@ -67,7 +63,29 @@ internal fun Context.startRouteService(
                 accuracyMeters = accuracyMeters,
             ),
         )
-    }.onFailure { onFailure() }
+}
+
+internal sealed interface ForegroundServiceStartOutcome {
+    data object Started : ForegroundServiceStartOutcome
+    data class NotAllowed(val cause: Throwable) : ForegroundServiceStartOutcome
+    data class SecurityOrSetup(val cause: SecurityException) : ForegroundServiceStartOutcome
+    data class Failed(val cause: Throwable) : ForegroundServiceStartOutcome
+}
+
+internal inline fun foregroundServiceStartOutcome(
+    start: () -> Unit,
+): ForegroundServiceStartOutcome = try {
+    start()
+    ForegroundServiceStartOutcome.Started
+} catch (failure: Throwable) {
+    classifyForegroundServiceStartFailure(failure)
+}
+
+internal fun classifyForegroundServiceStartFailure(failure: Throwable): ForegroundServiceStartOutcome = when {
+    Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && failure is ForegroundServiceStartNotAllowedException ->
+        ForegroundServiceStartOutcome.NotAllowed(failure)
+    failure is SecurityException -> ForegroundServiceStartOutcome.SecurityOrSetup(failure)
+    else -> ForegroundServiceStartOutcome.Failed(failure)
 }
 
 internal fun Context.isGranted(permission: String): Boolean =

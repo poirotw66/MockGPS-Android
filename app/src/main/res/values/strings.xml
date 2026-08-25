@@ -27,6 +27,8 @@
     <string name="invalid_coordinate">Enter latitude -90 to 90 and longitude -180 to 180.</string>
     <string name="location_permission_required">Location permission is required before starting the foreground service.</string>
     <string name="notification_permission_denied">Notification permission was denied. Android may hide the ongoing notification from the notification drawer.</string>
+    <string name="foreground_service_start_not_allowed">Android blocked this foreground service start. Return to the app and try again.</string>
+    <string name="foreground_service_security_failed">The foreground service lacks required permission or mock-location setup. Check app permissions and Developer options.</string>
     <string name="foreground_service_start_failed">Android did not allow the foreground service to start. Check location services and Developer options, then try again.</string>
     <string name="action_start_mock">Start mock location</string>
     <string name="action_stop">Stop</string>
@@ -67,8 +69,10 @@
     <string name="auto_journey_duration">Duration</string>
     <string name="auto_journey_transport">Transport</string>
     <string name="auto_journey_notice">Each generation picks a famous landmark and sends shape control points to the FOSSGIS OpenStreetMap routing service. The result follows real roads, so every shape is naturally different and imperfect.</string>
-    <string name="generated_journey_name">%1$s · %2$s journey</string>
+    <string name="generated_journey_name">%1$s · %2$s · %3$s journey</string>
     <string name="action_generate_journey">Generate</string>
+    <string name="action_try_another_landmark">Try another landmark</string>
+    <string name="auto_journey_route_error">That landmark could not produce a road route. Try another landmark.</string>
     <string name="region_taiwan">Taiwan</string>
     <string name="region_japan">Japan</string>
     <string name="region_south_korea">Korea</string>
