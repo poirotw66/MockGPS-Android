@@ -9,7 +9,9 @@ import com.sora.mockgps.feature.search.PlaceSearchBias
 import com.sora.mockgps.feature.search.PlaceSearchException
 import com.sora.mockgps.feature.search.PlaceSearchResult
 import com.sora.mockgps.feature.search.PlaceSearchSource
+import com.sora.mockgps.feature.search.formatCoordinateSearchLabel
 import com.sora.mockgps.feature.search.mergePlaceSearchResults
+import com.sora.mockgps.feature.search.parseCoordinateSearchQuery
 import com.sora.mockgps.feature.search.viewboxAround
 import com.sora.mockgps.core.model.Coordinate
 import com.sora.mockgps.feature.favorites.domain.FavoriteLocation
@@ -150,7 +152,7 @@ class MapViewModel @JvmOverloads constructor(
         }
     }
 
-    /** Debounced, cancellable query entry point. Local landmarks first; remote rate limited at 1/s. */
+    /** Debounced, cancellable query entry point. Coordinates and landmarks first; remote rate limited at 1/s. */
     fun onPlaceSearchQueryChanged(query: String) {
         placeSearchJob?.cancel()
         val normalizedQuery = query.trim()
@@ -160,6 +162,24 @@ class MapViewModel @JvmOverloads constructor(
                     placeSearchQuery = query,
                     isPlaceSearching = false,
                     placeSearchResults = emptyList(),
+                    placeSearchError = null,
+                )
+            }
+            return
+        }
+        val coordinateResult = parseCoordinateSearchQuery(normalizedQuery)?.let { coordinate ->
+            PlaceSearchResult(
+                name = formatCoordinateSearchLabel(coordinate),
+                coordinate = coordinate,
+                source = PlaceSearchSource.Coordinate,
+            )
+        }
+        if (coordinateResult != null) {
+            mutableUiState.update {
+                it.copy(
+                    placeSearchQuery = query,
+                    isPlaceSearching = false,
+                    placeSearchResults = listOf(coordinateResult),
                     placeSearchError = null,
                 )
             }

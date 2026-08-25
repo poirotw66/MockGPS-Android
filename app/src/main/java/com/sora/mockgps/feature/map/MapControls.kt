@@ -672,10 +672,12 @@ internal fun PlaceSearchContent(
 ) {
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val coordinateResults = results.filter { it.source == PlaceSearchSource.Coordinate }
     val landmarkResults = results.filter { it.source == PlaceSearchSource.Landmark }
     val remoteResults = results.filter { it.source == PlaceSearchSource.Remote }
     val showNicknameHint = !isSearching &&
         looksLikeLandmarkNickname(query) &&
+        coordinateResults.isEmpty() &&
         landmarkResults.isEmpty()
     OutlinedTextField(
         value = query,
@@ -738,6 +740,12 @@ internal fun PlaceSearchContent(
             color = MaterialTheme.colorScheme.error,
             style = MaterialTheme.typography.bodySmall,
         )
+    }
+    if (coordinateResults.isNotEmpty()) {
+        PlaceSearchSectionHeader(stringResource(R.string.place_search_section_coordinates))
+        coordinateResults.forEach { result ->
+            PlaceSearchResultButton(result, onPlaceSelected)
+        }
     }
     if (landmarkResults.isNotEmpty()) {
         PlaceSearchSectionHeader(stringResource(R.string.place_search_section_landmarks))

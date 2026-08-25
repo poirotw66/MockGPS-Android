@@ -84,4 +84,32 @@ class PlaceSearchRepositoryTest {
         assertFalse(looksLikeLandmarkNickname("Tokyo Station"))
         assertFalse(looksLikeLandmarkNickname("a"))
     }
+
+    @Test fun `parseCoordinateSearchQuery accepts comma and space separated lat lon`() {
+        val comma = parseCoordinateSearchQuery("25.033964, 121.564468")
+        val space = parseCoordinateSearchQuery("25.033964 121.564468")
+        assertEquals(25.033964, comma!!.latitude, 1e-9)
+        assertEquals(121.564468, comma.longitude, 1e-9)
+        assertEquals(comma, space)
+    }
+
+    @Test fun `parseCoordinateSearchQuery swaps lon lat order`() {
+        val swapped = parseCoordinateSearchQuery("121.564468, 25.033964")
+        assertEquals(25.033964, swapped!!.latitude, 1e-9)
+        assertEquals(121.564468, swapped.longitude, 1e-9)
+    }
+
+    @Test fun `parseCoordinateSearchQuery rejects single numbers and out of range values`() {
+        assertEquals(null, parseCoordinateSearchQuery("101"))
+        assertEquals(null, parseCoordinateSearchQuery("25.033964"))
+        assertEquals(null, parseCoordinateSearchQuery("999, 50"))
+        assertEquals(null, parseCoordinateSearchQuery("not, coords"))
+    }
+
+    @Test fun `formatCoordinateSearchLabel uses fixed precision`() {
+        assertEquals(
+            "25.033964, 121.564468",
+            formatCoordinateSearchLabel(Coordinate(25.033964, 121.564468)),
+        )
+    }
 }

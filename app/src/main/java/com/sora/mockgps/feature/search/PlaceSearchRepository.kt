@@ -13,9 +13,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.util.Locale
 import org.json.JSONArray
 
-enum class PlaceSearchSource { Landmark, Remote }
+enum class PlaceSearchSource { Coordinate, Landmark, Remote }
 
 data class PlaceSearchResult(
     val name: String,
@@ -122,6 +123,31 @@ internal fun buildNominatimSearchUrl(
     }
     return builder.toString()
 }
+
+/**
+ * Parses "lat, lon" / "lat lon" / "lon, lat" when one value is outside latitude range.
+ * Returns null when the query is not exactly two numeric components in valid ranges.
+ */
+internal fun parseCoordinateSearchQuery(query: String): Coordinate? {
+    val parts = query.trim().split(Regex("[,\\s;]+")).filter { it.isNotBlank() }
+    if (parts.size != 2) return null
+    val first = parts[0].toDoubleOrNull() ?: return null
+    val second = parts[1].toDoubleOrNull() ?: return null
+    val (latitude, longitude) = if (abs(first) > 90.0 && abs(second) <= 90.0) {
+        second to first
+    } else {
+        first to second
+    }
+    return Coordinate(latitude, longitude).takeIf {
+        it.latitude.isFinite() && it.latitude in -90.0..90.0 &&
+            it.longitude.isFinite() && it.longitude in -180.0..180.0
+    }
+}
+
+internal fun formatCoordinateSearchLabel(coordinate: Coordinate): String =
+    "${coordinate.latitude.formatSearchCoordinate()}, ${coordinate.longitude.formatSearchCoordinate()}"
+
+private fun Double.formatSearchCoordinate(): String = String.format(Locale.US, "%.6f", this)
 
 /** Soft viewbox around [center]; Nominatim order is left,top,right,bottom. */
 internal fun viewboxAround(center: Coordinate, deltaDegrees: Double = 0.35): String {
