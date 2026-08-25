@@ -18,6 +18,7 @@ class MockLocationForegroundServiceTest {
         assertEquals("com.sora.mockgps.action.PAUSE_ROUTE", MockLocationForegroundService.ACTION_PAUSE_ROUTE)
         assertEquals("com.sora.mockgps.action.RESUME_ROUTE", MockLocationForegroundService.ACTION_RESUME_ROUTE)
         assertEquals("com.sora.mockgps.action.STOP_ROUTE", MockLocationForegroundService.ACTION_STOP_ROUTE)
+        assertEquals("com.sora.mockgps.action.SET_JOYSTICK", MockLocationForegroundService.ACTION_SET_JOYSTICK)
         assertEquals(
             "com.sora.mockgps.extra.ROUTE_MOVEMENT_PROFILE",
             MockLocationForegroundService.EXTRA_ROUTE_MOVEMENT_PROFILE,

@@ -115,7 +115,7 @@ UX／效能更新（2026-08-24）：改為 edge-to-edge 滿版地圖與安全區
 ## 後續 Phase 2
 
 - [x] `GeoCalculator`：distance/bearing/interpolation
-- [ ] Joystick UI 與 500 ms movement loop
+- [x] Joystick UI 與 500 ms movement loop
 - [x] Cycling 固定 18 km/h
 - [x] FOSSGIS OpenStreetMap bicycle demo router 作為無 API key 的 MVP 路徑來源
 - [x] Route polyline、移動進度、Pause/Resume、Stop

@@ -38,6 +38,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -60,6 +61,7 @@ import com.sora.mockgps.R
 import com.sora.mockgps.core.model.Coordinate
 import com.sora.mockgps.feature.favorites.domain.FavoriteLocation
 import com.sora.mockgps.feature.routes.domain.SavedRouteSummary
+import com.sora.mockgps.route.JoystickSpeed
 import com.sora.mockgps.route.PlannedRoute
 import com.sora.mockgps.service.MockLocationForegroundService
 import com.sora.mockgps.service.MockServiceState
@@ -181,6 +183,10 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     var confirmClearFavorites by remember { mutableStateOf(false) }
     var confirmClearRecentLocations by remember { mutableStateOf(false) }
     var confirmClearRecents by remember { mutableStateOf(false) }
+    var joystickSpeed by rememberSaveable { mutableStateOf(JoystickSpeed.Walk) }
+    var joystickMagnitude by rememberSaveable { mutableFloatStateOf(0f) }
+    var lastJoystickBearing by rememberSaveable { mutableFloatStateOf(0f) }
+    var joystickMode by rememberSaveable { mutableStateOf(false) }
 
     val createRouteFileLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream"),
@@ -300,6 +306,8 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     val isRouteSession = isRouteStarting || isRouteRunning || isRoutePaused
     val isStarting = serviceState is MockServiceState.Starting || isRouteStarting
     val isActive = serviceState is MockServiceState.Active
+    val showJoystick = joystickMode && isActive && !isRouteSession
+    val sessionToken = routeState.sessionToken
     val isMapReady = uiState.loadingState == MapLoadingState.Ready
     val routeProgress = routeState.progressOrNull()
     val activeCoordinate = routeProgress?.coordinate ?: (serviceState as? MockServiceState.Active)?.coordinate
@@ -310,6 +318,25 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
 
     LaunchedEffect(isStarting, isActive) {
         if (isStarting || isActive) serviceStartErrorMessage = null
+    }
+
+    LaunchedEffect(isRouteSession) {
+        if (isRouteSession && joystickMode) joystickMode = false
+    }
+
+    LaunchedEffect(showJoystick) {
+        if (showJoystick) {
+            context.setJoystickVector(lastJoystickBearing, joystickMagnitude, joystickSpeed, sessionToken)
+        } else if (joystickMagnitude > 0f) {
+            joystickMagnitude = 0f
+            context.setJoystickVector(lastJoystickBearing, 0f, joystickSpeed, sessionToken)
+        }
+    }
+
+    LaunchedEffect(activeCoordinate, joystickMagnitude) {
+        if (joystickMagnitude > 0f) {
+            activeCoordinate?.let(viewModel::selectCoordinate)
+        }
     }
 
     LaunchedEffect(favoriteSavedMessage) {
@@ -349,7 +376,8 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             pendingRecentRoute = false
         }
     }
-    LaunchedEffect(serviceState, routeState) {
+    LaunchedEffect(serviceState, routeState, joystickMagnitude) {
+        if (joystickMagnitude > 0f) return@LaunchedEffect
         (serviceState as? MockServiceState.Active)?.coordinate?.let { coordinate ->
             when (routeState) {
                 RouteServiceState.Idle -> viewModel.rememberActiveCoordinate(coordinate, recordStaticRecent = true)
@@ -658,6 +686,35 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             }
         }
         val currentLocationLabel = stringResource(R.string.action_use_current_location)
+        if (showJoystick) {
+            JoystickOverlay(
+                enabled = true,
+                selectedSpeed = joystickSpeed,
+                onSpeedChange = { speed ->
+                    joystickSpeed = speed
+                    if (joystickMagnitude > 0f) {
+                        context.setJoystickVector(
+                            lastJoystickBearing,
+                            joystickMagnitude,
+                            speed,
+                            sessionToken,
+                        )
+                    }
+                },
+                onVectorChange = { bearing, magnitude ->
+                    lastJoystickBearing = bearing
+                    joystickMagnitude = magnitude
+                    context.setJoystickVector(bearing, magnitude, joystickSpeed, sessionToken)
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .navigationBarsPadding()
+                    .padding(
+                        start = 16.dp,
+                        bottom = if (compactLayout) 24.dp else 156.dp,
+                    ),
+            )
+        }
         Surface(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -747,10 +804,48 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             onShowRouteLibrary = { showRouteLibrary = true },
             onSaveRoute = { saveRouteName = true },
             onExportGpx = viewModel::exportPlannedRouteGpx,
-            onBeginRoutePlanning = viewModel::beginRoutePlanning,
-            onShowAutoJourney = { showAutoJourney = true },
+            onBeginRoutePlanning = {
+                joystickMode = false
+                viewModel.beginRoutePlanning()
+            },
+            onShowAutoJourney = {
+                joystickMode = false
+                showAutoJourney = true
+            },
             onRegenerateAutomaticJourney = viewModel::regenerateAutomaticJourney,
-            onShowShapeRoute = { showShapeRoute = true },
+            onShowShapeRoute = {
+                joystickMode = false
+                showShapeRoute = true
+            },
+            joystickMode = joystickMode,
+            joystickSpeed = joystickSpeed,
+            onJoystickSpeedChange = { speed ->
+                joystickSpeed = speed
+                if (showJoystick && joystickMagnitude > 0f) {
+                    context.setJoystickVector(lastJoystickBearing, joystickMagnitude, speed, sessionToken)
+                }
+            },
+            onStartJoystick = {
+                joystickMode = true
+                pendingRouteStart = false
+                val permissions = context.requiredRuntimePermissions(notificationPermissionHandled)
+                if (permissions.isEmpty()) {
+                    serviceStartErrorMessage = null
+                    applyServiceStartOutcome(context.startMockService(
+                        uiState.pendingCoordinate, uiState.updateIntervalMillis, uiState.accuracyMeters,
+                    ))
+                } else {
+                    permissionLauncher.launch(permissions.toTypedArray())
+                }
+            },
+            onEnableJoystick = { joystickMode = true },
+            onExitJoystick = {
+                if (joystickMagnitude > 0f) {
+                    context.setJoystickVector(lastJoystickBearing, 0f, joystickSpeed, sessionToken)
+                    joystickMagnitude = 0f
+                }
+                joystickMode = false
+            },
             onPlanRoute = viewModel::planBicycleRoute,
             onEditRouteOrigin = viewModel::editRouteOrigin,
             onEditRouteDestination = viewModel::editRouteDestination,
@@ -773,6 +868,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 }
             },
             onStartRoute = {
+                joystickMode = false
                 uiState.plannedRoute?.points?.let { points ->
                     val permissions = context.requiredRuntimePermissions(notificationPermissionHandled)
                     if (permissions.isEmpty()) {
@@ -806,6 +902,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 )
             },
             onStop = {
+                joystickMode = false
                 context.startService(MockLocationForegroundService.stopIntent(context, routeState.sessionToken))
             },
             modifier = Modifier

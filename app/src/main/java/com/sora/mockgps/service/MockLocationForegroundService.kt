@@ -21,6 +21,9 @@ import com.sora.mockgps.core.model.MockError
 import com.sora.mockgps.core.model.MockResult
 import com.sora.mockgps.route.AccelerationModel
 import com.sora.mockgps.route.GpsDriftConfiguration
+import com.sora.mockgps.route.JoystickMovement
+import com.sora.mockgps.route.JoystickSpeed
+import com.sora.mockgps.route.JoystickVector
 import com.sora.mockgps.route.MovementProfile
 import com.sora.mockgps.route.RouteExecution
 import com.sora.mockgps.route.RouteExecutionMode
@@ -36,6 +39,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -59,6 +63,10 @@ class MockLocationForegroundService : Service() {
     private var sessionCoordinate: Coordinate? = null
     @Volatile
     private var routeExecution: RouteExecution? = null
+    @Volatile
+    private var joystickVector: JoystickVector? = null
+    @Volatile
+    private var joystickSpeed: JoystickSpeed = JoystickSpeed.Walk
     private var cleanedUp = true
 
     private val coordinator by lazy {
@@ -95,6 +103,14 @@ class MockLocationForegroundService : Service() {
             } ?: rejectRouteStart()
             ACTION_PAUSE_ROUTE -> pauseRoute(intent.commandToken())
             ACTION_RESUME_ROUTE -> resumeRoute(intent.commandToken())
+            ACTION_SET_JOYSTICK -> setJoystick(
+                vector = JoystickVector(
+                    bearingDegrees = intent.getFloatExtra(EXTRA_JOYSTICK_BEARING, 0f),
+                    magnitude = intent.getFloatExtra(EXTRA_JOYSTICK_MAGNITUDE, 0f).coerceIn(0f, 1f),
+                ),
+                speed = intent.joystickSpeed(),
+                commandToken = intent.commandToken(),
+            )
             else -> requestStop(intent?.commandToken())
         }
         return START_NOT_STICKY
@@ -136,11 +152,38 @@ class MockLocationForegroundService : Service() {
                     publishState(MockServiceState.Active(coordinate))
 
                     while (isActive) {
-                        val payloadCoordinate = sessionCoordinate ?: coordinate
+                        val activeJoystick = joystickVector
+                        val interval = if (activeJoystick != null && activeJoystick.magnitude > 0f) {
+                            JOYSTICK_UPDATE_INTERVAL_MILLIS
+                        } else {
+                            updateIntervalMillis
+                        }
+                        var payloadCoordinate = sessionCoordinate ?: coordinate
+                        if (activeJoystick != null && activeJoystick.magnitude > 0f) {
+                            payloadCoordinate = JoystickMovement.stepCoordinate(
+                                origin = payloadCoordinate,
+                                vector = activeJoystick,
+                                speed = joystickSpeed,
+                                deltaMillis = interval,
+                            )
+                            sessionCoordinate = payloadCoordinate
+                            publishState(MockServiceState.Active(payloadCoordinate))
+                        }
+                        val payloadOptions = if (activeJoystick != null && activeJoystick.magnitude > 0f) {
+                            MockPayloadOptions(
+                                accuracyMeters = accuracyMeters,
+                                speedMetersPerSecond = (
+                                    JoystickMovement.speedMetersPerSecond(joystickSpeed) * activeJoystick.magnitude
+                                ).toFloat(),
+                                bearingDegrees = activeJoystick.bearingDegrees,
+                            )
+                        } else {
+                            MockPayloadOptions(accuracyMeters = accuracyMeters)
+                        }
                         val payload = when (
                             val result = payloadFactory.create(
                                 payloadCoordinate,
-                                MockPayloadOptions(accuracyMeters = accuracyMeters),
+                                payloadOptions,
                             )
                         ) {
                             is MockResult.Success -> result.value
@@ -150,7 +193,7 @@ class MockLocationForegroundService : Service() {
                             is MockResult.Success -> Unit
                             is MockResult.Failure -> throw MockSessionException(result.error.toString())
                         }
-                        delay(updateIntervalMillis)
+                        delayWithJoystickPreemption(interval)
                     }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
@@ -161,6 +204,26 @@ class MockLocationForegroundService : Service() {
                 } finally {
                     finishSession(sessionToken, terminalError, errorKind = terminalErrorKind)
                 }
+            }
+        }
+    }
+
+    private fun setJoystick(vector: JoystickVector, speed: JoystickSpeed, commandToken: ServiceSessionToken?) {
+        if (sessionJob?.isActive != true) return
+        if (!sessionGate.accepts(commandToken)) return
+        if (routeExecution != null) return
+        joystickVector = vector
+        joystickSpeed = speed
+    }
+
+    private suspend fun delayWithJoystickPreemption(totalMillis: Long) {
+        var elapsed = 0L
+        while (elapsed < totalMillis && currentCoroutineContext().isActive) {
+            val chunk = minOf(JOYSTICK_PREEMPT_POLL_MILLIS, totalMillis - elapsed)
+            delay(chunk)
+            elapsed += chunk
+            if ((joystickVector?.magnitude ?: 0f) > 0f && totalMillis > JOYSTICK_UPDATE_INTERVAL_MILLIS) {
+                return
             }
         }
     }
@@ -343,6 +406,8 @@ class MockLocationForegroundService : Service() {
     private fun requestStop(commandToken: ServiceSessionToken?) {
         if (!sessionGate.accepts(commandToken)) return
         val sessionToken = sessionGate.current() ?: return
+        joystickVector = null
+        joystickSpeed = JoystickSpeed.Walk
         val job = sessionJob
         serviceScope.launch {
             job?.cancelAndJoin()
@@ -414,6 +479,8 @@ class MockLocationForegroundService : Service() {
         publishRouteState(finalRouteState)
         finishingExecution?.stop()
         if (routeExecution === finishingExecution) routeExecution = null
+        joystickVector = null
+        joystickSpeed = JoystickSpeed.Walk
         sessionCoordinate = null
         sessionGate.end(sessionToken)
         demoteAndStop()
@@ -487,6 +554,7 @@ class MockLocationForegroundService : Service() {
         const val ACTION_PAUSE_ROUTE = "com.sora.mockgps.action.PAUSE_ROUTE"
         const val ACTION_RESUME_ROUTE = "com.sora.mockgps.action.RESUME_ROUTE"
         const val ACTION_STOP_ROUTE = "com.sora.mockgps.action.STOP_ROUTE"
+        const val ACTION_SET_JOYSTICK = "com.sora.mockgps.action.SET_JOYSTICK"
         const val EXTRA_LATITUDE = "com.sora.mockgps.extra.LATITUDE"
         const val EXTRA_LONGITUDE = "com.sora.mockgps.extra.LONGITUDE"
         const val EXTRA_ROUTE_LATITUDES = "com.sora.mockgps.extra.ROUTE_LATITUDES"
@@ -506,7 +574,12 @@ class MockLocationForegroundService : Service() {
         const val EXTRA_ACCURACY_METERS = "com.sora.mockgps.extra.ACCURACY_METERS"
         const val EXTRA_SESSION_ID = "com.sora.mockgps.extra.SESSION_ID"
         const val EXTRA_SESSION_GENERATION = "com.sora.mockgps.extra.SESSION_GENERATION"
+        const val EXTRA_JOYSTICK_BEARING = "com.sora.mockgps.extra.JOYSTICK_BEARING"
+        const val EXTRA_JOYSTICK_MAGNITUDE = "com.sora.mockgps.extra.JOYSTICK_MAGNITUDE"
+        const val EXTRA_JOYSTICK_SPEED = "com.sora.mockgps.extra.JOYSTICK_SPEED"
         const val UPDATE_INTERVAL_MILLIS = 1_000L
+        const val JOYSTICK_UPDATE_INTERVAL_MILLIS = 500L
+        private const val JOYSTICK_PREEMPT_POLL_MILLIS = 100L
         const val PAUSED_POLL_INTERVAL_MILLIS = 200L
         private const val CLEANUP_ATTEMPTS = 2
         val DEFAULT_COORDINATE = Coordinate(25.033964, 121.564468)
@@ -621,6 +694,21 @@ class MockLocationForegroundService : Service() {
                 putSessionToken(sessionToken)
             }
 
+        fun setJoystickIntent(
+            context: Context,
+            bearing: Float,
+            magnitude: Float,
+            speed: JoystickSpeed,
+            sessionToken: ServiceSessionToken? = null,
+        ): Intent =
+            Intent(context, MockLocationForegroundService::class.java).apply {
+                action = ACTION_SET_JOYSTICK
+                putExtra(EXTRA_JOYSTICK_BEARING, bearing)
+                putExtra(EXTRA_JOYSTICK_MAGNITUDE, magnitude.coerceIn(0f, 1f))
+                putExtra(EXTRA_JOYSTICK_SPEED, speed.name)
+                putSessionToken(sessionToken)
+            }
+
         private fun publishState(state: MockServiceState) {
             mutableState.value = state
         }
@@ -723,6 +811,11 @@ class MockLocationForegroundService : Service() {
             .takeIf(Float::isFinite)
             ?.coerceIn(1f, 100f)
             ?: MockPayloadOptions.DEFAULT_ACCURACY_METERS
+
+    private fun Intent.joystickSpeed(): JoystickSpeed =
+        getStringExtra(EXTRA_JOYSTICK_SPEED)
+            ?.let { runCatching { JoystickSpeed.valueOf(it) }.getOrNull() }
+            ?: JoystickSpeed.Walk
 
     private fun Intent.commandToken(): ServiceSessionToken? {
         val hasSessionId = hasExtra(EXTRA_SESSION_ID)

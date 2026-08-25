@@ -14,7 +14,9 @@ import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import com.sora.mockgps.core.io.readBoundedUtf8
 import com.sora.mockgps.core.model.Coordinate
+import com.sora.mockgps.route.JoystickSpeed
 import com.sora.mockgps.service.MockLocationForegroundService
+import com.sora.mockgps.service.ServiceSessionToken
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -81,6 +83,17 @@ internal fun Context.startMockService(
         startForegroundService(
             MockLocationForegroundService.startIntent(this, coordinate, updateIntervalMillis, accuracyMeters),
         )
+}
+
+internal fun Context.setJoystickVector(
+    bearing: Float,
+    magnitude: Float,
+    speed: JoystickSpeed,
+    sessionToken: ServiceSessionToken?,
+) {
+    startService(
+        MockLocationForegroundService.setJoystickIntent(this, bearing, magnitude, speed, sessionToken),
+    )
 }
 
 internal fun Context.startRouteService(

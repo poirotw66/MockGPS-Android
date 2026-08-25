@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -18,6 +19,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -55,6 +57,8 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Place
+import com.sora.mockgps.route.JoystickSpeed
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import com.sora.mockgps.R
@@ -128,6 +132,12 @@ internal fun MapControlPanel(
     onShowAutoJourney: () -> Unit,
     onRegenerateAutomaticJourney: () -> Unit,
     onShowShapeRoute: () -> Unit,
+    joystickMode: Boolean,
+    joystickSpeed: JoystickSpeed,
+    onJoystickSpeedChange: (JoystickSpeed) -> Unit,
+    onStartJoystick: () -> Unit,
+    onEnableJoystick: () -> Unit,
+    onExitJoystick: () -> Unit,
     onPlanRoute: () -> Unit,
     onEditRouteOrigin: () -> Unit,
     onEditRouteDestination: () -> Unit,
@@ -174,6 +184,7 @@ internal fun MapControlPanel(
                 MapDockButton(Icons.Filled.Search, R.string.map_group_search) { activeDetail = MapDetailGroup.Search }
                 MapDockButton(Icons.Filled.Favorite, R.string.map_group_places) { activeDetail = MapDetailGroup.Places }
                 MapDockButton(Icons.Filled.PlayArrow, R.string.map_group_route) { activeDetail = MapDetailGroup.Route }
+                MapDockButton(Icons.Filled.Place, R.string.map_group_joystick) { activeDetail = MapDetailGroup.Joystick }
                 MapDockButton(Icons.Filled.MoreVert, R.string.map_group_more) { activeDetail = MapDetailGroup.More }
             }
             Row(
@@ -261,6 +272,7 @@ internal fun MapControlPanel(
                             MapDetailGroup.Search -> R.string.map_group_search
                             MapDetailGroup.Places -> R.string.map_group_places
                             MapDetailGroup.Route -> R.string.map_group_route
+                            MapDetailGroup.Joystick -> R.string.map_group_joystick
                             MapDetailGroup.More -> R.string.map_group_more
                         },
                     ),
@@ -403,6 +415,85 @@ internal fun MapControlPanel(
                         onShowRouteLibrary()
                     }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                         Text(stringResource(R.string.action_route_library))
+                    }
+                }
+                if (detailGroup == MapDetailGroup.Joystick) {
+                    Text(
+                        stringResource(R.string.joystick_panel_subtitle),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (isRouteSession) {
+                        Text(
+                            stringResource(R.string.joystick_unavailable_during_route),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    } else {
+                        Text(stringResource(R.string.joystick_speed_label), style = MaterialTheme.typography.labelLarge)
+                        JoystickSpeed.entries.chunked(3).forEach { rowSpeeds ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                rowSpeeds.forEach { speed ->
+                                    FilterChip(
+                                        selected = joystickSpeed == speed,
+                                        onClick = { onJoystickSpeedChange(speed) },
+                                        label = {
+                                            Text(
+                                                stringResource(speed.labelResource()),
+                                                style = MaterialTheme.typography.labelSmall,
+                                            )
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                }
+                                repeat(3 - rowSpeeds.size) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
+                            }
+                        }
+                        when {
+                            joystickMode && isActive -> {
+                                Text(
+                                    stringResource(R.string.joystick_active_hint),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                                OutlinedButton(
+                                    onClick = {
+                                        activeDetail = null
+                                        onExitJoystick()
+                                    },
+                                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                                ) { Text(stringResource(R.string.action_exit_joystick)) }
+                                OutlinedButton(
+                                    onClick = onStop,
+                                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                                ) { Text(stringResource(R.string.action_stop)) }
+                            }
+                            isActive && !isRouteSession -> {
+                                Button(
+                                    onClick = {
+                                        activeDetail = null
+                                        onEnableJoystick()
+                                    },
+                                    enabled = isMapReady && !isStarting,
+                                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                                ) { Text(stringResource(R.string.action_enable_joystick)) }
+                            }
+                            else -> {
+                                Button(
+                                    onClick = {
+                                        activeDetail = null
+                                        onStartJoystick()
+                                    },
+                                    enabled = isMapReady && !isStarting,
+                                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                                ) { Text(stringResource(R.string.action_start_joystick)) }
+                            }
+                        }
                     }
                 }
                 if (detailGroup == MapDetailGroup.Route && !isStarting && !isActive) {
@@ -678,7 +769,18 @@ private enum class MapDetailGroup {
     Search,
     Places,
     Route,
+    Joystick,
     More,
+}
+
+@androidx.annotation.StringRes
+private fun JoystickSpeed.labelResource(): Int = when (this) {
+    JoystickSpeed.Walk -> R.string.joystick_speed_walk
+    JoystickSpeed.Run -> R.string.joystick_speed_run
+    JoystickSpeed.Bicycle -> R.string.joystick_speed_bicycle
+    JoystickSpeed.Car -> R.string.joystick_speed_car
+    JoystickSpeed.HighSpeedRail -> R.string.joystick_speed_high_speed_rail
+    JoystickSpeed.Airplane -> R.string.joystick_speed_airplane
 }
 
 @Composable
