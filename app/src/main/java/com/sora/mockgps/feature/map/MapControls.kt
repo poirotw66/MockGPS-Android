@@ -26,6 +26,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -74,6 +75,7 @@ internal fun MapControlPanel(
     pendingCoordinate: Coordinate,
     activeCoordinate: Coordinate?,
     showCoordinates: Boolean,
+    showLandmarks: Boolean,
     permissionMessage: String?,
     compactLayout: Boolean,
     panelMaxWidth: Dp,
@@ -105,6 +107,7 @@ internal fun MapControlPanel(
     onPlaceSearchQueryChanged: (String) -> Unit,
     onPlaceSelected: (com.sora.mockgps.feature.search.PlaceSearchResult) -> Unit,
     onShowCoordinatesChange: (Boolean) -> Unit,
+    onShowLandmarksChange: (Boolean) -> Unit,
     updateIntervalMillis: Long,
     accuracyMeters: Float,
     onUpdateIntervalChange: (Long) -> Unit,
@@ -310,6 +313,13 @@ internal fun MapControlPanel(
                     }
                 }
                 if (detailGroup == MapDetailGroup.More) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(stringResource(R.string.setting_show_landmarks), modifier = Modifier.weight(1f))
+                        Switch(checked = showLandmarks, onCheckedChange = onShowLandmarksChange)
+                    }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         TextButton(onClick = { onUpdateIntervalChange(if (updateIntervalMillis >= 2_000L) 1_000L else 2_000L) }, modifier = Modifier.weight(1f)) {
                             Text(stringResource(R.string.setting_update_interval, updateIntervalMillis / 1_000L))

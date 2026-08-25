@@ -5,6 +5,7 @@ import com.sora.mockgps.route.GeoMath
 import com.sora.mockgps.route.BicycleRouteRequest
 import com.sora.mockgps.route.RoutePolyline
 import com.sora.mockgps.route.RouteTransportMode
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -51,6 +52,27 @@ class JourneyPlannerTest {
             assertTrue(region.landmarks.all {
                 it.coordinate.latitude in latitudeRange && it.coordinate.longitude in longitudeRange
             })
+        }
+    }
+
+    @Test
+    fun `map shares all unique journey landmarks`() {
+        assertEquals(85, journeyLandmarks.size)
+        assertEquals(journeyLandmarks.size, journeyLandmarks.map { it.name }.toSet().size)
+        assertEquals(journeyLandmarks.size, journeyLandmarks.map { it.coordinate }.toSet().size)
+    }
+
+    @Test
+    fun `landmark geojson preserves names and longitude latitude order`() {
+        val features = JSONObject(journeyLandmarks.toFeatureCollectionGeoJson()).getJSONArray("features")
+
+        assertEquals(journeyLandmarks.size, features.length())
+        journeyLandmarks.forEachIndexed { index, landmark ->
+            val feature = features.getJSONObject(index)
+            val coordinates = feature.getJSONObject("geometry").getJSONArray("coordinates")
+            assertEquals(landmark.name, feature.getJSONObject("properties").getString("name"))
+            assertEquals(landmark.coordinate.longitude, coordinates.getDouble(0), 0.0)
+            assertEquals(landmark.coordinate.latitude, coordinates.getDouble(1), 0.0)
         }
     }
 

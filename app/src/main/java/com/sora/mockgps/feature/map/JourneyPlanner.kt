@@ -119,6 +119,8 @@ internal enum class JourneyRegion(val landmarks: List<JourneyLandmark>) {
     ),
 }
 
+internal val journeyLandmarks: List<JourneyLandmark> = JourneyRegion.entries.flatMap { it.landmarks }
+
 internal enum class JourneyDuration(val minutes: Int) {
     Short(30), Medium(60), Long(120),
 }

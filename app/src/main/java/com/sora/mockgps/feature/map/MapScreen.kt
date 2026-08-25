@@ -47,6 +47,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sora.mockgps.R
@@ -71,15 +73,28 @@ import java.util.Locale
 import kotlin.math.cos
 import kotlin.math.log2
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.camera.CameraState
 import org.maplibre.compose.camera.rememberCameraState
 import org.maplibre.compose.map.MaplibreMap
 import org.maplibre.compose.map.MapOptions
 import org.maplibre.compose.map.OrnamentOptions
+import org.maplibre.compose.expressions.dsl.Feature
 import org.maplibre.compose.expressions.dsl.const
+import org.maplibre.compose.expressions.dsl.format
+import org.maplibre.compose.expressions.dsl.offset
+import org.maplibre.compose.expressions.dsl.span
+import org.maplibre.compose.expressions.value.StringValue
 import org.maplibre.compose.layers.CircleLayer
 import org.maplibre.compose.layers.LineLayer
+import org.maplibre.compose.layers.SymbolLayer
 import org.maplibre.compose.sources.GeoJsonData
 import org.maplibre.compose.sources.rememberGeoJsonSource
 import org.maplibre.compose.style.BaseStyle
@@ -154,6 +169,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     var selectingRouteWaypoint by rememberSaveable { mutableStateOf(false) }
     var showAutoJourney by rememberSaveable { mutableStateOf(false) }
     var showShapeRoute by rememberSaveable { mutableStateOf(false) }
+    var showLandmarks by rememberSaveable { mutableStateOf(true) }
     var confirmClearFavorites by remember { mutableStateOf(false) }
     var confirmClearRecentLocations by remember { mutableStateOf(false) }
     var confirmClearRecents by remember { mutableStateOf(false) }
@@ -532,6 +548,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             routeDestination = uiState.routeDestination,
             routeWaypoints = uiState.routeWaypoints,
             showRouteControlPoints = uiState.showRouteControlPoints,
+            showLandmarks = showLandmarks,
             activeRouteCoordinate = activeCoordinate.takeIf { isRouteSession },
             cameraState = cameraState,
             onMapLoaded = viewModel::onMapLoaded,
@@ -590,6 +607,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             pendingCoordinate = uiState.pendingCoordinate,
             activeCoordinate = activeCoordinate,
             showCoordinates = uiState.showCoordinates,
+            showLandmarks = showLandmarks,
             permissionMessage = serviceStartErrorMessage ?: permissionMessage,
             compactLayout = compactLayout,
             panelMaxWidth = panelMaxWidth,
@@ -624,6 +642,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 coroutineScope.launch { cameraState.animateTo(cameraState.position.copy(target = result.coordinate.toPosition())) }
             },
             onShowCoordinatesChange = viewModel::setShowCoordinates,
+            onShowLandmarksChange = { showLandmarks = it },
             updateIntervalMillis = uiState.updateIntervalMillis,
             accuracyMeters = uiState.accuracyMeters,
             onUpdateIntervalChange = viewModel::setUpdateIntervalMillis,
@@ -746,6 +765,7 @@ private fun MapPicker(
     routeDestination: Coordinate?,
     routeWaypoints: List<Coordinate>,
     showRouteControlPoints: Boolean,
+    showLandmarks: Boolean,
     activeRouteCoordinate: Coordinate?,
     cameraState: CameraState,
     onMapLoaded: () -> Unit,
@@ -776,6 +796,16 @@ private fun MapPicker(
                     ClickResult.Consume
                 },
             ) {
+                if (showLandmarks) {
+                    LandmarkLayer { landmark ->
+                        onCoordinateSelected(landmark.coordinate)
+                        tapScope.launch {
+                            cameraState.animateTo(
+                                cameraState.position.copy(target = landmark.coordinate.toPosition()),
+                            )
+                        }
+                    }
+                }
                 if (routePoints.size >= 2) RouteLine(routePoints)
                 SelectedLocationMarker(pendingCoordinate)
                 activeRouteCoordinate?.let { RouteActiveMarker(it) }
@@ -827,6 +857,43 @@ private fun MapPicker(
     androidx.compose.runtime.LaunchedEffect(cameraState.isCameraMoving) {
         if (!cameraState.isCameraMoving) onCameraIdle(cameraState.position)
     }
+}
+
+@Composable
+private fun LandmarkLayer(onLandmarkSelected: (JourneyLandmark) -> Unit) {
+    val data = remember { GeoJsonData.JsonString(journeyLandmarks.toFeatureCollectionGeoJson()) }
+    val source = rememberGeoJsonSource(data)
+    LaunchedEffect(source, data) { source.setData(data) }
+    val onClick: (List<org.maplibre.spatialk.geojson.Feature<*, *>>) -> ClickResult = { features ->
+        val name = features.firstNotNullOfOrNull { feature ->
+            (feature.properties as? JsonObject)?.get("name")?.jsonPrimitive?.contentOrNull
+        }
+        val landmark = journeyLandmarks.firstOrNull { it.name == name }
+        landmark?.let(onLandmarkSelected)
+        if (landmark == null) ClickResult.Pass else ClickResult.Consume
+    }
+    CircleLayer(
+        id = "journey-landmarks",
+        source = source,
+        minZoom = 10f,
+        color = const(BloomWalkCoral),
+        radius = const(5.dp),
+        strokeColor = const(Color.White),
+        strokeWidth = const(2.dp),
+        onClick = onClick,
+    )
+    SymbolLayer(
+        id = "journey-landmark-labels",
+        source = source,
+        minZoom = 13f,
+        textField = format(span(Feature.get("name").cast<StringValue>())),
+        textSize = const(12.sp),
+        textColor = const(MaterialTheme.colorScheme.onSurface),
+        textHaloColor = const(MaterialTheme.colorScheme.surface),
+        textHaloWidth = const(2.dp),
+        textOffset = offset(0.em, -1.em),
+        onClick = onClick,
+    )
 }
 
 internal fun List<Coordinate>.previewCameraPosition(fallback: CameraPosition): CameraPosition {
@@ -956,6 +1023,25 @@ private fun List<Coordinate>.toLineStringGeoJson(): String = joinToString(
 
 private fun Coordinate.toPointGeoJson(): String =
     """{"type":"Feature","geometry":{"type":"Point","coordinates":[$longitude,$latitude]}}"""
+
+internal fun List<JourneyLandmark>.toFeatureCollectionGeoJson(): String = buildJsonObject {
+    put("type", "FeatureCollection")
+    put("features", buildJsonArray {
+        this@toFeatureCollectionGeoJson.forEach { landmark ->
+            add(buildJsonObject {
+                put("type", "Feature")
+                put("properties", buildJsonObject { put("name", landmark.name) })
+                put("geometry", buildJsonObject {
+                    put("type", "Point")
+                    put("coordinates", buildJsonArray {
+                        add(landmark.coordinate.longitude)
+                        add(landmark.coordinate.latitude)
+                    })
+                })
+            })
+        }
+    })
+}.toString()
 
 private val MapDisplayType.styleUrl: String
     get() = when (this) {

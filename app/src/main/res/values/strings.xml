@@ -184,6 +184,7 @@
     <string name="route_replace_title">Create another route</string>
     <string name="action_hide_coordinates">Hide coordinates</string>
     <string name="action_show_coordinates">Show coordinates</string>
+    <string name="setting_show_landmarks">Show famous landmarks</string>
     <string name="action_clear_all">Clear all</string>
     <string name="action_clear_history">Clear history</string>
     <string name="clear_favorites_title">Clear all favorites?</string>

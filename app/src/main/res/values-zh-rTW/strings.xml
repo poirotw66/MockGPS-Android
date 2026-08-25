@@ -175,6 +175,7 @@
     <string name="route_replace_title">建立其他路線</string>
     <string name="action_hide_coordinates">隱藏座標</string>
     <string name="action_show_coordinates">顯示座標</string>
+    <string name="setting_show_landmarks">顯示著名景點</string>
     <string name="action_clear_all">全部清除</string>
     <string name="action_clear_history">清除歷史</string>
     <string name="clear_favorites_title">清除所有收藏？</string>
