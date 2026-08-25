@@ -52,18 +52,20 @@ private fun JourneyLandmark.searchTexts(): List<String> =
 internal fun normalizeLandmarkSearchText(value: String): String =
     value.trim().lowercase().replace(Regex("\\s+"), " ")
 
-internal fun JourneyRegion.nominatimCountryCode(): String = when (this) {
+internal fun JourneyRegion.nominatimCountryCode(): String? = when (this) {
+    JourneyRegion.CurrentLocation -> null
     JourneyRegion.Taiwan -> "tw"
     JourneyRegion.Japan -> "jp"
     JourneyRegion.SouthKorea -> "kr"
 }
 
 internal fun nearestJourneyRegion(coordinate: Coordinate): JourneyRegion =
-    JourneyRegion.entries.minBy { region ->
+    JourneyRegion.entries.filter { it.landmarks.isNotEmpty() }.minBy { region ->
         region.landmarks.minOf { GeoMath.distanceMeters(coordinate, it.coordinate) }
     }
 
 internal enum class JourneyRegion(val landmarks: List<JourneyLandmark>) {
+    CurrentLocation(emptyList()),
     Taiwan(
         listOf(
             JourneyLandmark(
@@ -251,7 +253,31 @@ internal enum class JourneyRegion(val landmarks: List<JourneyLandmark>) {
                 "Seongsan Ilchulbong", "城山日出峰", Coordinate(33.4581, 126.9425), 1_000.0,
                 listOf("日出峰", "城山"),
             ),
-            JourneyLandmark("Jeongbang Waterfall", "正房瀑布", Coordinate(33.2449, 126.5716), 1_000.0),
+            JourneyLandmark("Jeongbang Waterfall", "正房瀑布", Coordinate(33.2449, 126.5716), 1_000.0, listOf("正房瀑布")),
+            JourneyLandmark(
+                "Hallasan", "漢拏山", Coordinate(33.3617, 126.5292), 1_000.0,
+                listOf("漢拏山", "漢拿山"),
+            ),
+            JourneyLandmark(
+                "Manjanggul Cave", "萬丈窟", Coordinate(33.5283, 126.7717), 1_000.0,
+                listOf("萬丈窟", "萬長窟"),
+            ),
+            JourneyLandmark(
+                "Cheonjiyeon Falls", "天地淵瀑布", Coordinate(33.2470, 126.5540), 1_000.0,
+                listOf("天地淵", "天地淵瀑布"),
+            ),
+            JourneyLandmark(
+                "Hamdeok Beach", "咸德海水浴場", Coordinate(33.5430, 126.6696), 1_500.0,
+                listOf("咸德", "咸德海水浴場"),
+            ),
+            JourneyLandmark(
+                "O'sulloc Tea Museum", "雪綠茶園", Coordinate(33.3058, 126.2892), 1_500.0,
+                listOf("雪綠茶園", "OSulloc"),
+            ),
+            JourneyLandmark(
+                "Udo Island", "牛島", Coordinate(33.5040, 126.9520), 1_500.0,
+                listOf("牛島"),
+            ),
         ),
     ),
 }
@@ -266,6 +292,7 @@ internal data class AutoJourneyOptions(
     val region: JourneyRegion = JourneyRegion.Taiwan,
     val duration: JourneyDuration = JourneyDuration.Medium,
     val transportMode: RouteTransportMode = RouteTransportMode.Bicycle,
+    val centerCoordinate: Coordinate? = null,
 )
 
 internal enum class RouteShape { Heart, Star, Circle, Cat, Dog, Rabbit, Fish, Butterfly, ChristmasTree }
@@ -286,8 +313,16 @@ internal object JourneyPlanner {
         val targetDistanceMeters = (
             speedKilometersPerHour(options.transportMode) * 1_000.0 * options.duration.minutes / 60.0
         ).coerceIn(MINIMUM_JOURNEY_METERS, MAXIMUM_JOURNEY_METERS)
-        val landmark = randomLandmark(options.region, random, excludedLandmark)
-        val center = randomCenter(landmark, random)
+        val landmark = when (options.region) {
+            JourneyRegion.CurrentLocation -> currentLocationLandmark(
+                requireNotNull(options.centerCoordinate) { "Current location requires a coordinate." },
+            )
+            else -> randomLandmark(options.region, random, excludedLandmark)
+        }
+        val center = when (options.region) {
+            JourneyRegion.CurrentLocation -> landmark.coordinate
+            else -> randomCenter(landmark, random)
+        }
         val shape = RouteShape.entries[random.nextInt(RouteShape.entries.size)]
         val baselineDistance = shapeDistanceMeters(center, shape)
         val radiusMeters = (DEFAULT_SHAPE_RADIUS_METERS * targetDistanceMeters / baselineDistance)
@@ -297,6 +332,9 @@ internal object JourneyPlanner {
             )
         return GeneratedJourney(shape, landmark, center, shapePoints(center, shape, radiusMeters))
     }
+
+    private fun currentLocationLandmark(coordinate: Coordinate): JourneyLandmark =
+        JourneyLandmark("Current Location", "目前位置", coordinate)
 
     private fun randomLandmark(
         region: JourneyRegion,

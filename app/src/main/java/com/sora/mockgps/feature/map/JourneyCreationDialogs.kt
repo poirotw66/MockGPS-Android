@@ -36,9 +36,7 @@ internal fun AutoJourneyDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OptionLabel(R.string.auto_journey_region)
-                OptionRow(JourneyRegion.entries, options.region, { it.label() }) {
-                    options = options.copy(region = it)
-                }
+                RegionOptionGrid(options.region) { options = options.copy(region = it) }
                 OptionLabel(R.string.auto_journey_duration)
                 OptionRow(JourneyDuration.entries, options.duration, { it.label() }) {
                     options = options.copy(duration = it)
@@ -108,6 +106,25 @@ private val RouteShapeSaver = Saver<RouteShape, String>(
 )
 
 @Composable
+private fun RegionOptionGrid(selected: JourneyRegion, onSelected: (JourneyRegion) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        JourneyRegion.entries.chunked(2).forEach { rowRegions ->
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                rowRegions.forEach { region ->
+                    FilterChip(
+                        selected = selected == region,
+                        onClick = { onSelected(region) },
+                        label = { Text(region.label()) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                repeat(2 - rowRegions.size) { Spacer(modifier = Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+@Composable
 private fun ShapeOptionGrid(selected: RouteShape, onSelected: (RouteShape) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         RouteShape.entries.chunked(3).forEach { rowShapes ->
@@ -153,6 +170,7 @@ private fun <T> OptionRow(
 @Composable
 private fun JourneyRegion.label(): String = stringResource(
     when (this) {
+        JourneyRegion.CurrentLocation -> R.string.region_current_location
         JourneyRegion.Taiwan -> R.string.region_taiwan
         JourneyRegion.Japan -> R.string.region_japan
         JourneyRegion.SouthKorea -> R.string.region_south_korea

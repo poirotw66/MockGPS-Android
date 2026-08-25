@@ -159,6 +159,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     var notificationPermissionHandled by rememberSaveable { mutableStateOf(false) }
     var pendingRouteStart by rememberSaveable { mutableStateOf(false) }
     var pendingCurrentLocation by rememberSaveable { mutableStateOf(false) }
+    var pendingAutoJourney by remember { mutableStateOf<AutoJourneyOptions?>(null) }
     var routeOptions by rememberSaveable(stateSaver = RouteSimulationOptionsSaver) {
         mutableStateOf(RouteSimulationOptions())
     }
@@ -225,8 +226,10 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     ) {
         val shouldStartRoute = pendingRouteStart
         val shouldUseCurrentLocation = pendingCurrentLocation
+        val autoJourney = pendingAutoJourney
         pendingRouteStart = false
         pendingCurrentLocation = false
+        pendingAutoJourney = null
         notificationPermissionHandled = true
         if (!context.hasLocationPermission()) {
             permissionMessage = locationPermissionRequired
@@ -235,7 +238,14 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                 !context.isGranted(Manifest.permission.POST_NOTIFICATIONS)
             ) notificationPermissionDenied else null
-            if (shouldUseCurrentLocation) {
+            if (autoJourney != null) {
+                val coordinate = context.lastKnownCoordinate()
+                if (coordinate == null) {
+                    permissionMessage = currentLocationUnavailable
+                } else {
+                    viewModel.generateAutomaticJourney(autoJourney.copy(centerCoordinate = coordinate))
+                }
+            } else if (shouldUseCurrentLocation) {
                 val coordinate = context.lastKnownCoordinate()
                 if (coordinate == null) {
                     permissionMessage = currentLocationUnavailable
@@ -474,7 +484,21 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     com.sora.mockgps.route.RouteTransportMode.Drive -> MovementPreset.Drive
                 },
             )
-            viewModel.generateAutomaticJourney(options)
+            if (options.region != JourneyRegion.CurrentLocation) {
+                viewModel.generateAutomaticJourney(options)
+            } else if (!context.hasLocationPermission()) {
+                pendingAutoJourney = options
+                permissionLauncher.launch(
+                    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
+                )
+            } else {
+                val coordinate = context.lastKnownCoordinate()
+                if (coordinate == null) {
+                    permissionMessage = currentLocationUnavailable
+                } else {
+                    viewModel.generateAutomaticJourney(options.copy(centerCoordinate = coordinate))
+                }
+            }
         },
     )
     if (showShapeRoute) ShapeRouteDialog(
@@ -634,7 +658,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 .navigationBarsPadding()
                 .padding(
                     end = if (compactLayout) (panelMaxWidth + 20.dp) else 16.dp,
-                    bottom = if (compactLayout) 16.dp else 132.dp,
+                    bottom = if (compactLayout) 24.dp else 156.dp,
                 ),
             shape = CircleShape,
             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),

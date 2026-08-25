@@ -885,6 +885,7 @@ class MapViewModel @JvmOverloads constructor(
 
     @StringRes
     private fun JourneyRegion.labelResource(): Int = when (this) {
+        JourneyRegion.CurrentLocation -> R.string.region_current_location
         JourneyRegion.Taiwan -> R.string.region_taiwan
         JourneyRegion.Japan -> R.string.region_japan
         JourneyRegion.SouthKorea -> R.string.region_south_korea

@@ -73,6 +73,7 @@
     <string name="action_generate_journey">Generate</string>
     <string name="action_try_another_landmark">Try another landmark</string>
     <string name="auto_journey_route_error">That landmark could not produce a road route. Try another landmark.</string>
+    <string name="region_current_location">Current location</string>
     <string name="region_taiwan">Taiwan</string>
     <string name="region_japan">Japan</string>
     <string name="region_south_korea">Korea</string>

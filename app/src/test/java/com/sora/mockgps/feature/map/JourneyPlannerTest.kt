@@ -31,7 +31,7 @@ class JourneyPlannerTest {
 
     @Test
     fun `regions center journeys in their selected countries`() {
-        JourneyRegion.entries.forEach { region ->
+        JourneyRegion.entries.filter { it.landmarks.isNotEmpty() }.forEach { region ->
             val journey = JourneyPlanner.automaticJourney(AutoJourneyOptions(region = region), Random(2))
             assertTrue(region.landmarks.any { GeoMath.distanceMeters(journey.center, it.coordinate) <= 1_000.0 })
             assertTrue(journey.points.all { GeoMath.distanceMeters(it, journey.center) < 20_000.0 })
@@ -39,12 +39,30 @@ class JourneyPlannerTest {
     }
 
     @Test
+    fun `current location journey centers on provided coordinate`() {
+        val center = Coordinate(25.033964, 121.564468)
+        val journey = JourneyPlanner.automaticJourney(
+            AutoJourneyOptions(
+                region = JourneyRegion.CurrentLocation,
+                centerCoordinate = center,
+            ),
+            Random(3),
+        )
+
+        assertEquals(center, journey.center)
+        assertEquals(center, journey.landmark.coordinate)
+        assertEquals("目前位置", journey.landmark.nameZhTw)
+        assertTrue(journey.points.all { GeoMath.distanceMeters(it, center) < 20_000.0 })
+    }
+
+    @Test
     fun `regions provide a large unique landmark pool`() {
-        JourneyRegion.entries.forEach { region ->
+        JourneyRegion.entries.filter { it.landmarks.isNotEmpty() }.forEach { region ->
             val (latitudeRange, longitudeRange) = when (region) {
                 JourneyRegion.Taiwan -> 21.5..25.5 to 119.0..122.5
                 JourneyRegion.Japan -> 25.0..46.0 to 127.0..146.0
-                JourneyRegion.SouthKorea -> 33.0..39.0 to 124.0..130.0
+                JourneyRegion.SouthKorea -> 33.0..39.0 to 124.0..131.0
+                JourneyRegion.CurrentLocation -> error("Current location has no landmark pool.")
             }
             assertTrue(region.landmarks.size >= 25)
             assertEquals(region.landmarks.size, region.landmarks.map { it.name }.toSet().size)
@@ -57,11 +75,27 @@ class JourneyPlannerTest {
 
     @Test
     fun `map shares all unique journey landmarks`() {
-        assertEquals(85, journeyLandmarks.size)
+        assertEquals(91, journeyLandmarks.size)
         assertEquals(journeyLandmarks.size, journeyLandmarks.map { it.name }.toSet().size)
         assertEquals(journeyLandmarks.size, journeyLandmarks.map { it.coordinate }.toSet().size)
         assertEquals(journeyLandmarks.size, journeyLandmarks.map { it.nameZhTw }.toSet().size)
         assertTrue(journeyLandmarks.all { it.nameZhTw.isNotBlank() })
+    }
+
+    @Test
+    fun `south korea includes jeju island landmarks`() {
+        val jejuNames = setOf(
+            "Seongsan Ilchulbong",
+            "Jeongbang Waterfall",
+            "Hallasan",
+            "Manjanggul Cave",
+            "Cheonjiyeon Falls",
+            "Hamdeok Beach",
+            "O'sulloc Tea Museum",
+            "Udo Island",
+        )
+        val koreaNames = JourneyRegion.SouthKorea.landmarks.map { it.name }.toSet()
+        assertTrue(jejuNames.all { it in koreaNames })
     }
 
     @Test
@@ -189,7 +223,7 @@ class JourneyPlannerTest {
         repeat(100) {
             val journey = JourneyPlanner.automaticJourney(
                 AutoJourneyOptions(
-                    region = JourneyRegion.entries[it % JourneyRegion.entries.size],
+                    region = JourneyRegion.entries.filter { it.landmarks.isNotEmpty() }[it % 3],
                     duration = JourneyDuration.entries[it % JourneyDuration.entries.size],
                     transportMode = RouteTransportMode.entries[it % RouteTransportMode.entries.size],
                 ),

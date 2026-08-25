@@ -69,6 +69,7 @@
     <string name="action_generate_journey">產生旅程</string>
     <string name="action_try_another_landmark">改用其他景點</string>
     <string name="auto_journey_route_error">此景點無法產生道路路線。請改用其他景點。</string>
+    <string name="region_current_location">目前位置</string>
     <string name="region_taiwan">台灣</string>
     <string name="region_japan">日本</string>
     <string name="region_south_korea">韓國</string>
