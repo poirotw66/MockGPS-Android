@@ -38,6 +38,7 @@ internal object AutomaticJourneyStateReducer {
         isPlanningRoute = true,
         routeError = null,
         automaticJourneyRecoveryAvailable = false,
+        automaticJourneyRecoveryKind = null,
         activeSavedRouteId = null,
         activeRouteName = routeName,
     )
@@ -47,11 +48,17 @@ internal object AutomaticJourneyStateReducer {
         isPlanningRoute = false,
         routeError = null,
         automaticJourneyRecoveryAvailable = false,
+        automaticJourneyRecoveryKind = null,
     )
 
-    fun failure(state: MapUiState, error: String): MapUiState = state.copy(
+    fun failure(
+        state: MapUiState,
+        error: String,
+        recoveryKind: AutomaticJourneyRecoveryKind,
+    ): MapUiState = state.copy(
         isPlanningRoute = false,
         routeError = error,
         automaticJourneyRecoveryAvailable = true,
+        automaticJourneyRecoveryKind = recoveryKind,
     )
 }

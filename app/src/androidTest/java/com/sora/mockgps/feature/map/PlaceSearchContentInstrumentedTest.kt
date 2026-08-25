@@ -105,7 +105,7 @@ class PlaceSearchContentInstrumentedTest {
         }
 
         composeRule.onNodeWithText(context.getString(R.string.place_search_section_coordinates)).assertIsDisplayed()
-        composeRule.onNodeWithText(label).assertIsDisplayed()
+        composeRule.onAllNodesWithText(label).assertCountEquals(2)
     }
 
     @Test
@@ -141,6 +141,6 @@ class PlaceSearchContentInstrumentedTest {
         composeRule.onNodeWithText(searchLabel).performTextInput("25.033964, 121.564468")
         val expected = formatCoordinateSearchLabel(Coordinate(25.033964, 121.564468))
         composeRule.onNodeWithText(context.getString(R.string.place_search_section_coordinates)).assertIsDisplayed()
-        composeRule.onNodeWithText(expected).assertIsDisplayed()
+        composeRule.onAllNodesWithText(expected).assertCountEquals(2)
     }
 }

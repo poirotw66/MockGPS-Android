@@ -70,9 +70,12 @@
     <string name="auto_journey_notice">每次會挑選著名景點，並將形狀控制點傳送至 FOSSGIS OpenStreetMap 路線服務。結果會沿著真實道路，因此每次形狀都會自然不同，也不會過度完美。</string>
     <string name="auto_journey_notice_perfect_shape">每次會挑選著名景點，並以該點為中心產生幾何圖形路線。不經道路規劃，形狀會完整保留。</string>
     <string name="generated_journey_name">%1$s · %2$s · %3$s旅程</string>
+    <string name="generated_current_location_journey_name">目前位置 · %1$s旅程</string>
     <string name="action_generate_journey">產生旅程</string>
     <string name="action_try_another_landmark">改用其他景點</string>
+    <string name="action_try_another_shape">換個形狀</string>
     <string name="auto_journey_route_error">此景點無法產生道路路線。請改用其他景點。</string>
+    <string name="auto_journey_route_error_current_location">無法在目前位置產生道路路線。請換個形狀，或改選「完美圖形」。</string>
     <string name="region_current_location">目前位置</string>
     <string name="region_taiwan">台灣</string>
     <string name="region_japan">日本</string>
@@ -196,6 +199,7 @@
     <string name="clear_recent_locations_message">最近成功使用的靜態位置將從此裝置永久刪除。</string>
     <string name="action_use_current_location">使用目前位置</string>
     <string name="current_location_unavailable">目前位置無法使用。請允許定位權限並等待取得位置。</string>
+    <string name="current_location_resolving">正在取得目前位置…</string>
     <string name="export_route_failed">無法匯出路線。</string>
     <string name="read_gpx_failed">無法讀取 GPX 檔案。</string>
     <string name="read_backup_failed">無法讀取備份檔案。</string>

@@ -74,9 +74,12 @@
     <string name="auto_journey_notice">Each generation picks a famous landmark and sends shape control points to the FOSSGIS OpenStreetMap routing service. The result follows real roads, so every shape is naturally different and imperfect.</string>
     <string name="auto_journey_notice_perfect_shape">Each generation picks a famous landmark and draws a geometric shape centered on it. The route keeps the full shape without road routing.</string>
     <string name="generated_journey_name">%1$s · %2$s · %3$s journey</string>
+    <string name="generated_current_location_journey_name">Current location · %1$s journey</string>
     <string name="action_generate_journey">Generate</string>
     <string name="action_try_another_landmark">Try another landmark</string>
+    <string name="action_try_another_shape">Try another shape</string>
     <string name="auto_journey_route_error">That landmark could not produce a road route. Try another landmark.</string>
+    <string name="auto_journey_route_error_current_location">Could not build a road route from your current location. Try another shape, or switch to Perfect shape.</string>
     <string name="region_current_location">Current location</string>
     <string name="region_taiwan">Taiwan</string>
     <string name="region_japan">Japan</string>
@@ -205,6 +208,7 @@
     <string name="clear_recent_locations_message">Recent static locations will be permanently removed from this device.</string>
     <string name="action_use_current_location">Use current location</string>
     <string name="current_location_unavailable">Current location is unavailable. Allow location permission and wait for a location fix.</string>
+    <string name="current_location_resolving">Getting current location…</string>
     <string name="export_route_failed">Unable to export the route.</string>
     <string name="read_gpx_failed">Unable to read the GPX file.</string>
     <string name="read_backup_failed">Unable to read the backup file.</string>

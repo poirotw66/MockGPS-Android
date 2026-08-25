@@ -27,6 +27,7 @@ data class MapUiState(
     val isPlanningRoute: Boolean = false,
     val routeError: String? = null,
     val automaticJourneyRecoveryAvailable: Boolean = false,
+    val automaticJourneyRecoveryKind: AutomaticJourneyRecoveryKind? = null,
     val favoriteMessage: String? = null,
     /** The saved route that supplied [plannedRoute], if it was loaded from storage. */
     val activeSavedRouteId: Long? = null,
@@ -96,6 +97,10 @@ enum class MapLoadingState {
     Loading,
     Ready,
     Error,
+}
+
+enum class AutomaticJourneyRecoveryKind {
+    AnotherLandmark, AnotherShape,
 }
 
 const val DEFAULT_MAP_ZOOM = 15f

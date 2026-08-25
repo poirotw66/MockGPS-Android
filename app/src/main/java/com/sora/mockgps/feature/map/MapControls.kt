@@ -79,6 +79,7 @@ internal fun MapControlPanel(
     showCoordinates: Boolean,
     showLandmarks: Boolean,
     permissionMessage: String?,
+    isResolvingCurrentLocation: Boolean,
     compactLayout: Boolean,
     panelMaxWidth: Dp,
     mapType: MapDisplayType,
@@ -101,6 +102,7 @@ internal fun MapControlPanel(
     isPlanningRoute: Boolean,
     routeError: String?,
     automaticJourneyRecoveryAvailable: Boolean,
+    automaticJourneyRecoveryKind: AutomaticJourneyRecoveryKind?,
     activeRouteName: String?,
     placeSearchQuery: String,
     isPlaceSearching: Boolean,
@@ -276,6 +278,13 @@ internal fun MapControlPanel(
             permissionMessage?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
+            if (isResolvingCurrentLocation) {
+                Text(
+                    stringResource(R.string.current_location_resolving),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
             routeError?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
@@ -285,7 +294,18 @@ internal fun MapControlPanel(
                 OutlinedButton(
                     onClick = onRegenerateAutomaticJourney,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                ) { Text(stringResource(R.string.action_try_another_landmark)) }
+                ) {
+                    Text(
+                        stringResource(
+                            when (automaticJourneyRecoveryKind) {
+                                AutomaticJourneyRecoveryKind.AnotherShape -> R.string.action_try_another_shape
+                                AutomaticJourneyRecoveryKind.AnotherLandmark,
+                                null,
+                                -> R.string.action_try_another_landmark
+                            },
+                        ),
+                    )
+                }
             }
             if (routePlanningStep == RoutePlanningStep.Inactive) {
                 if (detailGroup == MapDetailGroup.Search) {

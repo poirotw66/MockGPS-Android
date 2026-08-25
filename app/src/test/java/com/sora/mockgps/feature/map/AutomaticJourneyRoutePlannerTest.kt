@@ -61,7 +61,11 @@ class AutomaticJourneyRoutePlannerTest {
         val loading = AutomaticJourneyStateReducer.planning(MapUiState(), first, options.transportMode, "Journey")
 
         val failure = runCatching { planner.plan(first, options.transportMode) }.exceptionOrNull()
-        val failed = AutomaticJourneyStateReducer.failure(loading, "Try another landmark")
+        val failed = AutomaticJourneyStateReducer.failure(
+            loading,
+            "Try another landmark",
+            AutomaticJourneyRecoveryKind.AnotherLandmark,
+        )
         val regenerated = planner.generate(options)
 
         assertTrue(failure is IllegalStateException)

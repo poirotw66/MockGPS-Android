@@ -528,6 +528,7 @@ class MapViewModel @JvmOverloads constructor(
                 isPlanningRoute = false,
                 routeError = null,
                 automaticJourneyRecoveryAvailable = false,
+                automaticJourneyRecoveryKind = null,
             )
         }
     }
@@ -544,6 +545,7 @@ class MapViewModel @JvmOverloads constructor(
                 showRouteControlPoints = true,
                 routeError = null,
                 automaticJourneyRecoveryAvailable = false,
+                automaticJourneyRecoveryKind = null,
                 isPlanningRoute = false,
                 activeSavedRouteId = null,
                 activeRouteName = null,
@@ -567,6 +569,7 @@ class MapViewModel @JvmOverloads constructor(
                 showRouteControlPoints = true,
                 routeError = null,
                 automaticJourneyRecoveryAvailable = false,
+                automaticJourneyRecoveryKind = null,
                 isPlanningRoute = false,
                 activeSavedRouteId = null,
                 activeRouteName = null,
@@ -579,12 +582,7 @@ class MapViewModel @JvmOverloads constructor(
         routePlanningJob?.cancel()
         automaticJourneyOptions = options
         val journey = automaticJourneyRoutePlanner.generate(options)
-        val routeName = localized(
-            R.string.generated_journey_name,
-            journey.landmark.displayName(currentSearchLocale().usesTraditionalChinese()),
-            localized(options.region.labelResource()),
-            localized(journey.shape.labelResource()),
-        )
+        val routeName = automaticJourneyRouteName(options, journey)
         when (options.routeStyle) {
             AutoJourneyRouteStyle.PerfectShape -> {
                 val route = perfectShapeRoute(journey.points)
@@ -634,6 +632,7 @@ class MapViewModel @JvmOverloads constructor(
                 isPlanningRoute = false,
                 routeError = null,
                 automaticJourneyRecoveryAvailable = false,
+                automaticJourneyRecoveryKind = null,
                 activeSavedRouteId = null,
                 activeRouteName = localized(shape.labelResource()),
             )
@@ -671,6 +670,7 @@ class MapViewModel @JvmOverloads constructor(
                 activeRouteName = null,
                 routeError = null,
                 automaticJourneyRecoveryAvailable = false,
+                automaticJourneyRecoveryKind = null,
             )
         }
     }
@@ -687,6 +687,7 @@ class MapViewModel @JvmOverloads constructor(
                 plannedRoute = null,
                 routeError = null,
                 automaticJourneyRecoveryAvailable = false,
+                automaticJourneyRecoveryKind = null,
             )
         }
     }
@@ -740,6 +741,7 @@ class MapViewModel @JvmOverloads constructor(
                 plannedRoute = null,
                 routeError = null,
                 automaticJourneyRecoveryAvailable = false,
+                automaticJourneyRecoveryKind = null,
             )
         }
         routePlanningJob = viewModelScope.launch {
@@ -800,7 +802,8 @@ class MapViewModel @JvmOverloads constructor(
                     ) {
                         AutomaticJourneyStateReducer.failure(
                             current,
-                            localized(R.string.auto_journey_route_error),
+                            automaticJourneyRouteError(),
+                            automaticJourneyRecoveryKind(),
                         )
                     } else {
                         current
@@ -823,6 +826,7 @@ class MapViewModel @JvmOverloads constructor(
                 activeRouteName = null,
                 routeError = null,
                 automaticJourneyRecoveryAvailable = false,
+                automaticJourneyRecoveryKind = null,
             )
         }
     }
@@ -842,6 +846,7 @@ class MapViewModel @JvmOverloads constructor(
                 activeRouteName = null,
                 routeError = null,
                 automaticJourneyRecoveryAvailable = false,
+                automaticJourneyRecoveryKind = null,
             )
         }
     }
@@ -862,6 +867,7 @@ class MapViewModel @JvmOverloads constructor(
                 activeRouteName = null,
                 routeError = null,
                 automaticJourneyRecoveryAvailable = false,
+                automaticJourneyRecoveryKind = null,
             )
         }
     }
@@ -919,6 +925,34 @@ class MapViewModel @JvmOverloads constructor(
         RouteShape.Butterfly -> R.string.shape_butterfly
         RouteShape.ChristmasTree -> R.string.shape_christmas_tree
     }
+
+    private fun automaticJourneyRouteName(options: AutoJourneyOptions, journey: GeneratedJourney): String {
+        val useZhTw = currentSearchLocale().usesTraditionalChinese()
+        return when (options.region) {
+            JourneyRegion.CurrentLocation -> localized(
+                R.string.generated_current_location_journey_name,
+                localized(journey.shape.labelResource()),
+            )
+            else -> localized(
+                R.string.generated_journey_name,
+                journey.landmark.displayName(useZhTw),
+                localized(options.region.labelResource()),
+                localized(journey.shape.labelResource()),
+            )
+        }
+    }
+
+    private fun automaticJourneyRouteError(): String = when (automaticJourneyOptions?.region) {
+        JourneyRegion.CurrentLocation -> localized(R.string.auto_journey_route_error_current_location)
+        else -> localized(R.string.auto_journey_route_error)
+    }
+
+    private fun automaticJourneyRecoveryKind(): AutomaticJourneyRecoveryKind =
+        if (automaticJourneyOptions?.region == JourneyRegion.CurrentLocation) {
+            AutomaticJourneyRecoveryKind.AnotherShape
+        } else {
+            AutomaticJourneyRecoveryKind.AnotherLandmark
+        }
 
     private fun perfectShapeRoute(points: List<Coordinate>): PlannedRoute = PlannedRoute(
         points = points,

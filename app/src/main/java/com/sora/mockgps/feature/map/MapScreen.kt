@@ -160,6 +160,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     var pendingRouteStart by rememberSaveable { mutableStateOf(false) }
     var pendingCurrentLocation by rememberSaveable { mutableStateOf(false) }
     var pendingAutoJourney by remember { mutableStateOf<AutoJourneyOptions?>(null) }
+    var isResolvingCurrentLocation by remember { mutableStateOf(false) }
     var routeOptions by rememberSaveable(stateSaver = RouteSimulationOptionsSaver) {
         mutableStateOf(RouteSimulationOptions())
     }
@@ -213,6 +214,23 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     val serviceStartSecurityFailed = stringResource(R.string.foreground_service_security_failed)
     val serviceStartFailed = stringResource(R.string.foreground_service_start_failed)
     val developerOptionsUnavailable = stringResource(R.string.developer_options_unavailable)
+    fun resolveCurrentLocation(onResolved: (Coordinate) -> Unit) {
+        if (!context.hasLocationPermission()) {
+            permissionMessage = locationPermissionRequired
+            return
+        }
+        permissionMessage = null
+        isResolvingCurrentLocation = true
+        coroutineScope.launch {
+            val coordinate = runCatching { context.resolveCurrentCoordinate() }.getOrNull()
+            isResolvingCurrentLocation = false
+            if (coordinate == null) {
+                permissionMessage = currentLocationUnavailable
+            } else {
+                onResolved(coordinate)
+            }
+        }
+    }
     fun applyServiceStartOutcome(outcome: ForegroundServiceStartOutcome) {
         serviceStartErrorMessage = when (outcome) {
             ForegroundServiceStartOutcome.Started -> null
@@ -239,17 +257,11 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 !context.isGranted(Manifest.permission.POST_NOTIFICATIONS)
             ) notificationPermissionDenied else null
             if (autoJourney != null) {
-                val coordinate = context.lastKnownCoordinate()
-                if (coordinate == null) {
-                    permissionMessage = currentLocationUnavailable
-                } else {
+                resolveCurrentLocation { coordinate ->
                     viewModel.generateAutomaticJourney(autoJourney.copy(centerCoordinate = coordinate))
                 }
             } else if (shouldUseCurrentLocation) {
-                val coordinate = context.lastKnownCoordinate()
-                if (coordinate == null) {
-                    permissionMessage = currentLocationUnavailable
-                } else {
+                resolveCurrentLocation { coordinate ->
                     viewModel.selectCoordinate(coordinate)
                     coroutineScope.launch {
                         cameraState.animateTo(cameraState.position.copy(target = coordinate.toPosition()))
@@ -492,10 +504,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
                 )
             } else {
-                val coordinate = context.lastKnownCoordinate()
-                if (coordinate == null) {
-                    permissionMessage = currentLocationUnavailable
-                } else {
+                resolveCurrentLocation { coordinate ->
                     viewModel.generateAutomaticJourney(options.copy(centerCoordinate = coordinate))
                 }
             }
@@ -640,10 +649,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
                 )
             } else {
-                val coordinate = context.lastKnownCoordinate()
-                if (coordinate == null) {
-                    permissionMessage = currentLocationUnavailable
-                } else {
+                resolveCurrentLocation { coordinate ->
                     viewModel.selectCoordinate(coordinate)
                     coroutineScope.launch {
                         cameraState.animateTo(cameraState.position.copy(target = coordinate.toPosition()))
@@ -667,15 +673,20 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
         ) {
             IconButton(
                 onClick = goToCurrentLocation,
+                enabled = !isResolvingCurrentLocation,
                 modifier = Modifier
                     .size(48.dp)
                     .semantics { contentDescription = currentLocationLabel },
             ) {
-                Icon(
-                    imageVector = Icons.Filled.LocationOn,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                )
+                if (isResolvingCurrentLocation) {
+                    CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(
+                        imageVector = Icons.Filled.LocationOn,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
             }
         }
         MapControlPanel(
@@ -684,6 +695,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             showCoordinates = uiState.showCoordinates,
             showLandmarks = showLandmarks,
             permissionMessage = serviceStartErrorMessage ?: permissionMessage,
+            isResolvingCurrentLocation = isResolvingCurrentLocation,
             compactLayout = compactLayout,
             panelMaxWidth = panelMaxWidth,
             mapType = uiState.mapType,
@@ -706,6 +718,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             isPlanningRoute = uiState.isPlanningRoute,
             routeError = uiState.routeError,
             automaticJourneyRecoveryAvailable = uiState.automaticJourneyRecoveryAvailable,
+            automaticJourneyRecoveryKind = uiState.automaticJourneyRecoveryKind,
             activeRouteName = uiState.activeRouteName,
             placeSearchQuery = uiState.placeSearchQuery,
             isPlaceSearching = uiState.isPlaceSearching,

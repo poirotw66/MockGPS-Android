@@ -67,6 +67,7 @@ internal object MapStateReducer {
             isPlanningRoute = false,
             routeError = null,
             automaticJourneyRecoveryAvailable = false,
+            automaticJourneyRecoveryKind = null,
             activeRouteName = name,
             activeSavedRouteId = savedRouteId,
         )
