@@ -42,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -72,6 +73,7 @@ import com.sora.mockgps.ui.theme.BloomWalkSage
 import java.util.Locale
 import kotlin.math.cos
 import kotlin.math.log2
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonArray
@@ -781,6 +783,14 @@ private fun MapPicker(
             padding = WindowInsets.safeDrawing.asPaddingValues(),
         ),
     )
+    val useZhTwLabels = LocalConfiguration.current.locales[0].usesTraditionalChinese()
+    var landmarkConfirmation by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(landmarkConfirmation) {
+        if (landmarkConfirmation != null) {
+            delay(2_000)
+            landmarkConfirmation = null
+        }
+    }
     Box(modifier = modifier.semantics { contentDescription = mapDescription }) {
         key(mapRenderKey) {
             MaplibreMap(
@@ -797,8 +807,9 @@ private fun MapPicker(
                 },
             ) {
                 if (showLandmarks) {
-                    LandmarkLayer { landmark ->
+                    LandmarkLayer(useZhTw = useZhTwLabels) { landmark ->
                         onCoordinateSelected(landmark.coordinate)
+                        landmarkConfirmation = landmark.displayName(useZhTwLabels)
                         tapScope.launch {
                             cameraState.animateTo(
                                 cameraState.position.copy(target = landmark.coordinate.toPosition()),
@@ -809,6 +820,23 @@ private fun MapPicker(
                 if (routePoints.size >= 2) RouteLine(routePoints)
                 SelectedLocationMarker(pendingCoordinate)
                 activeRouteCoordinate?.let { RouteActiveMarker(it) }
+            }
+        }
+        landmarkConfirmation?.let { name ->
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(bottom = 88.dp, start = 16.dp, end = 16.dp),
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+                shadowElevation = 2.dp,
+            ) {
+                Text(
+                    text = stringResource(R.string.landmark_selected, name),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    style = MaterialTheme.typography.labelLarge,
+                )
             }
         }
         if (loadingState == MapLoadingState.Ready && showRouteControlPoints) {
@@ -860,8 +888,14 @@ private fun MapPicker(
 }
 
 @Composable
-private fun LandmarkLayer(onLandmarkSelected: (JourneyLandmark) -> Unit) {
-    val data = remember { GeoJsonData.JsonString(journeyLandmarks.toFeatureCollectionGeoJson()) }
+private fun LandmarkLayer(
+    useZhTw: Boolean,
+    onLandmarkSelected: (JourneyLandmark) -> Unit,
+) {
+    // OpenFreeMap glyphs only serve Noto Sans; MapLibre default Open Sans / Arial Unicode 404s.
+    val data = remember(useZhTw) {
+        GeoJsonData.JsonString(journeyLandmarks.toFeatureCollectionGeoJson(useZhTw))
+    }
     val source = rememberGeoJsonSource(data)
     LaunchedEffect(source, data) { source.setData(data) }
     val onClick: (List<org.maplibre.spatialk.geojson.Feature<*, *>>) -> ClickResult = { features ->
@@ -885,13 +919,15 @@ private fun LandmarkLayer(onLandmarkSelected: (JourneyLandmark) -> Unit) {
     SymbolLayer(
         id = "journey-landmark-labels",
         source = source,
-        minZoom = 13f,
-        textField = format(span(Feature.get("name").cast<StringValue>())),
+        minZoom = 11.5f,
+        textField = format(span(Feature.get("label").cast<StringValue>())),
+        textFont = const(listOf("Noto Sans Regular")),
         textSize = const(12.sp),
         textColor = const(MaterialTheme.colorScheme.onSurface),
         textHaloColor = const(MaterialTheme.colorScheme.surface),
         textHaloWidth = const(2.dp),
         textOffset = offset(0.em, -1.em),
+        textAllowOverlap = const(false),
         onClick = onClick,
     )
 }
@@ -1024,24 +1060,31 @@ private fun List<Coordinate>.toLineStringGeoJson(): String = joinToString(
 private fun Coordinate.toPointGeoJson(): String =
     """{"type":"Feature","geometry":{"type":"Point","coordinates":[$longitude,$latitude]}}"""
 
-internal fun List<JourneyLandmark>.toFeatureCollectionGeoJson(): String = buildJsonObject {
-    put("type", "FeatureCollection")
-    put("features", buildJsonArray {
-        this@toFeatureCollectionGeoJson.forEach { landmark ->
-            add(buildJsonObject {
-                put("type", "Feature")
-                put("properties", buildJsonObject { put("name", landmark.name) })
-                put("geometry", buildJsonObject {
-                    put("type", "Point")
-                    put("coordinates", buildJsonArray {
-                        add(landmark.coordinate.longitude)
-                        add(landmark.coordinate.latitude)
+internal fun List<JourneyLandmark>.toFeatureCollectionGeoJson(useZhTw: Boolean = false): String =
+    buildJsonObject {
+        put("type", "FeatureCollection")
+        put("features", buildJsonArray {
+            this@toFeatureCollectionGeoJson.forEach { landmark ->
+                add(buildJsonObject {
+                    put("type", "Feature")
+                    put("properties", buildJsonObject {
+                        put("name", landmark.name)
+                        put("label", landmark.displayName(useZhTw))
+                    })
+                    put("geometry", buildJsonObject {
+                        put("type", "Point")
+                        put("coordinates", buildJsonArray {
+                            add(landmark.coordinate.longitude)
+                            add(landmark.coordinate.latitude)
+                        })
                     })
                 })
-            })
-        }
-    })
-}.toString()
+            }
+        })
+    }.toString()
+
+internal fun Locale.usesTraditionalChinese(): Boolean =
+    language == "zh" && (country.equals("TW", ignoreCase = true) || script == "Hant")
 
 private val MapDisplayType.styleUrl: String
     get() = when (this) {

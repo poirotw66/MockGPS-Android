@@ -60,6 +60,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import com.sora.mockgps.R
 import com.sora.mockgps.core.model.Coordinate
 import com.sora.mockgps.feature.search.PlaceSearchResult
+import com.sora.mockgps.feature.search.PlaceSearchSource
+import com.sora.mockgps.feature.search.looksLikeLandmarkNickname
 import com.sora.mockgps.route.PlannedRoute
 import com.sora.mockgps.service.RouteCompleted
 import com.sora.mockgps.service.RouteFailed
@@ -670,6 +672,11 @@ internal fun PlaceSearchContent(
 ) {
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val landmarkResults = results.filter { it.source == PlaceSearchSource.Landmark }
+    val remoteResults = results.filter { it.source == PlaceSearchSource.Remote }
+    val showNicknameHint = !isSearching &&
+        looksLikeLandmarkNickname(query) &&
+        landmarkResults.isEmpty()
     OutlinedTextField(
         value = query,
         onValueChange = onQueryChanged,
@@ -732,13 +739,48 @@ internal fun PlaceSearchContent(
             style = MaterialTheme.typography.bodySmall,
         )
     }
-    results.forEach { result ->
-        TextButton(
-            onClick = { onPlaceSelected(result) },
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(result.name, maxLines = 2, overflow = TextOverflow.Ellipsis)
+    if (landmarkResults.isNotEmpty()) {
+        PlaceSearchSectionHeader(stringResource(R.string.place_search_section_landmarks))
+        landmarkResults.forEach { result ->
+            PlaceSearchResultButton(result, onPlaceSelected)
         }
+    }
+    if (remoteResults.isNotEmpty()) {
+        PlaceSearchSectionHeader(stringResource(R.string.place_search_section_places))
+        remoteResults.forEach { result ->
+            PlaceSearchResultButton(result, onPlaceSelected)
+        }
+    }
+    if (showNicknameHint) {
+        Text(
+            stringResource(R.string.place_search_hint_landmark),
+            modifier = Modifier.padding(vertical = 4.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun PlaceSearchSectionHeader(title: String) {
+    Text(
+        title,
+        modifier = Modifier.padding(top = 8.dp, bottom = 2.dp),
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+@Composable
+private fun PlaceSearchResultButton(
+    result: PlaceSearchResult,
+    onPlaceSelected: (PlaceSearchResult) -> Unit,
+) {
+    TextButton(
+        onClick = { onPlaceSelected(result) },
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(result.name, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 

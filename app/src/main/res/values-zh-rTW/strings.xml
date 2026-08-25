@@ -167,8 +167,11 @@
     <string name="place_search_label">搜尋地點</string>
     <string name="action_clear_search">清除搜尋</string>
     <string name="place_search_loading">正在搜尋地點…</string>
-    <string name="place_search_empty">找不到符合的地點。</string>
-    <string name="place_search_privacy">搜尋字詞會送往相容 OpenStreetMap 的搜尋服務。此為公共服務，離線時無法使用且不提供 SLA。</string>
+    <string name="place_search_empty">找不到符合的地點。請試試更完整的地名。</string>
+    <string name="place_search_section_landmarks">著名景點</string>
+    <string name="place_search_section_places">其他地點</string>
+    <string name="place_search_hint_landmark">提示：試試更完整的景點名稱（例如台北101）。</string>
+    <string name="place_search_privacy">搜尋字詞會送往相容 OpenStreetMap 的搜尋服務。著名景點亦可離線比對。此為公共服務，不提供 SLA。</string>
     <string name="place_search_error_network">目前無法搜尋地點。請檢查網路後重試。</string>
     <string name="place_search_error_rate">搜尋服務忙碌中，請稍候再試。</string>
     <string name="place_search_error_invalid">搜尋服務回傳無效資料，請改用其他關鍵字。</string>
@@ -176,6 +179,7 @@
     <string name="action_hide_coordinates">隱藏座標</string>
     <string name="action_show_coordinates">顯示座標</string>
     <string name="setting_show_landmarks">顯示著名景點</string>
+    <string name="landmark_selected">已選取「%1$s」</string>
     <string name="action_clear_all">全部清除</string>
     <string name="action_clear_history">清除歷史</string>
     <string name="clear_favorites_title">清除所有收藏？</string>

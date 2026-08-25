@@ -60,17 +60,67 @@ class JourneyPlannerTest {
         assertEquals(85, journeyLandmarks.size)
         assertEquals(journeyLandmarks.size, journeyLandmarks.map { it.name }.toSet().size)
         assertEquals(journeyLandmarks.size, journeyLandmarks.map { it.coordinate }.toSet().size)
+        assertEquals(journeyLandmarks.size, journeyLandmarks.map { it.nameZhTw }.toSet().size)
+        assertTrue(journeyLandmarks.all { it.nameZhTw.isNotBlank() })
     }
 
     @Test
-    fun `landmark geojson preserves names and longitude latitude order`() {
-        val features = JSONObject(journeyLandmarks.toFeatureCollectionGeoJson()).getJSONArray("features")
+    fun `landmark display names follow locale flag`() {
+        val taipei101 = journeyLandmarks.first { it.name == "Taipei 101" }
 
-        assertEquals(journeyLandmarks.size, features.length())
+        assertEquals("Taipei 101", taipei101.displayName(useZhTw = false))
+        assertEquals("台北101", taipei101.displayName(useZhTw = true))
+        assertTrue(taipei101.aliases.contains("101"))
+        assertTrue(taipei101.aliases.contains("台北101"))
+        assertTrue(taipei101.aliases.contains("台北 101"))
+    }
+
+    @Test
+    fun `matchLandmarks finds Taipei 101 by nickname 101`() {
+        val matches = matchLandmarks("101", journeyLandmarks)
+        assertTrue(matches.any { it.name == "Taipei 101" })
+        assertEquals("Taipei 101", matches.first { it.name == "Taipei 101" }.name)
+    }
+
+    @Test
+    fun `matchLandmarks matches aliases with normalized spaces`() {
+        val spaced = matchLandmarks("台北 101", journeyLandmarks)
+        val compact = matchLandmarks("台北101", journeyLandmarks)
+        assertTrue(spaced.any { it.name == "Taipei 101" })
+        assertTrue(compact.any { it.name == "Taipei 101" })
+    }
+
+    @Test
+    fun `matchLandmarks is case insensitive on English names`() {
+        val matches = matchLandmarks("tokyo tower", journeyLandmarks)
+        assertEquals(listOf("Tokyo Tower"), matches.map { it.name })
+    }
+
+    @Test
+    fun `nearest journey region follows camera coordinate`() {
+        assertEquals(JourneyRegion.Taiwan, nearestJourneyRegion(Coordinate(25.03, 121.56)))
+        assertEquals(JourneyRegion.Japan, nearestJourneyRegion(Coordinate(35.66, 139.75)))
+        assertEquals(JourneyRegion.SouthKorea, nearestJourneyRegion(Coordinate(37.57, 126.98)))
+        assertEquals("tw", JourneyRegion.Taiwan.nominatimCountryCode())
+        assertEquals("jp", JourneyRegion.Japan.nominatimCountryCode())
+        assertEquals("kr", JourneyRegion.SouthKorea.nominatimCountryCode())
+    }
+
+    @Test
+    fun `landmark geojson preserves names labels and longitude latitude order`() {
+        val english = JSONObject(journeyLandmarks.toFeatureCollectionGeoJson(useZhTw = false))
+            .getJSONArray("features")
+        val chinese = JSONObject(journeyLandmarks.toFeatureCollectionGeoJson(useZhTw = true))
+            .getJSONArray("features")
+
+        assertEquals(journeyLandmarks.size, english.length())
         journeyLandmarks.forEachIndexed { index, landmark ->
-            val feature = features.getJSONObject(index)
+            val feature = english.getJSONObject(index)
+            val properties = feature.getJSONObject("properties")
             val coordinates = feature.getJSONObject("geometry").getJSONArray("coordinates")
-            assertEquals(landmark.name, feature.getJSONObject("properties").getString("name"))
+            assertEquals(landmark.name, properties.getString("name"))
+            assertEquals(landmark.name, properties.getString("label"))
+            assertEquals(landmark.nameZhTw, chinese.getJSONObject(index).getJSONObject("properties").getString("label"))
             assertEquals(landmark.coordinate.longitude, coordinates.getDouble(0), 0.0)
             assertEquals(landmark.coordinate.latitude, coordinates.getDouble(1), 0.0)
         }

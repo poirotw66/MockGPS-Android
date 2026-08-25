@@ -7,6 +7,7 @@ import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URL
 import java.net.URLEncoder
+import kotlin.math.abs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
@@ -14,7 +15,20 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 
-data class PlaceSearchResult(val name: String, val coordinate: Coordinate)
+enum class PlaceSearchSource { Landmark, Remote }
+
+data class PlaceSearchResult(
+    val name: String,
+    val coordinate: Coordinate,
+    val source: PlaceSearchSource = PlaceSearchSource.Remote,
+)
+
+/** Soft geographic bias for Nominatim (viewbox uses bounded=0). */
+data class PlaceSearchBias(
+    val countryCodes: String? = null,
+    val viewbox: String? = null,
+    val acceptLanguage: String? = null,
+)
 
 sealed class PlaceSearchException(message: String, cause: Throwable? = null) : Exception(message, cause) {
     class Network(cause: Throwable? = null) : PlaceSearchException("network", cause)
@@ -23,7 +37,7 @@ sealed class PlaceSearchException(message: String, cause: Throwable? = null) : E
 }
 
 interface PlaceSearchRepository {
-    suspend fun search(query: String): List<PlaceSearchResult>
+    suspend fun search(query: String, bias: PlaceSearchBias? = null): List<PlaceSearchResult>
 }
 
 data class PlaceSearchProviderConfig(
@@ -58,18 +72,20 @@ class NominatimPlaceSearchRepository(
     private val config: PlaceSearchProviderConfig = PlaceSearchProviderConfig(),
     private val limiter: RequestRateLimiter = RequestRateLimiter(config.requestIntervalMillis),
 ) : PlaceSearchRepository {
-    override suspend fun search(query: String): List<PlaceSearchResult> = withContext(Dispatchers.IO) {
+    override suspend fun search(query: String, bias: PlaceSearchBias?): List<PlaceSearchResult> = withContext(Dispatchers.IO) {
         val normalized = query.trim()
         if (normalized.length < 2) return@withContext emptyList()
         limiter.awaitTurn()
-        val endpoint = "${config.baseUrl}?format=jsonv2&limit=8&q=" +
-            URLEncoder.encode(normalized, Charsets.UTF_8.name())
+        val endpoint = buildNominatimSearchUrl(config.baseUrl, normalized, bias)
         val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
             connectTimeout = 12_000
             readTimeout = 12_000
             setRequestProperty("Accept", "application/json")
             setRequestProperty("User-Agent", config.userAgent)
+            bias?.acceptLanguage?.takeIf { it.isNotBlank() }?.let { language ->
+                setRequestProperty("Accept-Language", language)
+            }
         }
         try {
             when (val status = connection.responseCode) {
@@ -89,6 +105,56 @@ class NominatimPlaceSearchRepository(
     }
 }
 
+internal fun buildNominatimSearchUrl(
+    baseUrl: String,
+    query: String,
+    bias: PlaceSearchBias? = null,
+    limit: Int = 8,
+): String {
+    val encoded = URLEncoder.encode(query.trim(), Charsets.UTF_8.name())
+    val builder = StringBuilder("$baseUrl?format=jsonv2&limit=$limit&q=$encoded")
+    bias?.countryCodes?.takeIf { it.isNotBlank() }?.let { codes ->
+        builder.append("&countrycodes=").append(URLEncoder.encode(codes, Charsets.UTF_8.name()))
+    }
+    bias?.viewbox?.takeIf { it.isNotBlank() }?.let { box ->
+        builder.append("&viewbox=").append(URLEncoder.encode(box, Charsets.UTF_8.name()))
+        builder.append("&bounded=0")
+    }
+    return builder.toString()
+}
+
+/** Soft viewbox around [center]; Nominatim order is left,top,right,bottom. */
+internal fun viewboxAround(center: Coordinate, deltaDegrees: Double = 0.35): String {
+    val left = center.longitude - deltaDegrees
+    val right = center.longitude + deltaDegrees
+    val top = center.latitude + deltaDegrees
+    val bottom = center.latitude - deltaDegrees
+    return "$left,$top,$right,$bottom"
+}
+
+/** Local landmarks first; drop remote hits that roughly duplicate a landmark coordinate. */
+internal fun mergePlaceSearchResults(
+    local: List<PlaceSearchResult>,
+    remote: List<PlaceSearchResult>,
+): List<PlaceSearchResult> {
+    val filteredRemote = remote.filter { remoteHit ->
+        local.none { roughlySameCoordinate(it.coordinate, remoteHit.coordinate) }
+    }
+    return local + filteredRemote
+}
+
+private fun roughlySameCoordinate(first: Coordinate, second: Coordinate): Boolean =
+    abs(first.latitude - second.latitude) < 0.002 &&
+        abs(first.longitude - second.longitude) < 0.002
+
+/** Short or digit-heavy queries often intend a landmark nickname. */
+internal fun looksLikeLandmarkNickname(query: String): Boolean {
+    val normalized = query.trim()
+    if (normalized.length < 2) return false
+    if (normalized.all { it.isDigit() }) return true
+    return normalized.length <= 4
+}
+
 internal fun parseNominatimResults(body: String): List<PlaceSearchResult> = try {
     val items = JSONArray(body)
     buildList {
@@ -98,7 +164,7 @@ internal fun parseNominatimResults(body: String): List<PlaceSearchResult> = try 
             val longitude = item.optString("lon").toDoubleOrNull() ?: continue
             val name = item.optString("display_name").trim()
             if (name.isNotEmpty() && latitude in -90.0..90.0 && longitude in -180.0..180.0) {
-                add(PlaceSearchResult(name, Coordinate(latitude, longitude)))
+                add(PlaceSearchResult(name, Coordinate(latitude, longitude), PlaceSearchSource.Remote))
             }
         }
     }

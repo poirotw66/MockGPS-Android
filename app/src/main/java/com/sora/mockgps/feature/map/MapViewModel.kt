@@ -5,7 +5,12 @@ import androidx.annotation.StringRes
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.sora.mockgps.R
+import com.sora.mockgps.feature.search.PlaceSearchBias
 import com.sora.mockgps.feature.search.PlaceSearchException
+import com.sora.mockgps.feature.search.PlaceSearchResult
+import com.sora.mockgps.feature.search.PlaceSearchSource
+import com.sora.mockgps.feature.search.mergePlaceSearchResults
+import com.sora.mockgps.feature.search.viewboxAround
 import com.sora.mockgps.core.model.Coordinate
 import com.sora.mockgps.feature.favorites.domain.FavoriteLocation
 import com.sora.mockgps.feature.favorites.domain.RecentLocation
@@ -15,6 +20,7 @@ import com.sora.mockgps.feature.routes.domain.SavedRouteSummary
 import com.sora.mockgps.route.PlannedRoute
 import com.sora.mockgps.route.RoutePolyline
 import com.sora.mockgps.route.RouteTransportMode
+import java.util.Locale
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -144,26 +150,45 @@ class MapViewModel @JvmOverloads constructor(
         }
     }
 
-    /** Debounced, cancellable query entry point. Provider requests remain rate limited at 1/s. */
+    /** Debounced, cancellable query entry point. Local landmarks first; remote rate limited at 1/s. */
     fun onPlaceSearchQueryChanged(query: String) {
         placeSearchJob?.cancel()
         val normalizedQuery = query.trim()
+        if (normalizedQuery.length < MINIMUM_SEARCH_QUERY_LENGTH) {
+            mutableUiState.update {
+                it.copy(
+                    placeSearchQuery = query,
+                    isPlaceSearching = false,
+                    placeSearchResults = emptyList(),
+                    placeSearchError = null,
+                )
+            }
+            return
+        }
+        val useZhTw = currentSearchLocale().usesTraditionalChinese()
+        val localResults = matchLandmarks(normalizedQuery, journeyLandmarks).map { landmark ->
+            PlaceSearchResult(
+                name = landmark.displayName(useZhTw),
+                coordinate = landmark.coordinate,
+                source = PlaceSearchSource.Landmark,
+            )
+        }
         mutableUiState.update {
             it.copy(
                 placeSearchQuery = query,
-                isPlaceSearching = normalizedQuery.length >= MINIMUM_SEARCH_QUERY_LENGTH,
-                placeSearchResults = emptyList(),
+                isPlaceSearching = true,
+                placeSearchResults = localResults,
                 placeSearchError = null,
             )
         }
-        if (normalizedQuery.length < MINIMUM_SEARCH_QUERY_LENGTH) return
         placeSearchJob = viewModelScope.launch {
             delay(350)
             try {
-                val results = placeSearchRepository.search(normalizedQuery)
+                val remote = placeSearchRepository.search(normalizedQuery, placeSearchBias())
+                val merged = mergePlaceSearchResults(localResults, remote)
                 mutableUiState.update { current ->
                     if (current.placeSearchQuery == query) {
-                        current.copy(isPlaceSearching = false, placeSearchResults = results)
+                        current.copy(isPlaceSearching = false, placeSearchResults = merged)
                     } else {
                         current
                     }
@@ -177,15 +202,32 @@ class MapViewModel @JvmOverloads constructor(
                     is PlaceSearchException.InvalidResponse -> PlaceSearchError.InvalidResponse
                 }
                 mutableUiState.update { current ->
-                    if (current.placeSearchQuery == query) {
-                        current.copy(isPlaceSearching = false, placeSearchError = error)
-                    } else {
+                    if (current.placeSearchQuery != query) {
                         current
+                    } else {
+                        current.copy(
+                            isPlaceSearching = false,
+                            // Keep landmark hits usable offline; only surface remote errors when empty.
+                            placeSearchError = if (localResults.isEmpty()) error else null,
+                        )
                     }
                 }
             }
         }
     }
+
+    private fun placeSearchBias(): PlaceSearchBias {
+        val center = mutableUiState.value.camera.coordinate
+        val locale = currentSearchLocale()
+        return PlaceSearchBias(
+            countryCodes = nearestJourneyRegion(center).nominatimCountryCode(),
+            viewbox = viewboxAround(center),
+            acceptLanguage = if (locale.usesTraditionalChinese()) "zh-TW" else locale.toLanguageTag(),
+        )
+    }
+
+    private fun currentSearchLocale(): Locale =
+        getApplication<Application>().resources.configuration.locales[0]
 
     fun saveFavorite(name: String, coordinate: Coordinate) {
         viewModelScope.launch {
