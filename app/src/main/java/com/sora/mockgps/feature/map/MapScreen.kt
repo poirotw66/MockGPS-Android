@@ -23,9 +23,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -605,6 +609,51 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 )
             }
         }
+        val goToCurrentLocation: () -> Unit = {
+            if (!context.hasLocationPermission()) {
+                pendingCurrentLocation = true
+                permissionLauncher.launch(
+                    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
+                )
+            } else {
+                val coordinate = context.lastKnownCoordinate()
+                if (coordinate == null) {
+                    permissionMessage = currentLocationUnavailable
+                } else {
+                    viewModel.selectCoordinate(coordinate)
+                    coroutineScope.launch {
+                        cameraState.animateTo(cameraState.position.copy(target = coordinate.toPosition()))
+                    }
+                }
+            }
+        }
+        val currentLocationLabel = stringResource(R.string.action_use_current_location)
+        Surface(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .navigationBarsPadding()
+                .padding(
+                    end = if (compactLayout) (panelMaxWidth + 20.dp) else 16.dp,
+                    bottom = if (compactLayout) 16.dp else 132.dp,
+                ),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
+            tonalElevation = 4.dp,
+            shadowElevation = 6.dp,
+        ) {
+            IconButton(
+                onClick = goToCurrentLocation,
+                modifier = Modifier
+                    .size(48.dp)
+                    .semantics { contentDescription = currentLocationLabel },
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.LocationOn,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
         MapControlPanel(
             pendingCoordinate = uiState.pendingCoordinate,
             activeCoordinate = activeCoordinate,
@@ -655,23 +704,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     context.startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS))
                 }.onFailure { permissionMessage = developerOptionsUnavailable }
             },
-            onUseCurrentLocation = {
-                if (!context.hasLocationPermission()) {
-                    pendingCurrentLocation = true
-                    permissionLauncher.launch(
-                        arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
-                    )
-                } else {
-                    val coordinate = context.lastKnownCoordinate()
-                    if (coordinate == null) permissionMessage = currentLocationUnavailable
-                    else {
-                        viewModel.selectCoordinate(coordinate)
-                        coroutineScope.launch {
-                            cameraState.animateTo(cameraState.position.copy(target = coordinate.toPosition()))
-                        }
-                    }
-                }
-            },
+            onUseCurrentLocation = goToCurrentLocation,
             onSaveFavorite = { saveFavoriteCoordinate = uiState.pendingCoordinate },
             onShowFavorites = { showFavorites = true },
             onShowRouteLibrary = { showRouteLibrary = true },
