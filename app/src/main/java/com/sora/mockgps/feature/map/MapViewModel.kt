@@ -579,20 +579,40 @@ class MapViewModel @JvmOverloads constructor(
         routePlanningJob?.cancel()
         automaticJourneyOptions = options
         val journey = automaticJourneyRoutePlanner.generate(options)
-        mutableUiState.update {
-            AutomaticJourneyStateReducer.planning(
-                state = it,
-                journey = journey,
-                transportMode = options.transportMode,
-                routeName = localized(
-                    R.string.generated_journey_name,
-                    journey.landmark.displayName(currentSearchLocale().usesTraditionalChinese()),
-                    localized(options.region.labelResource()),
-                    localized(journey.shape.labelResource()),
-                ),
-            )
+        val routeName = localized(
+            R.string.generated_journey_name,
+            journey.landmark.displayName(currentSearchLocale().usesTraditionalChinese()),
+            localized(options.region.labelResource()),
+            localized(journey.shape.labelResource()),
+        )
+        when (options.routeStyle) {
+            AutoJourneyRouteStyle.PerfectShape -> {
+                val route = perfectShapeRoute(journey.points)
+                mutableUiState.update {
+                    AutomaticJourneyStateReducer.planning(
+                        state = it,
+                        journey = journey,
+                        transportMode = options.transportMode,
+                        routeName = routeName,
+                    ).copy(
+                        routeWaypoints = emptyList(),
+                        plannedRoute = route,
+                        isPlanningRoute = false,
+                    )
+                }
+            }
+            AutoJourneyRouteStyle.RoadAdapted -> {
+                mutableUiState.update {
+                    AutomaticJourneyStateReducer.planning(
+                        state = it,
+                        journey = journey,
+                        transportMode = options.transportMode,
+                        routeName = routeName,
+                    )
+                }
+                planAutomaticJourney(journey, options.transportMode)
+            }
         }
-        planAutomaticJourney(journey, options.transportMode)
     }
 
     fun regenerateAutomaticJourney() {
@@ -602,11 +622,7 @@ class MapViewModel @JvmOverloads constructor(
     internal fun generateShapeRoute(center: Coordinate, shape: RouteShape) {
         routePlanningJob?.cancel()
         val points = JourneyPlanner.shapePoints(center, shape)
-        val route = PlannedRoute(
-            points = points,
-            distanceMeters = RoutePolyline(points).totalDistanceMeters,
-            providerDurationSeconds = 0.0,
-        )
+        val route = perfectShapeRoute(points)
         mutableUiState.update {
             it.copy(
                 isRoutePlanningMode = true,
@@ -903,6 +919,12 @@ class MapViewModel @JvmOverloads constructor(
         RouteShape.Butterfly -> R.string.shape_butterfly
         RouteShape.ChristmasTree -> R.string.shape_christmas_tree
     }
+
+    private fun perfectShapeRoute(points: List<Coordinate>): PlannedRoute = PlannedRoute(
+        points = points,
+        distanceMeters = RoutePolyline(points).totalDistanceMeters,
+        providerDurationSeconds = 0.0,
+    )
 
     private fun awaitMapLoad() {
         mapLoadTimeout?.cancel()

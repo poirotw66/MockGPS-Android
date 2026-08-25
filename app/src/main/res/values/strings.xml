@@ -68,7 +68,11 @@
     <string name="auto_journey_region">Region</string>
     <string name="auto_journey_duration">Duration</string>
     <string name="auto_journey_transport">Transport</string>
+    <string name="auto_journey_route_style">Route style</string>
+    <string name="route_style_perfect_shape">Perfect shape</string>
+    <string name="route_style_road_adapted">Road adapted</string>
     <string name="auto_journey_notice">Each generation picks a famous landmark and sends shape control points to the FOSSGIS OpenStreetMap routing service. The result follows real roads, so every shape is naturally different and imperfect.</string>
+    <string name="auto_journey_notice_perfect_shape">Each generation picks a famous landmark and draws a geometric shape centered on it. The route keeps the full shape without road routing.</string>
     <string name="generated_journey_name">%1$s · %2$s · %3$s journey</string>
     <string name="action_generate_journey">Generate</string>
     <string name="action_try_another_landmark">Try another landmark</string>

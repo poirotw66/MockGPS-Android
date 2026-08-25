@@ -292,8 +292,13 @@ internal data class AutoJourneyOptions(
     val region: JourneyRegion = JourneyRegion.Taiwan,
     val duration: JourneyDuration = JourneyDuration.Medium,
     val transportMode: RouteTransportMode = RouteTransportMode.Bicycle,
+    val routeStyle: AutoJourneyRouteStyle = AutoJourneyRouteStyle.RoadAdapted,
     val centerCoordinate: Coordinate? = null,
 )
+
+internal enum class AutoJourneyRouteStyle {
+    PerfectShape, RoadAdapted,
+}
 
 internal enum class RouteShape { Heart, Star, Circle, Cat, Dog, Rabbit, Fish, Butterfly, ChristmasTree }
 

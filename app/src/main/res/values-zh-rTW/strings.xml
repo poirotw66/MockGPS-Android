@@ -64,7 +64,11 @@
     <string name="auto_journey_region">地區</string>
     <string name="auto_journey_duration">旅程時長</string>
     <string name="auto_journey_transport">交通工具</string>
+    <string name="auto_journey_route_style">路線選項</string>
+    <string name="route_style_perfect_shape">完美圖形</string>
+    <string name="route_style_road_adapted">適配道路</string>
     <string name="auto_journey_notice">每次會挑選著名景點，並將形狀控制點傳送至 FOSSGIS OpenStreetMap 路線服務。結果會沿著真實道路，因此每次形狀都會自然不同，也不會過度完美。</string>
+    <string name="auto_journey_notice_perfect_shape">每次會挑選著名景點，並以該點為中心產生幾何圖形路線。不經道路規劃，形狀會完整保留。</string>
     <string name="generated_journey_name">%1$s · %2$s · %3$s旅程</string>
     <string name="action_generate_journey">產生旅程</string>
     <string name="action_try_another_landmark">改用其他景點</string>

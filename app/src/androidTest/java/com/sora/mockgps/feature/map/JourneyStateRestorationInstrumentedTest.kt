@@ -41,9 +41,11 @@ class JourneyStateRestorationInstrumentedTest {
         val japan = context.getString(R.string.region_japan)
         val longDuration = context.getString(R.string.duration_120_minutes)
         val drive = context.getString(R.string.transport_drive)
+        val perfectShape = context.getString(R.string.route_style_perfect_shape)
         composeRule.onNodeWithText(japan).performClick()
         composeRule.onNodeWithText(longDuration).performClick()
         composeRule.onNodeWithText(drive).performClick()
+        composeRule.onNodeWithText(perfectShape).performClick()
 
         restorationTester.emulateSavedInstanceStateRestore()
         composeRule.waitForIdle()
@@ -51,6 +53,7 @@ class JourneyStateRestorationInstrumentedTest {
         composeRule.onNodeWithText(japan).assertIsSelected()
         composeRule.onNodeWithText(longDuration).assertIsSelected()
         composeRule.onNodeWithText(drive).assertIsSelected()
+        composeRule.onNodeWithText(perfectShape).assertIsSelected()
     }
 
     @Test

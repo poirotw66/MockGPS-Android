@@ -45,7 +45,18 @@ internal fun AutoJourneyDialog(
                 OptionRow(RouteTransportMode.entries, options.transportMode, { it.label() }) {
                     options = options.copy(transportMode = it)
                 }
-                Text(stringResource(R.string.auto_journey_notice))
+                OptionLabel(R.string.auto_journey_route_style)
+                OptionRow(AutoJourneyRouteStyle.entries, options.routeStyle, { it.label() }) {
+                    options = options.copy(routeStyle = it)
+                }
+                Text(
+                    stringResource(
+                        when (options.routeStyle) {
+                            AutoJourneyRouteStyle.PerfectShape -> R.string.auto_journey_notice_perfect_shape
+                            AutoJourneyRouteStyle.RoadAdapted -> R.string.auto_journey_notice
+                        },
+                    ),
+                )
             }
         },
         confirmButton = {
@@ -89,13 +100,20 @@ internal fun ShapeRouteDialog(
 
 private val AutoJourneyOptionsSaver = listSaver<AutoJourneyOptions, String>(
     save = { options ->
-        listOf(options.region.name, options.duration.name, options.transportMode.name)
+        listOf(
+            options.region.name,
+            options.duration.name,
+            options.transportMode.name,
+            options.routeStyle.name,
+        )
     },
     restore = { values ->
         AutoJourneyOptions(
             region = JourneyRegion.valueOf(values[0]),
             duration = JourneyDuration.valueOf(values[1]),
             transportMode = RouteTransportMode.valueOf(values[2]),
+            routeStyle = values.getOrNull(3)?.let(AutoJourneyRouteStyle::valueOf)
+                ?: AutoJourneyRouteStyle.RoadAdapted,
         )
     },
 )
@@ -192,6 +210,14 @@ private fun RouteTransportMode.label(): String = stringResource(
         RouteTransportMode.Walk -> R.string.transport_walk
         RouteTransportMode.Bicycle -> R.string.transport_bicycle
         RouteTransportMode.Drive -> R.string.transport_drive
+    },
+)
+
+@Composable
+private fun AutoJourneyRouteStyle.label(): String = stringResource(
+    when (this) {
+        AutoJourneyRouteStyle.PerfectShape -> R.string.route_style_perfect_shape
+        AutoJourneyRouteStyle.RoadAdapted -> R.string.route_style_road_adapted
     },
 )
 
