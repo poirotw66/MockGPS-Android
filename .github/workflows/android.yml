@@ -36,6 +36,7 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
+      # Larger AVD disk avoids InstallException for the MapLibre debug APK (~70MB+).
       - name: API ${{ matrix.api-level }} Google APIs instrumentation tests
         uses: ReactiveCircus/android-emulator-runner@v2
         with:
@@ -43,4 +44,8 @@ jobs:
           arch: x86_64
           profile: pixel_2
           target: google_apis
+          disk-size: 4G
+          heap-size: 512M
+          disable-animations: true
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: ./gradlew connectedDebugAndroidTest --stacktrace
