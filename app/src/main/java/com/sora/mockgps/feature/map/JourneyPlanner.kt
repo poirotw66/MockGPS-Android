@@ -315,9 +315,15 @@ internal object JourneyPlanner {
         random: Random = Random.Default,
         excludedLandmark: JourneyLandmark? = null,
     ): GeneratedJourney {
-        val targetDistanceMeters = (
-            speedKilometersPerHour(options.transportMode) * 1_000.0 * options.duration.minutes / 60.0
-        ).coerceIn(MINIMUM_JOURNEY_METERS, MAXIMUM_JOURNEY_METERS)
+        val targetDistanceMeters = targetDistanceMeters(options)
+        // Road routing detours inflate distance; undersize the geometric shape so the
+        // adapted route stays closer to the selected journey duration.
+        val sizingDistanceMeters = when (options.routeStyle) {
+            AutoJourneyRouteStyle.PerfectShape -> targetDistanceMeters
+            AutoJourneyRouteStyle.RoadAdapted ->
+                (targetDistanceMeters * ROAD_ADAPTED_SHAPE_DISTANCE_FACTOR)
+                    .coerceIn(MINIMUM_JOURNEY_METERS, MAXIMUM_JOURNEY_METERS)
+        }
         val landmark = when (options.region) {
             JourneyRegion.CurrentLocation -> currentLocationLandmark(
                 requireNotNull(options.centerCoordinate) { "Current location requires a coordinate." },
@@ -330,12 +336,26 @@ internal object JourneyPlanner {
         }
         val shape = RouteShape.entries[random.nextInt(RouteShape.entries.size)]
         val baselineDistance = shapeDistanceMeters(center, shape)
-        val radiusMeters = (DEFAULT_SHAPE_RADIUS_METERS * targetDistanceMeters / baselineDistance)
+        val radiusMeters = (DEFAULT_SHAPE_RADIUS_METERS * sizingDistanceMeters / baselineDistance)
             .coerceIn(
                 MINIMUM_SHAPE_RADIUS_METERS,
                 minOf(transportRadiusLimit(options.transportMode), landmark.maximumShapeRadiusMeters),
             )
         return GeneratedJourney(shape, landmark, center, shapePoints(center, shape, radiusMeters))
+    }
+
+    /** Target travel distance for the selected duration and transport speed. */
+    fun targetDistanceMeters(options: AutoJourneyOptions): Double = (
+        speedKilometersPerHour(options.transportMode) * 1_000.0 * options.duration.minutes / 60.0
+    ).coerceIn(MINIMUM_JOURNEY_METERS, MAXIMUM_JOURNEY_METERS)
+
+    fun estimatedShapeRadiusMeters(journey: GeneratedJourney): Double =
+        journey.points.maxOf { GeoMath.distanceMeters(journey.center, it) }
+            .coerceAtLeast(MINIMUM_SHAPE_RADIUS_METERS)
+
+    fun withShapeRadius(journey: GeneratedJourney, radiusMeters: Double): GeneratedJourney {
+        val clamped = radiusMeters.coerceIn(MINIMUM_SHAPE_RADIUS_METERS, MAXIMUM_SHAPE_RADIUS_METERS)
+        return journey.copy(points = shapePoints(journey.center, journey.shape, clamped))
     }
 
     private fun currentLocationLandmark(coordinate: Coordinate): JourneyLandmark =
@@ -467,4 +487,6 @@ internal object JourneyPlanner {
     private const val DEFAULT_SHAPE_RADIUS_METERS = 1_000.0
     private const val MINIMUM_CENTER_OFFSET_METERS = 100.0
     private const val MAXIMUM_CENTER_OFFSET_METERS = 1_000.0
+    /** Geometric distance as a fraction of the duration target before road adaptation. */
+    private const val ROAD_ADAPTED_SHAPE_DISTANCE_FACTOR = 0.70
 }

@@ -2,6 +2,7 @@ package com.sora.mockgps.feature.map
 
 import com.sora.mockgps.core.model.Coordinate
 import com.sora.mockgps.route.PlannedRoute
+import com.sora.mockgps.route.RoutePolyline
 import com.sora.mockgps.route.RouteTransportMode
 import com.sora.mockgps.route.RoutingRepository
 import kotlinx.coroutines.runBlocking
@@ -75,6 +76,48 @@ class AutomaticJourneyRoutePlannerTest {
         assertNotEquals(first.landmark, regenerated.landmark)
     }
 
+    @Test
+    fun `road adapted planning shrinks shape until distance fits duration target`() = runBlocking {
+        val repository = InflatingRoutingRepository(inflationFactor = 1.6)
+        val planner = AutomaticJourneyRoutePlanner(repository, Random(17))
+        val options = AutoJourneyOptions(
+            duration = JourneyDuration.Medium,
+            transportMode = RouteTransportMode.Bicycle,
+            routeStyle = AutoJourneyRouteStyle.RoadAdapted,
+        )
+        val journey = planner.generate(options)
+        val target = JourneyPlanner.targetDistanceMeters(options)
+
+        val result = planner.planWithinTargetDistance(journey, options.transportMode, target)
+
+        assertTrue(result.route.distanceMeters <= target * 1.05)
+        assertTrue(repository.planCount >= 2)
+        assertTrue(
+            JourneyPlanner.estimatedShapeRadiusMeters(result.journey) <
+                JourneyPlanner.estimatedShapeRadiusMeters(journey),
+        )
+    }
+
+    @Test
+    fun `success reducer updates control points when journey was shrunk`() {
+        val original = JourneyPlanner.automaticJourney(
+            AutoJourneyOptions(routeStyle = AutoJourneyRouteStyle.RoadAdapted),
+            Random(21),
+        )
+        val shrunk = JourneyPlanner.withShapeRadius(original, 200.0)
+        val loading = AutomaticJourneyStateReducer.planning(
+            MapUiState(), original, RouteTransportMode.Bicycle, "Journey",
+        )
+        val route = PlannedRoute(shrunk.points, 2_000.0, 400.0)
+
+        val result = AutomaticJourneyStateReducer.success(loading, route, shrunk)
+
+        assertEquals(shrunk.points, result.routeWaypoints)
+        assertEquals(shrunk.points.first(), result.routeOrigin)
+        assertEquals(shrunk.points.last(), result.routeDestination)
+        assertEquals(route, result.plannedRoute)
+    }
+
     private class RecordingRoutingRepository(
         private val route: PlannedRoute = PlannedRoute(
             listOf(Coordinate(25.0, 121.0), Coordinate(25.01, 121.01)),
@@ -94,6 +137,26 @@ class AutomaticJourneyRoutePlannerTest {
             this.transportMode = transportMode
             failure?.let { throw it }
             return route
+        }
+    }
+
+    /** Simulates road detours by returning inflated distance relative to control-point length. */
+    private class InflatingRoutingRepository(
+        private val inflationFactor: Double,
+    ) : RoutingRepository {
+        var planCount: Int = 0
+
+        override suspend fun planRoute(
+            waypoints: List<Coordinate>,
+            transportMode: RouteTransportMode,
+        ): PlannedRoute {
+            planCount += 1
+            val geometric = RoutePolyline(waypoints).totalDistanceMeters
+            return PlannedRoute(
+                points = waypoints,
+                distanceMeters = geometric * inflationFactor,
+                providerDurationSeconds = 0.0,
+            )
         }
     }
 }

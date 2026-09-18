@@ -373,7 +373,12 @@ internal class MapRoutingCoordinator(
                         routeName = routeName,
                     )
                 }
-                planAutomaticJourney(journey, options.transportMode)
+                planAutomaticJourney(
+                    journey = journey,
+                    transportMode = options.transportMode,
+                    targetDistanceMeters = JourneyPlanner.targetDistanceMeters(options),
+                    routeName = routeName,
+                )
             }
         }
     }
@@ -548,18 +553,24 @@ internal class MapRoutingCoordinator(
         }
     }
 
-    private fun planAutomaticJourney(journey: GeneratedJourney, transportMode: RouteTransportMode) {
-        val origin = journey.points.first()
-        val destination = journey.points.last()
-        val waypoints = journey.points
+    private fun planAutomaticJourney(
+        journey: GeneratedJourney,
+        transportMode: RouteTransportMode,
+        targetDistanceMeters: Double,
+        routeName: String,
+    ) {
         routePlanningJob = scope.launch {
             try {
-                val route = automaticJourneyRoutePlanner.plan(journey, transportMode)
+                val result = automaticJourneyRoutePlanner.planWithinTargetDistance(
+                    journey = journey,
+                    transportMode = transportMode,
+                    targetDistanceMeters = targetDistanceMeters,
+                )
                 uiState.update { current ->
-                    if (current.isRoutePlanningMode && current.routeOrigin == origin &&
-                        current.routeDestination == destination && current.routeWaypoints == waypoints
+                    if (current.isRoutePlanningMode && current.isPlanningRoute &&
+                        current.activeRouteName == routeName
                     ) {
-                        AutomaticJourneyStateReducer.success(current, route)
+                        AutomaticJourneyStateReducer.success(current, result.route, result.journey)
                     } else {
                         current
                     }
@@ -568,8 +579,8 @@ internal class MapRoutingCoordinator(
                 throw cancelled
             } catch (failure: Throwable) {
                 uiState.update { current ->
-                    if (current.isRoutePlanningMode && current.routeOrigin == origin &&
-                        current.routeDestination == destination && current.routeWaypoints == waypoints
+                    if (current.isRoutePlanningMode && current.isPlanningRoute &&
+                        current.activeRouteName == routeName
                     ) {
                         AutomaticJourneyStateReducer.failure(
                             current,

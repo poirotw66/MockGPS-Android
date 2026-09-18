@@ -15,11 +15,21 @@ class JourneyPlannerTest {
     @Test
     fun `automatic journey is closed and scales with duration and transport`() {
         val shortWalk = JourneyPlanner.automaticJourney(
-            AutoJourneyOptions(JourneyRegion.Taiwan, JourneyDuration.Short, RouteTransportMode.Walk),
+            AutoJourneyOptions(
+                JourneyRegion.Taiwan,
+                JourneyDuration.Short,
+                RouteTransportMode.Walk,
+                routeStyle = AutoJourneyRouteStyle.PerfectShape,
+            ),
             Random(1),
         ).points
         val longDrive = JourneyPlanner.automaticJourney(
-            AutoJourneyOptions(JourneyRegion.Taiwan, JourneyDuration.Long, RouteTransportMode.Drive),
+            AutoJourneyOptions(
+                JourneyRegion.Taiwan,
+                JourneyDuration.Long,
+                RouteTransportMode.Drive,
+                routeStyle = AutoJourneyRouteStyle.PerfectShape,
+            ),
             Random(1),
         ).points
 
@@ -27,6 +37,30 @@ class JourneyPlannerTest {
         assertEquals(longDrive.first(), longDrive.last())
         assertTrue(RoutePolyline(longDrive).totalDistanceMeters > RoutePolyline(shortWalk).totalDistanceMeters)
         assertTrue(RoutePolyline(longDrive).totalDistanceMeters in 35_000.0..70_000.0)
+    }
+
+    @Test
+    fun `road adapted journeys undersize the geometric shape versus perfect shape`() {
+        val options = AutoJourneyOptions(
+            region = JourneyRegion.Taiwan,
+            duration = JourneyDuration.Medium,
+            transportMode = RouteTransportMode.Bicycle,
+        )
+        val perfect = JourneyPlanner.automaticJourney(
+            options.copy(routeStyle = AutoJourneyRouteStyle.PerfectShape),
+            Random(5),
+        )
+        val adapted = JourneyPlanner.automaticJourney(
+            options.copy(routeStyle = AutoJourneyRouteStyle.RoadAdapted),
+            Random(5),
+        )
+        val target = JourneyPlanner.targetDistanceMeters(options)
+
+        assertEquals(perfect.landmark, adapted.landmark)
+        assertEquals(perfect.shape, adapted.shape)
+        assertTrue(RoutePolyline(adapted.points).totalDistanceMeters < RoutePolyline(perfect.points).totalDistanceMeters)
+        assertTrue(RoutePolyline(adapted.points).totalDistanceMeters < target)
+        assertTrue(RoutePolyline(perfect.points).totalDistanceMeters in (target * 0.85)..(target * 1.15))
     }
 
     @Test
