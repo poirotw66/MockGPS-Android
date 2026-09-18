@@ -116,10 +116,12 @@ internal fun MapControlPanel(
     onShowLandmarksChange: (Boolean) -> Unit,
     updateIntervalMillis: Long,
     accuracyMeters: Float,
-    onUpdateIntervalChange: (Long) -> Unit,
-    onAccuracyChange: (Float) -> Unit,
+    onCycleUpdateInterval: () -> Unit,
+    onCycleAccuracy: () -> Unit,
     onToggleMapType: () -> Unit,
     onOpenDeveloperOptions: () -> Unit,
+    onOpenBatterySettings: () -> Unit,
+    onShowSetupGuide: () -> Unit,
     onUseCurrentLocation: () -> Unit,
     onSaveFavorite: () -> Unit,
     onShowFavorites: () -> Unit,
@@ -353,10 +355,15 @@ internal fun MapControlPanel(
                         Switch(checked = showLandmarks, onCheckedChange = onShowLandmarksChange)
                     }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = { onUpdateIntervalChange(if (updateIntervalMillis >= 2_000L) 1_000L else 2_000L) }, modifier = Modifier.weight(1f)) {
-                            Text(stringResource(R.string.setting_update_interval, updateIntervalMillis / 1_000L))
+                        TextButton(onClick = onCycleUpdateInterval, modifier = Modifier.weight(1f)) {
+                            Text(
+                                stringResource(
+                                    R.string.setting_update_interval,
+                                    formatUpdateIntervalLabel(updateIntervalMillis),
+                                ),
+                            )
                         }
-                        TextButton(onClick = { onAccuracyChange(if (accuracyMeters >= 10f) 5f else 10f) }, modifier = Modifier.weight(1f)) {
+                        TextButton(onClick = onCycleAccuracy, modifier = Modifier.weight(1f)) {
                             Text(stringResource(R.string.setting_accuracy, accuracyMeters.toInt()))
                         }
                     }
@@ -382,6 +389,23 @@ internal fun MapControlPanel(
                             modifier = Modifier.padding(start = 8.dp),
                         )
                     }
+                    OutlinedButton(
+                        onClick = onOpenBatterySettings,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    ) {
+                        Text(stringResource(R.string.action_open_battery_settings))
+                    }
+                    TextButton(
+                        onClick = onShowSetupGuide,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    ) {
+                        Text(stringResource(R.string.action_show_setup_guide))
+                    }
+                    Text(
+                        stringResource(R.string.setup_guide_is_mock),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     if (!compactLayout) {
                         Text(
                             stringResource(R.string.mock_app_setup_hint),
@@ -762,4 +786,11 @@ internal fun MapControlPanel(
     }
 }
 }
+
+internal fun formatUpdateIntervalLabel(intervalMillis: Long): String =
+    if (intervalMillis % 1_000L == 0L) {
+        (intervalMillis / 1_000L).toString()
+    } else {
+        String.format(Locale.US, "%.1f", intervalMillis / 1_000.0)
+    }
 

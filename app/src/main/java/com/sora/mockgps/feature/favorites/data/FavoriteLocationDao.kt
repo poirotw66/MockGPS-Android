@@ -12,6 +12,12 @@ interface FavoriteLocationDao {
     @Query("SELECT * FROM favorite_locations ORDER BY updatedAt DESC, id DESC")
     fun observeAll(): Flow<List<FavoriteLocationEntity>>
 
+    @Query("SELECT * FROM favorite_locations ORDER BY updatedAt DESC, id DESC")
+    suspend fun getAll(): List<FavoriteLocationEntity>
+
+    @Query("SELECT * FROM recent_locations ORDER BY usedAt DESC, id DESC")
+    suspend fun getAllRecentLocations(): List<RecentLocationEntity>
+
     @Query("SELECT * FROM favorite_locations WHERE id = :id LIMIT 1")
     suspend fun getById(id: Long): FavoriteLocationEntity?
 
@@ -98,4 +104,33 @@ interface FavoriteLocationDao {
         updateName(concurrent.id, entity.name, entity.updatedAt)
         return concurrent.id
     }
+
+    /** Restores a validated favorites backup atomically. Exported IDs are remapped to local rows. */
+    @Transaction
+    suspend fun restoreBackup(
+        favorites: List<FavoriteLocationEntity>,
+        recentLocations: List<RecentLocationEntity>,
+        replaceExisting: Boolean,
+        maximumRecentRows: Int,
+    ): FavoriteRestoreCounts {
+        if (replaceExisting) {
+            clearRecentLocations()
+            clearAll()
+        }
+        favorites.forEach { exported ->
+            save(exported.copy(id = 0))
+        }
+        recentLocations.forEach { exported ->
+            recordRecentLocation(exported.copy(id = 0), maximumRecentRows)
+        }
+        return FavoriteRestoreCounts(
+            favoritesRestored = favorites.size,
+            recentLocationsRestored = minOf(recentLocations.size, maximumRecentRows),
+        )
+    }
 }
+
+data class FavoriteRestoreCounts(
+    val favoritesRestored: Int,
+    val recentLocationsRestored: Int,
+)

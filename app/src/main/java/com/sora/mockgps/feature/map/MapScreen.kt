@@ -137,6 +137,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     }
     var saveFavoriteCoordinate by remember { mutableStateOf<Coordinate?>(null) }
     var showFavorites by remember { mutableStateOf(false) }
+    var showSetupGuide by remember { mutableStateOf(false) }
     var renameFavorite by remember { mutableStateOf<FavoriteLocation?>(null) }
     var deleteFavorite by remember { mutableStateOf<FavoriteLocation?>(null) }
     var showRouteLibrary by remember { mutableStateOf(false) }
@@ -182,6 +183,13 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 .onFailure { Toast.makeText(context, readBackupFailed, Toast.LENGTH_LONG).show() }
         }
     }
+    val importFavoritesBackupLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { selected ->
+            runCatching { context.readText(selected) }
+                .onSuccess { viewModel.restoreFavoritesBackup(it) }
+                .onFailure { Toast.makeText(context, readBackupFailed, Toast.LENGTH_LONG).show() }
+        }
+    }
 
     val locationPermissionRequired = stringResource(R.string.location_permission_required)
     val notificationPermissionDenied = stringResource(R.string.notification_permission_denied)
@@ -189,6 +197,23 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     val serviceStartSecurityFailed = stringResource(R.string.foreground_service_security_failed)
     val serviceStartFailed = stringResource(R.string.foreground_service_start_failed)
     val developerOptionsUnavailable = stringResource(R.string.developer_options_unavailable)
+    val batterySettingsUnavailable = stringResource(R.string.battery_settings_unavailable)
+    fun openDeveloperOptions() {
+        runCatching {
+            context.startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS))
+        }.onFailure { permissionMessage = developerOptionsUnavailable }
+    }
+    fun openBatterySettings() {
+        runCatching {
+            context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+        }.onFailure { permissionMessage = batterySettingsUnavailable }
+    }
+
+    LaunchedEffect(uiState.settingsReady, uiState.setupGuideDismissed) {
+        if (uiState.settingsReady && !uiState.setupGuideDismissed) {
+            showSetupGuide = true
+        }
+    }
     fun resolveCurrentLocation(onResolved: (Coordinate) -> Unit) {
         if (!context.hasLocationPermission()) {
             permissionMessage = locationPermissionRequired
@@ -360,10 +385,19 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             kind = error.kind,
             onDismiss = MockLocationForegroundService::consumeError,
             onOpenDeveloperOptions = {
-                runCatching {
-                    context.startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS))
-                }.onFailure { permissionMessage = developerOptionsUnavailable }
+                openDeveloperOptions()
                 MockLocationForegroundService.consumeError()
+            },
+        )
+    }
+
+    if (showSetupGuide) {
+        SetupGuideDialog(
+            onOpenDeveloperOptions = { openDeveloperOptions() },
+            onOpenBatterySettings = { openBatterySettings() },
+            onDismiss = {
+                showSetupGuide = false
+                viewModel.dismissSetupGuide()
             },
         )
     }
@@ -417,6 +451,14 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             onDelete = { deleteFavorite = it },
             onClearAll = { confirmClearFavorites = true },
             onClearRecentLocations = { confirmClearRecentLocations = true },
+            onExportBackup = {
+                showFavorites = false
+                viewModel.exportFavoritesBackup()
+            },
+            onImportBackup = {
+                showFavorites = false
+                importFavoritesBackupLauncher.launch(arrayOf("application/json"))
+            },
             onDismiss = { showFavorites = false },
         )
     }
@@ -759,14 +801,12 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             onShowLandmarksChange = { showLandmarks = it },
             updateIntervalMillis = uiState.updateIntervalMillis,
             accuracyMeters = uiState.accuracyMeters,
-            onUpdateIntervalChange = viewModel::setUpdateIntervalMillis,
-            onAccuracyChange = viewModel::setAccuracyMeters,
+            onCycleUpdateInterval = viewModel::cycleUpdateIntervalMillis,
+            onCycleAccuracy = viewModel::cycleAccuracyMeters,
             onToggleMapType = viewModel::toggleMapType,
-            onOpenDeveloperOptions = {
-                runCatching {
-                    context.startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS))
-                }.onFailure { permissionMessage = developerOptionsUnavailable }
-            },
+            onOpenDeveloperOptions = { openDeveloperOptions() },
+            onOpenBatterySettings = { openBatterySettings() },
+            onShowSetupGuide = { showSetupGuide = true },
             onUseCurrentLocation = goToCurrentLocation,
             onSaveFavorite = { saveFavoriteCoordinate = uiState.pendingCoordinate },
             onShowFavorites = { showFavorites = true },

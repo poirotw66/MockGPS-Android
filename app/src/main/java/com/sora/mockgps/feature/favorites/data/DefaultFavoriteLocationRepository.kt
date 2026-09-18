@@ -1,7 +1,10 @@
 package com.sora.mockgps.feature.favorites.data
 
+import com.sora.mockgps.feature.favorites.domain.FavoriteBackup
 import com.sora.mockgps.feature.favorites.domain.FavoriteLocation
 import com.sora.mockgps.feature.favorites.domain.FavoriteLocationRepository
+import com.sora.mockgps.feature.favorites.domain.FavoriteRestoreResult
+import com.sora.mockgps.feature.favorites.domain.RecentLocation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -67,6 +70,48 @@ class DefaultFavoriteLocationRepository(
     }
 
     override suspend fun clearRecentLocations() { dao.clearRecentLocations() }
+
+    override suspend fun exportBackup(): String {
+        val favorites = dao.getAll().map(FavoriteLocationEntity::toDomain)
+        val recent = dao.getAllRecentLocations().map(RecentLocationEntity::toDomain)
+        return FavoriteBackupJson.encode(FavoriteBackup(favorites, recent))
+    }
+
+    override suspend fun restoreBackup(
+        serialized: String,
+        replaceExisting: Boolean,
+    ): FavoriteRestoreResult {
+        val backup = FavoriteBackupJson.decode(serialized)
+        val counts = dao.restoreBackup(
+            favorites = backup.favorites.map { favorite ->
+                val coordinate = FavoriteCoordinate(favorite.latitude, favorite.longitude)
+                FavoriteLocationEntity(
+                    id = favorite.id,
+                    name = favorite.name,
+                    latitude = favorite.latitude,
+                    longitude = favorite.longitude,
+                    normalizedLatitude = coordinate.normalizedLatitude,
+                    normalizedLongitude = coordinate.normalizedLongitude,
+                    createdAt = favorite.createdAt,
+                    updatedAt = favorite.updatedAt,
+                )
+            },
+            recentLocations = backup.recentLocations.map { recent ->
+                val coordinate = FavoriteCoordinate(recent.latitude, recent.longitude)
+                RecentLocationEntity(
+                    id = recent.id,
+                    latitude = recent.latitude,
+                    longitude = recent.longitude,
+                    normalizedLatitude = coordinate.normalizedLatitude,
+                    normalizedLongitude = coordinate.normalizedLongitude,
+                    usedAt = recent.usedAt,
+                )
+            },
+            replaceExisting = replaceExisting,
+            maximumRecentRows = MAX_RECENT_LOCATIONS,
+        )
+        return FavoriteRestoreResult(counts.favoritesRestored, counts.recentLocationsRestored)
+    }
 
     private fun String.validatedName(): String {
         val normalized = trim()

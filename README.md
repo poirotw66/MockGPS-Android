@@ -42,7 +42,7 @@ Debug APK: `app/build/outputs/apk/debug/app-debug.apk`
 
 Google Play Console, Data Safety, foreground-service declaration, and privacy policy URL require account-owner actions. Before each release: bump `versionCode`/`versionName`, sign the AAB, upload to Internal Testing.
 
-JSON backup includes saved/recent routes only — **not favorites**.
+JSON backup includes saved/recent routes only — **not favorites**. Favorites have a separate backup/restore in the Favorites dialog.
 
 ### Device matrix
 

@@ -42,7 +42,7 @@ Debug APK：`app/build/outputs/apk/debug/app-debug.apk`
 
 Google Play Console、Data Safety、foreground-service declaration、privacy policy URL 需帳號擁有者操作。每個 release 前：更新 `versionCode`/`versionName`、簽署 AAB、上傳 Internal Testing。
 
-JSON backup 僅包含 saved/recent routes，**不包含 favorites**。
+JSON backup 僅包含 saved/recent routes，**不包含 favorites**。收藏地點可在「收藏」對話框另行備份／還原。
 
 ### 手動裝置矩陣
 

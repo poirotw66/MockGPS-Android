@@ -74,6 +74,24 @@ class DefaultFavoriteLocationRepositoryTest {
         assertTrue(recent.none { it.latitude == 25.033964 })
     }
 
+    @Test
+    fun `export and restore favorites backup round-trips places and recent locations`() = runBlocking {
+        val clock = MutableClock(1_000)
+        val repository = DefaultFavoriteLocationRepository(InMemoryFavoriteLocationDao(), clock)
+        repository.save("Taipei 101", 25.033964, 121.564468)
+        clock.now = 2_000
+        repository.recordRecent(35.681236, 139.767125)
+
+        val backup = repository.exportBackup()
+        val restoredInto = DefaultFavoriteLocationRepository(InMemoryFavoriteLocationDao(), clock)
+        val result = restoredInto.restoreBackup(backup, replaceExisting = true)
+
+        assertEquals(1, result.favoritesRestored)
+        assertEquals(1, result.recentLocationsRestored)
+        assertEquals("Taipei 101", restoredInto.favorites.first().single().name)
+        assertEquals(35.681236, restoredInto.recentLocations.first().single().latitude, 0.0)
+    }
+
     private class MutableClock(var now: Long) : FavoriteLocationClock {
         override fun currentTimeMillis(): Long = now
     }
@@ -88,6 +106,9 @@ class DefaultFavoriteLocationRepositoryTest {
 
         override fun observeAll(): Flow<List<FavoriteLocationEntity>> = state
         override fun observeRecentLocations(): Flow<List<RecentLocationEntity>> = recentState
+
+        override suspend fun getAll(): List<FavoriteLocationEntity> = state.value
+        override suspend fun getAllRecentLocations(): List<RecentLocationEntity> = recentState.value
 
         override suspend fun getById(id: Long): FavoriteLocationEntity? = rows[id]
 

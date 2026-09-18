@@ -14,6 +14,8 @@ import com.sora.mockgps.feature.search.mergePlaceSearchResults
 import com.sora.mockgps.feature.search.parseCoordinateSearchQuery
 import com.sora.mockgps.feature.search.viewboxAround
 import com.sora.mockgps.core.model.Coordinate
+import com.sora.mockgps.core.settings.nextAccuracyMeters
+import com.sora.mockgps.core.settings.nextUpdateIntervalMillis
 import com.sora.mockgps.feature.favorites.domain.FavoriteLocation
 import com.sora.mockgps.feature.favorites.domain.RecentLocation
 import com.sora.mockgps.feature.routes.domain.RecentRouteSummary
@@ -92,6 +94,8 @@ class MapViewModel @JvmOverloads constructor(
                         showCoordinates = settings.showCoordinates,
                         updateIntervalMillis = settings.updateIntervalMillis,
                         accuracyMeters = settings.accuracyMeters,
+                        setupGuideDismissed = settings.setupGuideDismissed,
+                        settingsReady = true,
                         pendingCoordinate = restoredCoordinate ?: state.pendingCoordinate,
                         camera = restoredCoordinate?.let { state.camera.copy(coordinate = it) } ?: state.camera,
                     )
@@ -137,15 +141,26 @@ class MapViewModel @JvmOverloads constructor(
     }
 
     fun setUpdateIntervalMillis(intervalMillis: Long) {
-        val normalized = intervalMillis.coerceIn(250L, 60_000L)
-        mutableUiState.update { it.copy(updateIntervalMillis = normalized) }
-        viewModelScope.launch { settingsRepository.update { it.copy(updateIntervalMillis = normalized) } }
+        mutableUiState.update { it.copy(updateIntervalMillis = intervalMillis) }
+        viewModelScope.launch { settingsRepository.update { it.copy(updateIntervalMillis = intervalMillis) } }
+    }
+
+    fun cycleUpdateIntervalMillis() {
+        setUpdateIntervalMillis(nextUpdateIntervalMillis(mutableUiState.value.updateIntervalMillis))
     }
 
     fun setAccuracyMeters(accuracyMeters: Float) {
-        val normalized = accuracyMeters.coerceIn(1f, 100f)
-        mutableUiState.update { it.copy(accuracyMeters = normalized) }
-        viewModelScope.launch { settingsRepository.update { it.copy(accuracyMeters = normalized) } }
+        mutableUiState.update { it.copy(accuracyMeters = accuracyMeters) }
+        viewModelScope.launch { settingsRepository.update { it.copy(accuracyMeters = accuracyMeters) } }
+    }
+
+    fun cycleAccuracyMeters() {
+        setAccuracyMeters(nextAccuracyMeters(mutableUiState.value.accuracyMeters))
+    }
+
+    fun dismissSetupGuide() {
+        mutableUiState.update { it.copy(setupGuideDismissed = true) }
+        viewModelScope.launch { settingsRepository.update { it.copy(setupGuideDismissed = true) } }
     }
 
     fun rememberActiveCoordinate(coordinate: Coordinate, recordStaticRecent: Boolean) {
@@ -289,9 +304,63 @@ class MapViewModel @JvmOverloads constructor(
         mutableUiState.update { it.copy(favoriteMessage = null) }
     }
 
+    fun exportFavoritesBackup() {
+        viewModelScope.launch {
+            runCatching { favoriteRepository.exportBackup() }
+                .onSuccess { json ->
+                    mutableUiState.update {
+                        it.copy(
+                            routeOperationResult = RouteOperationResult(
+                                message = localized(R.string.favorites_backup_ready),
+                                export = RouteExport("application/json", "mock-gps-favorites.json", json),
+                            ),
+                        )
+                    }
+                }
+                .onFailure {
+                    mutableUiState.update {
+                        it.copy(
+                            routeOperationResult = RouteOperationResult(
+                                message = localized(R.string.favorites_backup_export_failed),
+                                isError = true,
+                            ),
+                        )
+                    }
+                }
+        }
+    }
+
+    fun restoreFavoritesBackup(serialized: String, replaceExisting: Boolean = false) {
+        viewModelScope.launch {
+            runCatching { favoriteRepository.restoreBackup(serialized, replaceExisting) }
+                .onSuccess { restored ->
+                    mutableUiState.update {
+                        it.copy(
+                            routeOperationResult = RouteOperationResult(
+                                localized(
+                                    R.string.favorites_backup_restored,
+                                    restored.favoritesRestored,
+                                    restored.recentLocationsRestored,
+                                ),
+                            ),
+                        )
+                    }
+                }
+                .onFailure {
+                    mutableUiState.update {
+                        it.copy(
+                            routeOperationResult = RouteOperationResult(
+                                message = localized(R.string.favorites_backup_restore_failed),
+                                isError = true,
+                            ),
+                        )
+                    }
+                }
+        }
+    }
+
     private fun localized(@StringRes resourceId: Int, vararg formatArgs: Any): String =
         getApplication<Application>().getString(resourceId, *formatArgs)
-
 
     fun savePlannedRoute(name: String) = routing.savePlannedRoute(name)
     fun loadSavedRoute(id: Long) = routing.loadSavedRoute(id)

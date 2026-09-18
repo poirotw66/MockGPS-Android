@@ -23,4 +23,7 @@ interface FavoriteLocationRepository {
     suspend fun clearAll()
     suspend fun recordRecent(latitude: Double, longitude: Double): RecentLocation
     suspend fun clearRecentLocations()
+
+    suspend fun exportBackup(): String
+    suspend fun restoreBackup(serialized: String, replaceExisting: Boolean = false): FavoriteRestoreResult
 }

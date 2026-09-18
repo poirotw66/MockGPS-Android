@@ -42,6 +42,9 @@ data class MapUiState(
     val showCoordinates: Boolean = true,
     val updateIntervalMillis: Long = 1_000L,
     val accuracyMeters: Float = 5f,
+    /** False until DataStore settings have been applied at least once. */
+    val settingsReady: Boolean = false,
+    val setupGuideDismissed: Boolean = false,
 ) {
     val routePlanningStep: RoutePlanningStep
         get() = when {

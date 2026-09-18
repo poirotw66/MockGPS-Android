@@ -69,53 +69,70 @@ internal fun FavoritesDialog(
     onDelete: (FavoriteLocation) -> Unit,
     onClearAll: () -> Unit,
     onClearRecentLocations: () -> Unit,
+    onExportBackup: () -> Unit,
+    onImportBackup: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.favorites_title)) },
         text = {
-            if (favorites.isEmpty() && recentLocations.isEmpty()) {
-                Text(stringResource(R.string.favorites_empty))
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    if (favorites.isNotEmpty()) {
-                        item { Text(stringResource(R.string.favorites_title), style = MaterialTheme.typography.titleSmall) }
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = onExportBackup, modifier = Modifier.weight(1f)) {
+                        Text(stringResource(R.string.action_export_favorites_backup))
                     }
-                    items(favorites, key = { "favorite-${it.id}" }) { favorite ->
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            TextButton(onClick = { onSelect(favorite) }, modifier = Modifier.fillMaxWidth()) {
-                                Column(modifier = Modifier.fillMaxWidth()) {
-                                    Text(favorite.name, style = MaterialTheme.typography.titleSmall)
-                                    Text(
-                                        String.format(Locale.US, "%.6f, %.6f", favorite.latitude, favorite.longitude),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
+                    TextButton(onClick = onImportBackup, modifier = Modifier.weight(1f)) {
+                        Text(stringResource(R.string.action_import_favorites_backup))
+                    }
+                }
+                Text(
+                    stringResource(R.string.favorites_backup_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (favorites.isEmpty() && recentLocations.isEmpty()) {
+                    Text(stringResource(R.string.favorites_empty))
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        if (favorites.isNotEmpty()) {
+                            item { Text(stringResource(R.string.favorites_title), style = MaterialTheme.typography.titleSmall) }
+                        }
+                        items(favorites, key = { "favorite-${it.id}" }) { favorite ->
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                TextButton(onClick = { onSelect(favorite) }, modifier = Modifier.fillMaxWidth()) {
+                                    Column(modifier = Modifier.fillMaxWidth()) {
+                                        Text(favorite.name, style = MaterialTheme.typography.titleSmall)
+                                        Text(
+                                            String.format(Locale.US, "%.6f, %.6f", favorite.latitude, favorite.longitude),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
                                 }
-                            }
-                            Row(modifier = Modifier.padding(horizontal = 4.dp)) {
-                                TextButton(onClick = { onRename(favorite) }) {
-                                    Text(stringResource(R.string.action_rename))
-                                }
-                                TextButton(onClick = { onDelete(favorite) }) {
-                                    Text(stringResource(R.string.action_delete))
+                                Row(modifier = Modifier.padding(horizontal = 4.dp)) {
+                                    TextButton(onClick = { onRename(favorite) }) {
+                                        Text(stringResource(R.string.action_rename))
+                                    }
+                                    TextButton(onClick = { onDelete(favorite) }) {
+                                        Text(stringResource(R.string.action_delete))
+                                    }
                                 }
                             }
                         }
-                    }
-                    if (recentLocations.isNotEmpty()) {
-                        item { Text(stringResource(R.string.recent_locations_title), style = MaterialTheme.typography.titleSmall) }
-                    }
-                    items(recentLocations, key = { "recent-${it.id}" }) { recent ->
-                        TextButton(onClick = { onSelectRecent(recent) }, modifier = Modifier.fillMaxWidth()) {
-                            Text(
-                                String.format(Locale.US, "%.6f, %.6f", recent.latitude, recent.longitude),
-                                modifier = Modifier.fillMaxWidth(),
-                            )
+                        if (recentLocations.isNotEmpty()) {
+                            item { Text(stringResource(R.string.recent_locations_title), style = MaterialTheme.typography.titleSmall) }
+                        }
+                        items(recentLocations, key = { "recent-${it.id}" }) { recent ->
+                            TextButton(onClick = { onSelectRecent(recent) }, modifier = Modifier.fillMaxWidth()) {
+                                Text(
+                                    String.format(Locale.US, "%.6f, %.6f", recent.latitude, recent.longitude),
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
                         }
                     }
                 }

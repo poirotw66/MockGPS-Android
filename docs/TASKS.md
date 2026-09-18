@@ -131,7 +131,7 @@ UX／效能更新（2026-08-24）：改為 edge-to-edge 滿版地圖與安全區
 ## 後續 Phase 3
 
 - [x] GPX import/export 與檔案驗證
-- [ ] 收藏 JSON backup/restore
+- [x] 收藏 JSON backup/restore
 - [x] Saved routes 與 route points schema
 - [x] 路線重新命名、複製、反向、刪除（大型 route simplification deferred）
 
