@@ -27,6 +27,7 @@ Debug APK：`app/build/outputs/apk/debug/app-debug.apk`
 - [MVP 範圍與驗收](docs/MVP.md)
 - [技術架構與平台決策](docs/ARCHITECTURE.md)
 - [開發里程碑與任務清單](docs/TASKS.md)
+- [裝置可靠度矩陣](docs/DEVICE_MATRIX.md)
 
 ## 已確定方向
 

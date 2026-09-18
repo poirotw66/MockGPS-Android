@@ -99,15 +99,22 @@ internal fun PlaceSearchContent(
         )
     }
     error?.let { searchError ->
+        val hasOfflineHits = landmarkResults.isNotEmpty() || coordinateResults.isNotEmpty()
         Text(
             stringResource(
-                when (searchError) {
-                    PlaceSearchError.Network -> R.string.place_search_error_network
-                    PlaceSearchError.RateLimited -> R.string.place_search_error_rate
-                    PlaceSearchError.InvalidResponse -> R.string.place_search_error_invalid
+                when {
+                    hasOfflineHits -> R.string.place_search_remote_unavailable_offline
+                    searchError == PlaceSearchError.Network -> R.string.place_search_error_network
+                    searchError == PlaceSearchError.RateLimited -> R.string.place_search_error_rate
+                    searchError == PlaceSearchError.InvalidResponse -> R.string.place_search_error_invalid
+                    else -> R.string.place_search_error_network
                 },
             ),
-            color = MaterialTheme.colorScheme.error,
+            color = if (hasOfflineHits) {
+                MaterialTheme.colorScheme.tertiary
+            } else {
+                MaterialTheme.colorScheme.error
+            },
             style = MaterialTheme.typography.bodySmall,
         )
     }

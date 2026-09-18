@@ -99,7 +99,7 @@ UX／效能更新（2026-08-24）：改為 edge-to-edge 滿版地圖與安全區
 ## Milestone 6：穩定化與 Release Candidate（3–5 天 + 8 小時 soak）
 
 - [x] 71 JVM tests、14 instrumentation tests、Compose/Room/fake engine failure coverage
-- [ ] API 26/34/36 完整 smoke matrix
+- [ ] API 26/34/36 完整 smoke matrix（見 [DEVICE_MATRIX.md](DEVICE_MATRIX.md)）
 - [ ] 非 Pixel 實體裝置背景與省電測試
 - [ ] 8 小時 static mock soak test
 - [ ] Start/Stop 20 次、鎖屏、Activity swipe-away、force-stop 測試

@@ -156,10 +156,31 @@ internal fun MapControlPanel(
 ) {
     val uriHandler = LocalUriHandler.current
     var activeDetail by remember { mutableStateOf<MapDetailGroup?>(null) }
-    val primaryActionIsStop = routePlanningStep == RoutePlanningStep.Inactive &&
-        isActive && activeCoordinate == pendingCoordinate
-    val primaryActionEnabled = isSelectingRouteWaypoint || isMapReady && !isStarting && !isPlanningRoute &&
-        !(routePlanningStep == RoutePlanningStep.Preview && isActive && !isRouteSession)
+    val dockActions = remember(
+        routePlanningStep,
+        isSelectingRouteWaypoint,
+        isMapReady,
+        isStarting,
+        isPlanningRoute,
+        isActive,
+        isRouteSession,
+        routePaused,
+        pendingCoordinate,
+        activeCoordinate,
+    ) {
+        resolveMapDockActions(
+            routePlanningStep = routePlanningStep,
+            isSelectingRouteWaypoint = isSelectingRouteWaypoint,
+            isMapReady = isMapReady,
+            isStarting = isStarting,
+            isPlanningRoute = isPlanningRoute,
+            isActive = isActive,
+            isRouteSession = isRouteSession,
+            routePaused = routePaused,
+            pendingCoordinate = pendingCoordinate,
+            activeCoordinate = activeCoordinate,
+        )
+    }
     BackHandler(enabled = activeDetail != null) { activeDetail = null }
     Surface(
         modifier = modifier
@@ -187,69 +208,63 @@ internal fun MapControlPanel(
                 MapDockButton(Icons.Filled.Place, R.string.map_group_joystick) { activeDetail = MapDetailGroup.Joystick }
                 MapDockButton(Icons.Filled.MoreVert, R.string.map_group_more) { activeDetail = MapDetailGroup.More }
             }
+            if (dockActions.showPendingApplyHint) {
+                Text(
+                    stringResource(R.string.pending_apply_hint),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 4.dp),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.tertiary,
+                    maxLines = 2,
+                )
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Button(
-                    onClick = {
-                        if (isSelectingRouteWaypoint) {
-                            onCancelRouteWaypointSelection()
-                        } else when (routePlanningStep) {
-                            RoutePlanningStep.SelectStart,
-                            RoutePlanningStep.SelectDestination,
-                            -> onClearRoute()
-                            RoutePlanningStep.ReadyToPreview, RoutePlanningStep.Planning -> onPlanRoute()
-                            RoutePlanningStep.Preview -> when {
-                                isRouteSession -> onPauseResumeRoute()
-                                else -> onStartRoute()
+                val primary = dockActions.primary
+                if (primary != null) {
+                    Button(
+                        onClick = {
+                            when (primary) {
+                                MapPrimaryAction.CancelWaypointSelection -> onCancelRouteWaypointSelection()
+                                MapPrimaryAction.CancelRoutePlanning -> onClearRoute()
+                                MapPrimaryAction.PreviewRoute -> onPlanRoute()
+                                MapPrimaryAction.StartRoute -> onStartRoute()
+                                MapPrimaryAction.PauseRoute, MapPrimaryAction.ResumeRoute -> onPauseResumeRoute()
+                                MapPrimaryAction.ApplyLocation -> onApply()
+                                MapPrimaryAction.StartMock -> onStart()
                             }
-                            RoutePlanningStep.Inactive -> when {
-                                isActive && activeCoordinate != pendingCoordinate -> onApply()
-                                isActive -> onStop()
-                                else -> onStart()
-                            }
-                        }
-                    },
-                    enabled = primaryActionEnabled,
-                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                    shape = MaterialTheme.shapes.large,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (primaryActionIsStop) {
-                            MaterialTheme.colorScheme.error
-                        } else {
-                            MaterialTheme.colorScheme.primary
                         },
-                    ),
-                ) {
-                    if (isPlanningRoute && !isSelectingRouteWaypoint) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                    } else Text(
-                        stringResource(
-                            if (isSelectingRouteWaypoint) {
-                                R.string.action_cancel_route_stop_selection
-                            } else when (routePlanningStep) {
-                                RoutePlanningStep.SelectStart,
-                                RoutePlanningStep.SelectDestination,
-                                -> R.string.action_cancel
-                                RoutePlanningStep.ReadyToPreview, RoutePlanningStep.Planning -> R.string.action_preview_bicycle_route
-                                RoutePlanningStep.Preview -> if (isRouteSession) {
-                                    if (routePaused) R.string.action_resume_route else R.string.action_pause_route
-                                } else R.string.action_start_route_simulation
-                                RoutePlanningStep.Inactive -> when {
-                                    isActive && activeCoordinate != pendingCoordinate -> R.string.action_apply_new_location
-                                    isActive -> R.string.action_stop
-                                    else -> R.string.action_start_mock
-                                }
-                            },
-                        ),
-                        maxLines = 1,
-                    )
+                        enabled = dockActions.primaryEnabled,
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                        shape = MaterialTheme.shapes.large,
+                    ) {
+                        if (isPlanningRoute && primary == MapPrimaryAction.PreviewRoute) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        } else {
+                            Text(stringResource(primary.labelRes), maxLines = 1)
+                        }
+                    }
                 }
-                if (isActive && !primaryActionIsStop) {
-                    OutlinedButton(onClick = onStop, modifier = Modifier.heightIn(min = 48.dp)) {
-                        Text(stringResource(R.string.action_stop))
+                if (dockActions.showStop) {
+                    if (primary == null) {
+                        Button(
+                            onClick = onStop,
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                            shape = MaterialTheme.shapes.large,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error,
+                            ),
+                        ) {
+                            Text(stringResource(R.string.action_stop), maxLines = 1)
+                        }
+                    } else {
+                        OutlinedButton(onClick = onStop, modifier = Modifier.heightIn(min = 48.dp)) {
+                            Text(stringResource(R.string.action_stop))
+                        }
                     }
                 }
             }

@@ -24,6 +24,8 @@
     <string name="attribution_openstreetmap">© OpenStreetMap contributors</string>
     <string name="action_retry">Retry</string>
     <string name="action_apply_new_location">Apply new location</string>
+    <string name="pending_apply_hint">Selection changed — tap Apply to update the mock location.</string>
+    <string name="pending_apply_chip">Not applied yet</string>
     <string name="service_state">Service state: %1$s</string>
     <string name="state_idle">Idle</string>
     <string name="state_starting">Starting</string>
@@ -136,6 +138,7 @@
     <string name="route_fix_map">Fix the map</string>
     <string name="route_error_same_point">Choose a different destination.</string>
     <string name="route_error_unavailable">A route is unavailable right now. Check your connection or change the route points and try again.</string>
+    <string name="route_error_network">The routing service is unreachable. Check your connection and retry.</string>
     <string name="route_panel_title">Route</string>
     <string name="route_panel_subtitle">Choose endpoints, stops and simulation options</string>
     <string name="route_choose_start">Choose the start</string>
@@ -221,6 +224,7 @@
     <string name="place_search_hint_landmark">Tip: try a fuller landmark name (for example Taipei 101).</string>
     <string name="place_search_privacy">Search places, paste latitude and longitude, or match famous landmarks offline. Online queries use an OpenStreetMap-compatible service with no SLA.</string>
     <string name="place_search_error_network">Place search is unavailable. Check your connection and try again.</string>
+    <string name="place_search_remote_unavailable_offline">Online search is unavailable. Showing offline landmarks and coordinates only.</string>
     <string name="place_search_error_rate">Place search is busy. Please wait a moment before trying again.</string>
     <string name="place_search_error_invalid">Place search returned an invalid response. Try another query.</string>
     <string name="route_replace_title">Create another route</string>
@@ -280,5 +284,8 @@
     <string name="gpx_export_ready">GPX export is ready.</string>
     <string name="gpx_export_failed">Unable to export GPX.</string>
     <string name="gpx_imported">Imported GPX route “%1$s”.</string>
-    <string name="gpx_import_failed">Unable to import GPX.</string>
+    <string name="gpx_imported_simplified">Imported “%1$s” after simplifying %2$d points to %3$d (limit).</string>
+    <string name="gpx_import_file_too_large">The GPX file is too large to import.</string>
+    <string name="gpx_import_invalid_point_count">The GPX track must contain between 2 and %1$d points.</string>
+    <string name="gpx_import_failed">Unable to import the GPX file.</string>
 </resources>

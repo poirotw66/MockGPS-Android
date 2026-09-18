@@ -42,6 +42,8 @@ data class RecentRouteSummary(
 data class ImportedRoute(
     val name: String,
     val points: List<Coordinate>,
+    /** Present when the importer reduced a denser track to fit storage limits. */
+    val simplifiedFromPointCount: Int? = null,
 )
 
 data class RouteBackup(

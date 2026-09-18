@@ -122,9 +122,20 @@ object RouteGpxInterchange {
             require(latitude != null && longitude != null) { "Every GPX track point needs latitude and longitude." }
             Coordinate(latitude, longitude)
         }
+        require(points.size >= 2) { "A route must contain 2 to ${RouteDataValidator.MAX_POINTS} points." }
+        val simplifiedFrom = points.size.takeIf { it > RouteDataValidator.MAX_POINTS }
+        val limitedPoints = if (simplifiedFrom != null) {
+            RoutePointSimplifier.simplifyToMaxPoints(points, RouteDataValidator.MAX_POINTS)
+        } else {
+            points
+        }
         val routeName = document.getElementsByTagNameNS("*", "name")
             .item(0)?.textContent?.takeIf { it.isNotBlank() } ?: "Imported route"
-        return ImportedRoute(RouteDataValidator.name(routeName), RouteDataValidator.points(points))
+        return ImportedRoute(
+            name = RouteDataValidator.name(routeName),
+            points = RouteDataValidator.points(limitedPoints),
+            simplifiedFromPointCount = simplifiedFrom,
+        )
     }
 
     private fun String.xmlEscape(): String = replace("&", "&amp;")

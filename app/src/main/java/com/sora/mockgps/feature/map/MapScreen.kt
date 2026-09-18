@@ -628,6 +628,9 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             showRouteControlPoints = uiState.showRouteControlPoints,
             showLandmarks = showLandmarks,
             activeRouteCoordinate = activeCoordinate.takeIf { isRouteSession },
+            pendingApplyActiveCoordinate = activeCoordinate?.takeIf {
+                isActive && !isRouteSession && it != uiState.pendingCoordinate
+            },
             cameraState = cameraState,
             onMapLoaded = viewModel::onMapLoaded,
             onMapLoadFailed = viewModel::onMapLoadFailed,

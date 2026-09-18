@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -81,6 +82,8 @@ internal fun MapPicker(
     showRouteControlPoints: Boolean,
     showLandmarks: Boolean,
     activeRouteCoordinate: Coordinate?,
+    /** Static mock active pin when the pending selection has not been applied yet. */
+    pendingApplyActiveCoordinate: Coordinate? = null,
     cameraState: CameraState,
     onMapLoaded: () -> Unit,
     onMapLoadFailed: () -> Unit,
@@ -130,8 +133,29 @@ internal fun MapPicker(
                     }
                 }
                 if (routePoints.size >= 2) RouteLine(routePoints)
+                pendingApplyActiveCoordinate?.let { StaticActiveMarker(it) }
                 SelectedLocationMarker(pendingCoordinate)
                 activeRouteCoordinate?.let { RouteActiveMarker(it) }
+            }
+        }
+        pendingApplyActiveCoordinate?.let {
+            val pendingHint = stringResource(R.string.pending_apply_chip)
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(top = 12.dp, start = 16.dp, end = 16.dp)
+                    .semantics { contentDescription = pendingHint },
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.96f),
+                shadowElevation = 2.dp,
+            ) {
+                Text(
+                    text = pendingHint,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                )
             }
         }
         landmarkConfirmation?.let { name ->
@@ -277,6 +301,21 @@ private fun RouteControlMarker(label: String, color: Color, modifier: Modifier =
             Text(label, style = MaterialTheme.typography.labelLarge)
         }
     }
+}
+
+@Composable
+private fun StaticActiveMarker(coordinate: Coordinate) {
+    val data = remember(coordinate) { GeoJsonData.JsonString(coordinate.toPointGeoJson()) }
+    val source = rememberGeoJsonSource(data)
+    LaunchedEffect(source, data) { source.setData(data) }
+    CircleLayer(
+        id = "static-active-position",
+        source = source,
+        color = const(BloomWalkSage.copy(alpha = 0.55f)),
+        radius = const(11.dp),
+        strokeColor = const(Color.White),
+        strokeWidth = const(2.dp),
+    )
 }
 
 @Composable

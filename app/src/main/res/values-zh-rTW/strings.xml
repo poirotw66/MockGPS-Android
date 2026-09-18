@@ -24,6 +24,8 @@
     <string name="attribution_openstreetmap">© OpenStreetMap 貢獻者</string>
     <string name="action_retry">重試</string>
     <string name="action_apply_new_location">套用新位置</string>
+    <string name="pending_apply_hint">選點已變更 — 請點「套用」才會更新模擬位置。</string>
+    <string name="pending_apply_chip">尚未套用</string>
     <string name="service_state">服務狀態：%1$s</string>
     <string name="state_idle">閒置</string>
     <string name="state_starting">啟動中</string>
@@ -132,6 +134,7 @@
     <string name="route_fix_map">修正地圖</string>
     <string name="route_error_same_point">請選擇不同的終點。</string>
     <string name="route_error_unavailable">目前無法取得路線。請檢查網路，或變更路線點後重試。</string>
+    <string name="route_error_network">路線服務連線失敗。請檢查網路後再試一次。</string>
     <string name="route_panel_title">路線</string>
     <string name="route_panel_subtitle">設定起終點、停靠點與模擬選項</string>
     <string name="route_choose_start">選擇起點</string>
@@ -212,6 +215,7 @@
     <string name="place_search_hint_landmark">提示：試試更完整的景點名稱（例如台北101）。</string>
     <string name="place_search_privacy">可搜尋地點、貼上經緯度，或離線比對著名景點。線上搜尋使用相容 OpenStreetMap 的公共服務，不提供 SLA。</string>
     <string name="place_search_error_network">目前無法搜尋地點。請檢查網路後重試。</string>
+    <string name="place_search_remote_unavailable_offline">線上搜尋暫不可用，以下僅顯示離線景點與座標結果。</string>
     <string name="place_search_error_rate">搜尋服務忙碌中，請稍候再試。</string>
     <string name="place_search_error_invalid">搜尋服務回傳無效資料，請改用其他關鍵字。</string>
     <string name="route_replace_title">建立其他路線</string>
@@ -263,7 +267,10 @@
     <string name="gpx_export_ready">GPX 已可匯出。</string>
     <string name="gpx_export_failed">無法匯出 GPX。</string>
     <string name="gpx_imported">已匯入 GPX 路線「%1$s」。</string>
-    <string name="gpx_import_failed">無法匯入 GPX。</string>
+    <string name="gpx_imported_simplified">已匯入「%1$s」，並將 %2$d 個點簡化為 %3$d 個（上限）。</string>
+    <string name="gpx_import_file_too_large">GPX 檔案過大，無法匯入。</string>
+    <string name="gpx_import_invalid_point_count">GPX 軌跡點數須介於 2 到 %1$d。</string>
+    <string name="gpx_import_failed">無法匯入 GPX 檔案。</string>
     <string name="mock_error_title">無法啟動模擬位置</string>
     <string name="mock_error_generic">模擬位置工作階段已停止。請檢查定位服務後再試一次。</string>
     <string name="mock_error_setup_required">請在開發人員選項中將 BloomWalk GPS 設為模擬位置應用程式，然後再試一次。</string>

@@ -245,8 +245,8 @@ class MapViewModel @JvmOverloads constructor(
                     } else {
                         current.copy(
                             isPlaceSearching = false,
-                            // Keep landmark hits usable offline; only surface remote errors when empty.
-                            placeSearchError = if (localResults.isEmpty()) error else null,
+                            // Keep landmark hits usable offline while still explaining remote failure.
+                            placeSearchError = error,
                         )
                     }
                 }

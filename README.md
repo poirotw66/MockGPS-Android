@@ -27,6 +27,7 @@ Debug APK: `app/build/outputs/apk/debug/app-debug.apk`
 - [MVP scope & acceptance criteria](docs/MVP.md)
 - [Architecture & platform decisions](docs/ARCHITECTURE.md)
 - [Milestones & task list](docs/TASKS.md)
+- [Device reliability matrix](docs/DEVICE_MATRIX.md)
 
 ## Product decisions
 

@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.annotation.StringRes
 import com.sora.mockgps.R
 import com.sora.mockgps.core.model.Coordinate
+import com.sora.mockgps.feature.routes.data.RouteDataValidator
 import com.sora.mockgps.feature.routes.data.RouteGpxInterchange
 import com.sora.mockgps.feature.routes.domain.RouteRepository
 import com.sora.mockgps.route.PlannedRoute
@@ -247,11 +248,28 @@ internal class MapRoutingCoordinator(
             runCatching { RouteGpxInterchange.import(serialized) }
                 .onSuccess { imported ->
                     loadRoutePreview(imported.points, routeDistance(imported.points), imported.name, null)
+                    val message = imported.simplifiedFromPointCount?.let { originalCount ->
+                        localized(
+                            R.string.gpx_imported_simplified,
+                            imported.name,
+                            originalCount,
+                            imported.points.size,
+                        )
+                    } ?: localized(R.string.gpx_imported, imported.name)
                     uiState.update {
-                        it.copy(routeOperationResult = RouteOperationResult(localized(R.string.gpx_imported, imported.name)))
+                        it.copy(routeOperationResult = RouteOperationResult(message))
                     }
                 }
-                .onFailure { setRouteOperationError(localized(R.string.gpx_import_failed)) }
+                .onFailure { failure ->
+                    val message = when {
+                        failure.message?.contains("too large", ignoreCase = true) == true ->
+                            localized(R.string.gpx_import_file_too_large)
+                        failure.message?.contains("2 to", ignoreCase = true) == true ->
+                            localized(R.string.gpx_import_invalid_point_count, RouteDataValidator.MAX_POINTS)
+                        else -> localized(R.string.gpx_import_failed)
+                    }
+                    setRouteOperationError(message)
+                }
         }
     }
 
@@ -507,6 +525,12 @@ internal class MapRoutingCoordinator(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Throwable) {
+                val message = when (failure) {
+                    is com.sora.mockgps.route.RoutingNetworkException,
+                    is com.sora.mockgps.route.RoutingUnavailableException,
+                    -> application.getString(R.string.route_error_network)
+                    else -> application.getString(R.string.route_error_unavailable)
+                }
                 uiState.update { current ->
                     if (current.isRoutePlanningMode &&
                         current.routeOrigin == origin && current.routeDestination == destination &&
@@ -514,7 +538,7 @@ internal class MapRoutingCoordinator(
                     ) {
                         current.copy(
                             isPlanningRoute = false,
-                            routeError = application.getString(R.string.route_error_unavailable),
+                            routeError = message,
                         )
                     } else {
                         current
