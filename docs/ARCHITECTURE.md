@@ -33,7 +33,7 @@ MockLocationCoordinator
 ├── core/location/       engine contracts、payload factory、coordinator
 ├── service/             foreground service、notification、commands
 ├── feature/setup/       Developer Options 引導
-├── feature/map/         MapScreen、MapViewModel、搜尋
+├── feature/map/         MapScreen、MapPicker、MapControlPanel、MapViewModel、MapRoutingCoordinator
 ├── feature/search/      可替換的地點搜尋 adapter
 ├── feature/saved/       收藏與最近位置
 ├── feature/settings/    DataStore settings
@@ -102,6 +102,7 @@ Service 只接受明確、可序列化的小型命令：
 - 使用 `START_NOT_STICKY`：系統終止後不自動恢復定位模擬
 - `onDestroy()`、Stop action、engine fatal error 共用同一個 cleanup path
 - 不從 `BOOT_COMPLETED` 啟動
+- 路線模擬期間座標文字最多約每 5 秒更新一次；Pause／Resume／Start／結束會立即重建通知（含 action）
 
 ### Foreground service type
 

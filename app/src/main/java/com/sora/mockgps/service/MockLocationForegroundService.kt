@@ -68,6 +68,8 @@ class MockLocationForegroundService : Service() {
     @Volatile
     private var joystickSpeed: JoystickSpeed = JoystickSpeed.Walk
     private var cleanedUp = true
+    private var lastNotificationUpdateElapsedRealtime = 0L
+    private var lastPublishedRouteAction: RouteNotificationAction? = null
 
     private val coordinator by lazy {
         MockLocationCoordinator(
@@ -127,7 +129,7 @@ class MockLocationForegroundService : Service() {
         try {
             MockLocationNotification.createChannel(this)
             // Android requires this immediately after a foreground-service start, before I/O.
-            promoteToForeground(coordinate, routeAction = null)
+            promoteToForeground(coordinate, routeAction = null, forceNotificationUpdate = true)
         } catch (failure: Throwable) {
             publishState(MockServiceState.Error(failure.userFacingMessage(getString(R.string.mock_operation_failed))))
             sessionGate.end(sessionToken)
@@ -235,7 +237,7 @@ class MockLocationForegroundService : Service() {
         if (routeExecution != null) return
         sessionCoordinate = coordinate
         publishState(MockServiceState.Active(coordinate))
-        runCatching { promoteToForeground(coordinate) }
+        runCatching { promoteToForeground(coordinate, forceNotificationUpdate = true) }
     }
 
     private fun startRouteSession(
@@ -270,7 +272,12 @@ class MockLocationForegroundService : Service() {
         val initialCoordinate = execution.snapshot().reportedCoordinate
         try {
             MockLocationNotification.createChannel(this)
-            promoteToForeground(initialCoordinate, RouteNotificationAction.Pause, sessionToken)
+            promoteToForeground(
+                coordinate = initialCoordinate,
+                routeAction = RouteNotificationAction.Pause,
+                sessionToken = sessionToken,
+                forceNotificationUpdate = true,
+            )
         } catch (failure: Throwable) {
             val message = failure.userFacingMessage(getString(R.string.mock_operation_failed))
             publishState(MockServiceState.Error(message))
@@ -330,7 +337,12 @@ class MockLocationForegroundService : Service() {
                         }
 
                         if (snapshot.state == RouteExecutionState.REACHED_END) {
-                            promoteToForeground(snapshot.reportedCoordinate, sessionToken = sessionToken)
+                            promoteToForeground(
+                                coordinate = snapshot.reportedCoordinate,
+                                routeAction = null,
+                                sessionToken = sessionToken,
+                                forceNotificationUpdate = true,
+                            )
                             publishState(MockServiceState.Active(snapshot.reportedCoordinate))
                             completedRouteState = RouteCompleted(
                                 snapshot.toRouteProgress(),
@@ -345,7 +357,11 @@ class MockLocationForegroundService : Service() {
                             RouteExecutionState.STOPPED -> break
                             else -> publishRouteActive(current, sessionToken)
                         }
-                        promoteToForeground(sessionCoordinate ?: snapshot.reportedCoordinate, sessionToken = sessionToken)
+                        // Coordinate text only — keep Pause/Resume PendingIntents stable and skip most ticks.
+                        promoteToForeground(
+                            coordinate = sessionCoordinate ?: snapshot.reportedCoordinate,
+                            sessionToken = sessionToken,
+                        )
                         delay(updateIntervalMillis)
                     }
                 } catch (cancelled: CancellationException) {
@@ -369,7 +385,12 @@ class MockLocationForegroundService : Service() {
         sessionCoordinate = snapshot.reportedCoordinate
         publishRoutePaused(snapshot, requireNotNull(sessionGate.current()))
         runCatching {
-            promoteToForeground(snapshot.reportedCoordinate, RouteNotificationAction.Resume, sessionGate.current())
+            promoteToForeground(
+                coordinate = snapshot.reportedCoordinate,
+                routeAction = RouteNotificationAction.Resume,
+                sessionToken = sessionGate.current(),
+                forceNotificationUpdate = true,
+            )
         }
     }
 
@@ -381,7 +402,12 @@ class MockLocationForegroundService : Service() {
         sessionCoordinate = snapshot.reportedCoordinate
         publishRouteActive(snapshot, requireNotNull(sessionGate.current()))
         runCatching {
-            promoteToForeground(snapshot.reportedCoordinate, RouteNotificationAction.Pause, sessionGate.current())
+            promoteToForeground(
+                coordinate = snapshot.reportedCoordinate,
+                routeAction = RouteNotificationAction.Pause,
+                sessionToken = sessionGate.current(),
+                forceNotificationUpdate = true,
+            )
         }
     }
 
@@ -482,6 +508,8 @@ class MockLocationForegroundService : Service() {
         joystickVector = null
         joystickSpeed = JoystickSpeed.Walk
         sessionCoordinate = null
+        lastNotificationUpdateElapsedRealtime = 0L
+        lastPublishedRouteAction = null
         sessionGate.end(sessionToken)
         demoteAndStop()
         cancellation?.let { throw it }
@@ -491,7 +519,19 @@ class MockLocationForegroundService : Service() {
         coordinate: Coordinate,
         routeAction: RouteNotificationAction? = routeNotificationAction(),
         sessionToken: ServiceSessionToken? = sessionGate.current(),
+        forceNotificationUpdate: Boolean = false,
     ) {
+        val now = SystemClock.elapsedRealtime()
+        val actionChanged = routeAction != lastPublishedRouteAction
+        if (!forceNotificationUpdate &&
+            !actionChanged &&
+            lastNotificationUpdateElapsedRealtime > 0L &&
+            now - lastNotificationUpdateElapsedRealtime < NOTIFICATION_COORDINATE_UPDATE_INTERVAL_MILLIS
+        ) {
+            return
+        }
+        lastNotificationUpdateElapsedRealtime = now
+        lastPublishedRouteAction = routeAction
         val notification = MockLocationNotification.build(
             this,
             coordinate.latitude,
@@ -579,6 +619,8 @@ class MockLocationForegroundService : Service() {
         const val EXTRA_JOYSTICK_SPEED = "com.sora.mockgps.extra.JOYSTICK_SPEED"
         const val UPDATE_INTERVAL_MILLIS = 1_000L
         const val JOYSTICK_UPDATE_INTERVAL_MILLIS = 500L
+        /** How often route sessions refresh notification coordinate text while actions stay unchanged. */
+        const val NOTIFICATION_COORDINATE_UPDATE_INTERVAL_MILLIS = 5_000L
         private const val JOYSTICK_PREEMPT_POLL_MILLIS = 100L
         const val PAUSED_POLL_INTERVAL_MILLIS = 200L
         private const val CLEANUP_ATTEMPTS = 2

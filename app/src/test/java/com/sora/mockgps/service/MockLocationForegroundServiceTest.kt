@@ -37,6 +37,10 @@ class MockLocationForegroundServiceTest {
             MockLocationForegroundService.EXTRA_SESSION_GENERATION,
         )
         assertEquals(1_000L, MockLocationForegroundService.UPDATE_INTERVAL_MILLIS)
+        assertEquals(
+            5_000L,
+            MockLocationForegroundService.NOTIFICATION_COORDINATE_UPDATE_INTERVAL_MILLIS,
+        )
     }
 
     @Test
