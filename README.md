@@ -72,7 +72,7 @@ Reliability checklist (record device, API, result): 8-hour static soak, lockscre
 
 ## Map provider
 
-MapLibre Compose with OpenFreeMap vector tiles (Positron light / Dark). No account or API key. OpenFreeMap is a public service with no SLA.
+MapLibre Compose with OpenFreeMap vector tiles (Bright light / Dark). No account or API key. OpenFreeMap is a public service with no SLA.
 
 ## Routing provider
 

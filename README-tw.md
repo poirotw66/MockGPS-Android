@@ -72,7 +72,7 @@ Reliability checklist（需記錄結果）：8 小時 static soak、鎖屏、swi
 
 ## 地圖服務
 
-MapLibre Compose + OpenFreeMap 向量圖磚（Positron / Dark）。不需要帳號或 API key。OpenFreeMap 為公共服務、無 SLA。
+MapLibre Compose + OpenFreeMap 向量圖磚（Bright / Dark）。不需要帳號或 API key。OpenFreeMap 為公共服務、無 SLA。
 
 ## 路由服務
 

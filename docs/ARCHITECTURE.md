@@ -141,7 +141,7 @@ Idle → Starting → Active → Stopping → Idle
 - MapLibre Compose click handler 直接選定座標；camera state 只保存瀏覽位置
 - 拖曳與縮放只瀏覽，不會改變已選位置
 - MVP 不需要 reverse geocoding camera center；無 place name 時顯示座標，避免額外 API 成本與延遲
-- 地圖使用 OpenFreeMap 的 Positron／Dark 樣式，保留 MapLibre、OpenFreeMap 與 OpenStreetMap attribution
+- 地圖使用 OpenFreeMap 的 Bright／Dark 樣式，保留 MapLibre、OpenFreeMap 與 OpenStreetMap attribution
 - 搜尋透過可替換介面包裝 OSM 相容服務，只保留名稱、格式化地址與座標
 - 搜尋必須遵守供應商的 rate limit，並對文字輸入做 debounce/cancellation；unit test 使用 fake repository
 

@@ -1,5 +1,6 @@
 package com.sora.mockgps.feature.map
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,18 +36,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.em
-import androidx.compose.ui.unit.sp
 import com.sora.mockgps.R
 import com.sora.mockgps.core.model.Coordinate
+import com.sora.mockgps.route.GeoMath
 import com.sora.mockgps.ui.theme.BloomWalkCoral
 import com.sora.mockgps.ui.theme.BloomWalkGold
 import com.sora.mockgps.ui.theme.BloomWalkSage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.camera.CameraState
 import org.maplibre.compose.camera.rememberCameraState
@@ -56,13 +53,7 @@ import org.maplibre.compose.map.OrnamentOptions
 import org.maplibre.compose.style.BaseStyle
 import org.maplibre.compose.layers.CircleLayer
 import org.maplibre.compose.layers.LineLayer
-import org.maplibre.compose.layers.SymbolLayer
-import org.maplibre.compose.expressions.dsl.Feature
 import org.maplibre.compose.expressions.dsl.const
-import org.maplibre.compose.expressions.dsl.format
-import org.maplibre.compose.expressions.dsl.offset
-import org.maplibre.compose.expressions.dsl.span
-import org.maplibre.compose.expressions.value.StringValue
 import org.maplibre.compose.sources.GeoJsonData
 import org.maplibre.compose.sources.rememberGeoJsonSource
 import org.maplibre.compose.util.ClickResult
@@ -121,22 +112,26 @@ internal fun MapPicker(
                     ClickResult.Consume
                 },
             ) {
-                if (showLandmarks) {
-                    LandmarkLayer(useZhTw = useZhTwLabels) { landmark ->
-                        onCoordinateSelected(landmark.coordinate)
-                        landmarkConfirmation = landmark.displayName(useZhTwLabels)
-                        tapScope.launch {
-                            cameraState.animateTo(
-                                cameraState.position.copy(target = landmark.coordinate.toPosition()),
-                            )
-                        }
-                    }
-                }
                 if (routePoints.size >= 2) RouteLine(routePoints)
                 pendingApplyActiveCoordinate?.let { StaticActiveMarker(it) }
                 SelectedLocationMarker(pendingCoordinate)
                 activeRouteCoordinate?.let { RouteActiveMarker(it) }
             }
+        }
+        if (loadingState == MapLoadingState.Ready && showLandmarks) {
+            LandmarkPinsOverlay(
+                cameraState = cameraState,
+                useZhTw = useZhTwLabels,
+                onLandmarkSelected = { landmark ->
+                    onCoordinateSelected(landmark.coordinate)
+                    landmarkConfirmation = landmark.displayName(useZhTwLabels)
+                    tapScope.launch {
+                        cameraState.animateTo(
+                            cameraState.position.copy(target = landmark.coordinate.toPosition()),
+                        )
+                    }
+                },
+            )
         }
         pendingApplyActiveCoordinate?.let {
             val pendingHint = stringResource(R.string.pending_apply_chip)
@@ -224,49 +219,72 @@ internal fun MapPicker(
 }
 
 @Composable
-private fun LandmarkLayer(
+private fun LandmarkPinsOverlay(
+    cameraState: CameraState,
     useZhTw: Boolean,
     onLandmarkSelected: (JourneyLandmark) -> Unit,
 ) {
-    // OpenFreeMap glyphs only serve Noto Sans; MapLibre default Open Sans / Arial Unicode 404s.
-    val data = remember(useZhTw) {
-        GeoJsonData.JsonString(journeyLandmarks.toFeatureCollectionGeoJson(useZhTw))
+    // Recompose while the camera moves so pins track the map.
+    val camera = cameraState.position
+    val projection = cameraState.projection ?: return
+    val zoom = camera.zoom
+    if (zoom < LANDMARK_DOT_MIN_ZOOM) return
+
+    val center = Coordinate(camera.target.latitude, camera.target.longitude)
+    val maxDistanceMeters = landmarkVisibilityRadiusMeters(zoom)
+    val showLabels = zoom >= LANDMARK_LABEL_MIN_ZOOM
+    val nearby = remember(center.latitude, center.longitude, maxDistanceMeters) {
+        journeyLandmarks.filter { GeoMath.distanceMeters(center, it.coordinate) <= maxDistanceMeters }
     }
-    val source = rememberGeoJsonSource(data)
-    LaunchedEffect(source, data) { source.setData(data) }
-    val onClick: (List<org.maplibre.spatialk.geojson.Feature<*, *>>) -> ClickResult = { features ->
-        val name = features.firstNotNullOfOrNull { feature ->
-            (feature.properties as? JsonObject)?.get("name")?.jsonPrimitive?.contentOrNull
+
+    nearby.forEach { landmark ->
+        val screen = projection.screenLocationFromPosition(landmark.coordinate.toPosition())
+        val label = landmark.displayName(useZhTw)
+        Column(
+            modifier = Modifier
+                .offset(x = screen.x - 10.dp, y = screen.y - 10.dp)
+                .semantics { contentDescription = label },
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Surface(
+                onClick = { onLandmarkSelected(landmark) },
+                modifier = Modifier.size(20.dp),
+                shape = CircleShape,
+                color = BloomWalkCoral,
+                contentColor = Color.White,
+                shadowElevation = 3.dp,
+                border = BorderStroke(2.dp, Color.White),
+            ) {}
+            if (showLabels) {
+                Surface(
+                    onClick = { onLandmarkSelected(landmark) },
+                    shape = MaterialTheme.shapes.small,
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
+                    shadowElevation = 2.dp,
+                    modifier = Modifier.padding(top = 2.dp),
+                ) {
+                    Text(
+                        text = label,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                    )
+                }
+            }
         }
-        val landmark = journeyLandmarks.firstOrNull { it.name == name }
-        landmark?.let(onLandmarkSelected)
-        if (landmark == null) ClickResult.Pass else ClickResult.Consume
     }
-    CircleLayer(
-        id = "journey-landmarks",
-        source = source,
-        minZoom = 10f,
-        color = const(BloomWalkCoral),
-        radius = const(5.dp),
-        strokeColor = const(Color.White),
-        strokeWidth = const(2.dp),
-        onClick = onClick,
-    )
-    SymbolLayer(
-        id = "journey-landmark-labels",
-        source = source,
-        minZoom = 11.5f,
-        textField = format(span(Feature.get("label").cast<StringValue>())),
-        textFont = const(listOf("Noto Sans Regular")),
-        textSize = const(12.sp),
-        textColor = const(MaterialTheme.colorScheme.onSurface),
-        textHaloColor = const(MaterialTheme.colorScheme.surface),
-        textHaloWidth = const(2.dp),
-        textOffset = offset(0.em, -1.em),
-        textAllowOverlap = const(false),
-        onClick = onClick,
-    )
 }
+
+private fun landmarkVisibilityRadiusMeters(zoom: Double): Double = when {
+    zoom >= 14.0 -> 25_000.0
+    zoom >= 12.0 -> 60_000.0
+    zoom >= 10.0 -> 150_000.0
+    else -> 400_000.0
+}
+
+private const val LANDMARK_DOT_MIN_ZOOM = 7.0
+private const val LANDMARK_LABEL_MIN_ZOOM = 10.5
 
 @Composable
 private fun RouteLine(points: List<Coordinate>) {
@@ -381,6 +399,6 @@ private fun Coordinate.toPointGeoJson(): String =
 
 private val MapDisplayType.styleUrl: String
     get() = when (this) {
-        MapDisplayType.Light -> "https://tiles.openfreemap.org/styles/positron"
+        MapDisplayType.Light -> "https://tiles.openfreemap.org/styles/bright"
         MapDisplayType.Dark -> "https://tiles.openfreemap.org/styles/dark"
     }
