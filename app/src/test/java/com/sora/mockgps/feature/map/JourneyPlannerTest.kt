@@ -73,20 +73,41 @@ class JourneyPlannerTest {
     }
 
     @Test
-    fun `current location journey centers on provided coordinate`() {
-        val center = Coordinate(25.033964, 121.564468)
+    fun `current location journey starts on provided coordinate`() {
+        val start = Coordinate(25.033964, 121.564468)
         val journey = JourneyPlanner.automaticJourney(
             AutoJourneyOptions(
                 region = JourneyRegion.CurrentLocation,
-                centerCoordinate = center,
+                centerCoordinate = start,
             ),
             Random(3),
         )
 
-        assertEquals(center, journey.center)
-        assertEquals(center, journey.landmark.coordinate)
+        assertEquals(start, journey.points.first())
+        assertEquals(start, journey.points.last())
+        assertEquals(start, journey.landmark.coordinate)
         assertEquals("目前位置", journey.landmark.nameZhTw)
-        assertTrue(journey.points.all { GeoMath.distanceMeters(it, center) < 20_000.0 })
+        assertTrue(journey.startAnchored)
+        assertTrue(GeoMath.distanceMeters(journey.center, start) > 50.0)
+        assertTrue(journey.points.all { GeoMath.distanceMeters(it, journey.center) < 20_000.0 })
+    }
+
+    @Test
+    fun `current location resize keeps the anchored start`() {
+        val start = Coordinate(25.033964, 121.564468)
+        val journey = JourneyPlanner.automaticJourney(
+            AutoJourneyOptions(
+                region = JourneyRegion.CurrentLocation,
+                centerCoordinate = start,
+            ),
+            Random(9),
+        )
+        val resized = JourneyPlanner.withShapeRadius(journey, 250.0)
+
+        assertEquals(start, resized.points.first())
+        assertEquals(start, resized.points.last())
+        assertTrue(resized.startAnchored)
+        assertEquals(journey.shapeRingIndex, resized.shapeRingIndex)
     }
 
     @Test

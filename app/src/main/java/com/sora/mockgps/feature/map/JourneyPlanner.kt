@@ -307,6 +307,10 @@ internal data class GeneratedJourney(
     val landmark: JourneyLandmark,
     val center: Coordinate,
     val points: List<Coordinate>,
+    /** When true, [points].first() is the fixed start (current location) and must be preserved on resize. */
+    val startAnchored: Boolean = false,
+    /** Canonical shape-ring index rotated to the start when [startAnchored] is true. */
+    val shapeRingIndex: Int = 0,
 )
 
 internal object JourneyPlanner {
@@ -330,18 +334,38 @@ internal object JourneyPlanner {
             )
             else -> randomLandmark(options.region, random, excludedLandmark)
         }
-        val center = when (options.region) {
+        val startAnchor = when (options.region) {
             JourneyRegion.CurrentLocation -> landmark.coordinate
+            else -> null
+        }
+        // Current location: draft the shape around the user, then shift so the loop
+        // starts at that point instead of treating it as the geometric center.
+        val draftCenter = when {
+            startAnchor != null -> startAnchor
             else -> randomCenter(landmark, random)
         }
         val shape = RouteShape.entries[random.nextInt(RouteShape.entries.size)]
-        val baselineDistance = shapeDistanceMeters(center, shape)
+        val baselineDistance = shapeDistanceMeters(draftCenter, shape)
         val radiusMeters = (DEFAULT_SHAPE_RADIUS_METERS * sizingDistanceMeters / baselineDistance)
             .coerceIn(
                 MINIMUM_SHAPE_RADIUS_METERS,
                 minOf(transportRadiusLimit(options.transportMode), landmark.maximumShapeRadiusMeters),
             )
-        return GeneratedJourney(shape, landmark, center, shapePoints(center, shape, radiusMeters))
+        val draftPoints = shapePoints(draftCenter, shape, radiusMeters)
+        return if (startAnchor != null) {
+            val ringIndex = random.nextInt((draftPoints.size - 1).coerceAtLeast(1))
+            val oriented = rotateClosedRing(draftPoints, ringIndex)
+            anchorClosedRingAt(
+                points = oriented,
+                start = startAnchor,
+                shape = shape,
+                landmark = landmark,
+                constructionCenter = draftCenter,
+                shapeRingIndex = ringIndex,
+            )
+        } else {
+            GeneratedJourney(shape, landmark, draftCenter, draftPoints)
+        }
     }
 
     /** Target travel distance for the selected duration and transport speed. */
@@ -355,7 +379,52 @@ internal object JourneyPlanner {
 
     fun withShapeRadius(journey: GeneratedJourney, radiusMeters: Double): GeneratedJourney {
         val clamped = radiusMeters.coerceIn(MINIMUM_SHAPE_RADIUS_METERS, MAXIMUM_SHAPE_RADIUS_METERS)
-        return journey.copy(points = shapePoints(journey.center, journey.shape, clamped))
+        val draft = shapePoints(journey.center, journey.shape, clamped)
+        if (!journey.startAnchored) {
+            return journey.copy(points = draft)
+        }
+        val oriented = rotateClosedRing(draft, journey.shapeRingIndex)
+        return anchorClosedRingAt(
+            points = oriented,
+            start = journey.points.first(),
+            shape = journey.shape,
+            landmark = journey.landmark,
+            constructionCenter = journey.center,
+            shapeRingIndex = journey.shapeRingIndex,
+        )
+    }
+
+    /** Rotate a closed ring so [startIndex] becomes the first (and last) vertex. */
+    internal fun rotateClosedRing(points: List<Coordinate>, startIndex: Int): List<Coordinate> {
+        require(points.size >= 2 && points.first() == points.last()) { "Expected a closed ring." }
+        val open = points.dropLast(1)
+        val index = startIndex.mod(open.size)
+        val rotated = open.drop(index) + open.take(index)
+        return rotated + rotated.first()
+    }
+
+    /** Translate a closed ring so its first vertex lands on [start]. */
+    internal fun anchorClosedRingAt(
+        points: List<Coordinate>,
+        start: Coordinate,
+        shape: RouteShape,
+        landmark: JourneyLandmark,
+        constructionCenter: Coordinate,
+        shapeRingIndex: Int,
+    ): GeneratedJourney {
+        val from = points.first()
+        val dLat = start.latitude - from.latitude
+        val dLon = start.longitude - from.longitude
+        fun shift(coordinate: Coordinate): Coordinate =
+            Coordinate(coordinate.latitude + dLat, coordinate.longitude + dLon)
+        return GeneratedJourney(
+            shape = shape,
+            landmark = landmark,
+            center = shift(constructionCenter),
+            points = points.map(::shift),
+            startAnchored = true,
+            shapeRingIndex = shapeRingIndex,
+        )
     }
 
     private fun currentLocationLandmark(coordinate: Coordinate): JourneyLandmark =
