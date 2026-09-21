@@ -80,7 +80,7 @@ class FrameworkMockEngine(
         }
     }
 
-    /** ProviderProperties constants are compile-time inlined, so this remains safe on API 26-30. */
+    /** ProviderProperties constants are compile-time inlined, so this remains safe on API 29-30. */
     @SuppressLint("InlinedApi")
     @Suppress("DEPRECATION")
     private fun addLegacyTestProvider() {

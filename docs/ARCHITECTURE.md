@@ -79,7 +79,7 @@ interface MockLocationEngine {
 - Coordinator 固定 start 所有引擎；若任一引擎失敗，停止已啟動者並回報整體失敗，避免半套 Active 狀態
 - 每個 tick 可個別記錄引擎錯誤；連續錯誤達門檻時停止整體服務並 cleanup
 - `stop()` 使用 `try/finally`，FLP 一律嘗試 `setMockMode(false)`，framework 一律嘗試 disable/remove test provider
-- API 31+ 使用 `ProviderProperties` overload；API 26–30 使用舊 overload
+- API 31+ 使用 `ProviderProperties` overload；API 29–30 使用舊 overload
 
 第一個 spike 驗證 `GPS_PROVIDER + FLP`。只有當測試矩陣證明特定 client 需要時，才加入 `NETWORK_PROVIDER`，避免無證據地擴大替換系統 provider 的範圍。
 
@@ -218,12 +218,12 @@ Mock Location App selection 與跨 App 觀察必須在 emulator/實體裝置手�
 
 | 裝置 | 目的 |
 |---|---|
-| API 26 emulator/device | minSdk 舊 overload 與通知行為 |
+| API 29 emulator/device | minSdk 舊 overload 與通知行為 |
 | API 34 | FGS type、notification/location permission |
 | API 36 Google APIs image | target 行為、FLP、MapLibre |
 | 一台非 Pixel 實體裝置 | OEM 省電與背景穩定性 |
 
-GitHub Actions runs the instrumentation suite on API 26, 34, and 36 `google_apis` x86_64 images. This verifies repository-owned tests only; mock-app selection, independent cross-app LocationManager/FLP reads, long soak, and OEM background behavior remain manual release evidence.
+GitHub Actions runs the instrumentation suite on API 29, 34, and 36 `google_apis` x86_64 images. This verifies repository-owned tests only; mock-app selection, independent cross-app LocationManager/FLP reads, long soak, and OEM background behavior remain manual release evidence.
 
 ## 12. 主要風險與處理
 

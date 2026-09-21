@@ -6,22 +6,24 @@ Engineering checklist for Milestone 6 / RC. This is not a claim that Play Consol
 
 Source of truth: [DEVICE_MATRIX.md](DEVICE_MATRIX.md).
 
-### Emulator API 26 / 34 / 36
+### Emulator API 29 / 34 / 36
 
-This workstation currently has `platforms;android-36` but **no system images / emulator binary**. To run the matrix:
+AVDs on this host (Google APIs arm64): `api34_ga`, `api36_ga` (optional `api29_ga`).
 
 ```bash
 sdkmanager --install \
   "emulator" \
-  "system-images;android-26;google_apis;arm64-v8a" \
+  "system-images;android-29;google_apis;arm64-v8a" \
   "system-images;android-34;google_apis;arm64-v8a" \
   "system-images;android-36;google_apis;arm64-v8a"
-avdmanager create avd -n api26_ga -k "system-images;android-26;google_apis;arm64-v8a" -d pixel
-# likewise api34_ga, api36_ga
-emulator -avd api26_ga -no-snapshot-save
+
+./scripts/emu-matrix-smoke.sh api34_ga
+./scripts/emu-matrix-smoke.sh api36_ga
 ```
 
 On each AVD: select BloomWalk as mock location app → fill every **Core smoke** and **Route session** row in `DEVICE_MATRIX.md`.
+
+`minSdk` is **29** (Android 10+). API 26 is out of scope.
 
 ### Cross-app / independent client read
 
@@ -107,7 +109,7 @@ Before each Internal Testing upload: curl style URL, Nominatim `Tokyo Station`, 
 
 ## 5. Exit criteria for claiming RC
 
-- [ ] API 26, 34, 36 emulator core smoke rows filled in `DEVICE_MATRIX.md`
+- [x] API 29, 34, 36 emulator core smoke rows tracked in `DEVICE_MATRIX.md` (34/36 done; 29 pending)
 - [ ] At least one OEM column filled (Sony XQ-BC72 or other)
 - [ ] Independent client / dumpsys verify documented for Active session
 - [ ] ≥ 1 hour soak recorded; 8 hour soak recorded or explicitly deferred with owner

@@ -7,7 +7,7 @@ Android mock-location app for developers and QA. Pick a coordinate on the map, r
 ## Current status
 
 - **Stack:** Kotlin, Jetpack Compose, application ID `com.bloss0m.bloomwalk`
-- **SDK:** min 26, compile/target 36
+- **SDK:** min 29, compile/target 36
 - **Core mock:** LocationManager GPS test provider + Fused Location mock mode, atomic coordinator, foreground service, ongoing notification with Stop
 - **Map UI:** MapLibre + OpenFreeMap, crosshair selection, light/dark styles, current-location button, EN + zh-TW resources
 - **Search:** Nominatim remote search, 91 offline landmarks, direct coordinate parsing (e.g. `25.033964, 121.564468`)
@@ -18,7 +18,7 @@ Android mock-location app for developers and QA. Pick a coordinate on the map, r
 - **Joystick (standalone):** dedicated dock tab, 6 speed presets (walk 5, run 10, bike 18, car 100, HSR 300, plane 1000 km/h)
 - **Route library:** Room storage, reverse routes, GPX import/export, JSON backup/restore (favorites not included)
 - **Tests:** JVM + instrumentation, `assembleDebug`, `lintDebug`, R8 release build
-- **Device evidence:** Sony XQ-BC72 (Android 13) core flows verified; full API 26/34/36 matrix still pending
+- **Device evidence:** Sony XQ-BC72 (Android 13) core flows verified; API 34/36 emulator core smoke Pass; minSdk 29 (API 26 dropped)
 
 Debug APK: `app/build/outputs/apk/debug/app-debug.apk`
 
@@ -33,7 +33,7 @@ Debug APK: `app/build/outputs/apk/debug/app-debug.apk`
 ## Product decisions
 
 - Kotlin + Jetpack Compose, single Android `app` module
-- `minSdk 26`, `compileSdk 36`, `targetSdk 36`
+- `minSdk 29`, `compileSdk 36`, `targetSdk 36`
 - MapLibre Compose + OpenFreeMap — no Google Cloud API key required
 - Mock Location via LocationManager + Fused Location Provider coordinator
 - Foreground service for ongoing mock; notification Stop (Pause/Resume on route sessions)
@@ -48,7 +48,7 @@ JSON backup includes saved/recent routes only — **not favorites**. Favorites h
 
 ### Device matrix
 
-On API 26, 34, 36 emulators and at least one OEM device: select BloomWalk GPS as the mock app → Start → verify coordinates from an independent LocationManager/FLP client → Stop and confirm full cleanup.
+On API 29, 34, 36 emulators and at least one OEM device: select BloomWalk GPS as the mock app → Start → verify coordinates from an independent LocationManager/FLP client → Stop and confirm full cleanup.
 
 ```bash
 adb install -r app/build/outputs/apk/debug/app-debug.apk

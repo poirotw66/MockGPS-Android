@@ -2,7 +2,7 @@
 
 版本：0.1  
 規劃日期：2026-08-23  
-平台：Android 8.0+（API 26+）
+平台：Android 10+（API 29+）
 
 ## 1. 產品目標
 
@@ -157,7 +157,7 @@ App 未被選為 Mock Location App 時，按 Start 不 crash、不留下 ongoing
 
 - 自動測試通過（目前 71 JVM + 14 instrumentation）；裝置/跨 App AC 依 release checklist 記錄後才可宣稱通過
 - `assembleDebug`、unit tests、lint 通過
-- API 26、API 34、API 36 完成啟停 smoke test
+- API 29、API 34、API 36 完成啟停 smoke test
 - 至少一台實體 Android 裝置完成 8 小時穩定測試
 - 安裝、地圖供應、Mock Location 設定與疑難排解寫入 README
 - 沒有 P0/P1 crash 或會讓裝置持續殘留 mock mode 的已知問題

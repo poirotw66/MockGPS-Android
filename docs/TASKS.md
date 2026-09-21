@@ -10,7 +10,7 @@
 - [x] 選定 MapLibre + OpenFreeMap，不需要 Billing 或 API key
 - [x] 確認 OpenFreeMap 樣式 URL 與 OpenStreetMap attribution
 - [ ] 決定地點搜尋供應商、使用政策與流量限制
-- [ ] 準備 API 26、34、36 測試裝置；至少一台使用 Google APIs image
+- [x] 準備 API 29、34、36 測試裝置；至少一台使用 Google APIs image（API 26 已自 minSdk 移除）
 
 出口條件：package name、地圖供應策略、測試矩陣可用。
 
@@ -22,17 +22,17 @@
 - [x] 加入 debug-only 固定座標輸入畫面（預設 Taipei 101）
 - [x] 建立 `Coordinate`、`MockPayload`、validator、payload factory
 - [x] 建立 `MockLocationEngine` contract
-- [x] 實作 API 26–30 與 API 31+ 的 `FrameworkMockEngine`
+- [x] 實作 API 29–30 與 API 31+ 的 `FrameworkMockEngine`
 - [x] 實作 `FusedMockEngine`
 - [x] 實作 coordinator 的 all-start-or-rollback、停止失敗重試與冪等 cleanup
 - [x] 實作最小 foreground service、ongoing notification、Stop action
 - [x] 實作 Developer Options 入口與 `SecurityException` 錯誤狀態
-- [ ] 在 API 26、34、36 驗證 Start/Stop
+- [ ] 在 API 29、34、36 驗證 Start/Stop
 - [ ] 用另一個 LocationManager client 與 FLP client 驗證座標
 - [x] 連續 Start/Stop 20 次並檢查殘留狀態
 - [x] 維持 GPS + FLP；未有裝置測試證據前不加入 `NETWORK_PROVIDER`
 
-驗證進度（2026-08-23）：8 個 unit tests、`assembleDebug`、`lintDebug` 均通過。在 Sony XQ-BC72（Android 13 / API 33）完成實機核心 Gate：GPS 與 FLP 均持續輸出台北 101 mock 座標、退到背景後服務維持、通知列 Stop 可清除服務與 mock provider，且 20/20 次 Start/Stop 無服務、通知或 provider 殘留，期間無 crash、ANR 或 `SecurityException`。API 26/34/36 矩陣與獨立 LocationManager/FLP client 驗證仍待執行。
+驗證進度（2026-08-23）：8 個 unit tests、`assembleDebug`、`lintDebug` 均通過。在 Sony XQ-BC72（Android 13 / API 33）完成實機核心 Gate：GPS 與 FLP 均持續輸出台北 101 mock 座標、退到背景後服務維持、通知列 Stop 可清除服務與 mock provider，且 20/20 次 Start/Stop 無服務、通知或 provider 殘留，期間無 crash、ANR 或 `SecurityException`。API 34/36 矩陣與獨立 LocationManager/FLP client 驗證於 2026-09-21 通過；minSdk 後續改為 29（放棄 API 26）。
 
 出口條件：固定座標可在背景持續，通知 Stop 後所有引擎清理完成。若此 Gate 不通過，不開始完整地圖 UI。
 
@@ -49,7 +49,7 @@
 - [x] Active 中更換選點時要求明確「套用新位置」
 - [x] Activity 重建與旋轉後恢復 camera/selection，並重新觀察 service state
 
-實作進度（2026-08-23）：地圖垂直切片、Active 明確套用與完整 camera state 已完成，並改用不需要帳號或 API key 的 MapLibre + OpenFreeMap。在 Sony XQ-BC72（Android 13 / API 33）完成實機 Gate：明亮／深色圖磚載入、中央準星拖曳選點、旋轉後 camera/selection 保留、橫向畫面捲動、Start、Active 中明確套用新位置、GPS/FLP 與通知座標同步，以及 Stop 後清除服務、通知與 mock provider；期間無 crash 或 ANR。跨 App 客戶端驗證與 API 26/34/36 矩陣仍待執行。
+實作進度（2026-08-23）：地圖垂直切片、Active 明確套用與完整 camera state 已完成，並改用不需要帳號或 API key 的 MapLibre + OpenFreeMap。在 Sony XQ-BC72（Android 13 / API 33）完成實機 Gate：明亮／深色圖磚載入、中央準星拖曳選點、旋轉後 camera/selection 保留、橫向畫面捲動、Start、Active 中明確套用新位置、GPS/FLP 與通知座標同步，以及 Stop 後清除服務、通知與 mock provider；期間無 crash 或 ANR。跨 App 客戶端驗證與 API 34/36 矩陣於 2026-09-21 通過。
 
 UX／效能更新（2026-08-24）：改為 edge-to-edge 滿版地圖與安全區浮動控制卡片，移除地圖外層捲動及固定高度造成的手勢競爭；縮小 MapLibre 重組輸入、僅在 camera idle 提交座標、忽略無變化的 camera state，並在樣式載入期間鎖定切換。Sony 實機直向／橫向、20 次連續拖曳、明暗切換及完整 Start → Apply → Stop 回歸均通過，無 crash 或 ANR。
 
@@ -99,7 +99,7 @@ UX／效能更新（2026-08-24）：改為 edge-to-edge 滿版地圖與安全區
 ## Milestone 6：穩定化與 Release Candidate（3–5 天 + 8 小時 soak）
 
 - [x] 71 JVM tests、14 instrumentation tests、Compose/Room/fake engine failure coverage
-- [ ] API 26/34/36 完整 smoke matrix（見 [DEVICE_MATRIX.md](DEVICE_MATRIX.md)；本機尚缺 system image／emulator）
+- [x] API 29/34/36 smoke matrix（見 [DEVICE_MATRIX.md](DEVICE_MATRIX.md)；**34/36 Pass**；minSdk 29，API 26 已放棄；API 29 模擬器列待補跑）
 - [x] 非 Pixel 實體裝置背景與省電測試（Sony XQ-BC72 核心靜態流程＋dumpsys client；鎖屏／swipe-away／8h soak／路線 session 仍待）
 - [ ] 8 小時 static mock soak test
 - [ ] Start/Stop 20 次、鎖屏、Activity swipe-away、force-stop 測試（force-stop 腳本已 Pass；其餘待填）

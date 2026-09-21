@@ -7,7 +7,7 @@ Android Mock Location 工具。支援靜態選點、喜愛地點、路線模擬�
 ## 目前狀態
 
 - Android 專案：Kotlin、Jetpack Compose、application ID `com.bloss0m.bloomwalk`
-- SDK：min 26、compile/target 36
+- SDK：min 29、compile/target 36
 - 已完成：LocationManager GPS test provider、Fused Location mock mode、原子化 coordinator、前景服務、持續通知與 Stop action
 - Map UI：MapLibre + OpenFreeMap、中央準星選點、明亮／深色樣式、目前位置按鈕、繁中／英文資源
 - 搜尋：Nominatim 遠端搜尋 + 91 個離線著名景點 + 座標直接解析（如 `25.033964, 121.564468`）
@@ -18,7 +18,7 @@ Android Mock Location 工具。支援靜態選點、喜愛地點、路線模擬�
 - **搖桿（獨立功能）**：底部 Dock「搖桿」分頁，6 檔速度（步行 5、跑步 10、單車 18、汽車 100、高鐵 300、飛機 1000 km/h）
 - 路線資料：Room 儲存、反向路線、GPX 匯入匯出、JSON 備份還原（不含收藏地點）
 - 自動驗證：JVM + instrumentation tests、`assembleDebug`、`lintDebug`、R8 release
-- 實機證據：Sony XQ-BC72（Android 13）已驗證核心流程；API 26/34/36 矩陣仍待完整執行
+- 實機證據：Sony XQ-BC72（Android 13）已驗證核心流程；API 34／36 模擬器核心 smoke Pass；minSdk 29（已放棄 API 26）
 
 Debug APK：`app/build/outputs/apk/debug/app-debug.apk`
 
@@ -33,7 +33,7 @@ Debug APK：`app/build/outputs/apk/debug/app-debug.apk`
 ## 已確定方向
 
 - Kotlin、Jetpack Compose、單一 Android `app` module
-- `minSdk 26`、`compileSdk 36`、`targetSdk 36`
+- `minSdk 29`、`compileSdk 36`、`targetSdk 36`
 - MapLibre Compose + OpenFreeMap，不需要 Google Cloud API key
 - LocationManager + Fused Location Provider 組成 Mock Location coordinator
 - 前景服務維持模擬，通知提供 Stop（路線另有 Pause/Resume）
@@ -48,7 +48,7 @@ JSON backup 僅包含 saved/recent routes，**不包含 favorites**。收藏地�
 
 ### 手動裝置矩陣
 
-在 API 26、34、36 emulator 與 OEM 實機執行：選 BloomWalk GPS 為 mock location app → Start → 獨立 LocationManager/FLP client 讀值 → Stop 並確認清理完成。
+在 API 29、34、36 emulator 與 OEM 實機執行：選 BloomWalk GPS 為 mock location app → Start → 獨立 LocationManager/FLP client 讀值 → Stop 並確認清理完成。
 
 ```bash
 adb install -r app/build/outputs/apk/debug/app-debug.apk
