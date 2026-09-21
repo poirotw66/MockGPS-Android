@@ -99,18 +99,20 @@ UX／效能更新（2026-08-24）：改為 edge-to-edge 滿版地圖與安全區
 ## Milestone 6：穩定化與 Release Candidate（3–5 天 + 8 小時 soak）
 
 - [x] 71 JVM tests、14 instrumentation tests、Compose/Room/fake engine failure coverage
-- [ ] API 26/34/36 完整 smoke matrix（見 [DEVICE_MATRIX.md](DEVICE_MATRIX.md)）
-- [ ] 非 Pixel 實體裝置背景與省電測試
+- [ ] API 26/34/36 完整 smoke matrix（見 [DEVICE_MATRIX.md](DEVICE_MATRIX.md)；本機尚缺 system image／emulator）
+- [x] 非 Pixel 實體裝置背景與省電測試（Sony XQ-BC72 核心靜態流程＋dumpsys client；鎖屏／swipe-away／8h soak／路線 session 仍待）
 - [ ] 8 小時 static mock soak test
-- [ ] Start/Stop 20 次、鎖屏、Activity swipe-away、force-stop 測試
+- [ ] Start/Stop 20 次、鎖屏、Activity swipe-away、force-stop 測試（force-stop 腳本已 Pass；其餘待填）
 - [x] lint、license notice、R8 release build
 - [x] release signing 僅由環境變數注入；無 key／secret 進版控
 - [x] README：Unix／Windows 驗證、安裝、地圖供應、Developer Options、疑難排解
 - [x] Privacy/Data safety 草稿
-- [ ] Play Console foreground-service declaration/policy spike
+- [x] Play Console foreground-service declaration/policy spike（工程草稿見 [RELEASE_HARDENING.md](RELEASE_HARDENING.md)；Console 提交仍需帳號擁有者）
 - [ ] 關閉所有 P0/P1 問題並完成 MVP AC-01 至 AC-09
 
 出口條件：產出可安裝 RC APK/AAB；是否公開上架另以 Play policy review 為準。
+
+輔助腳本：`scripts/oem-smoke.sh`、`scripts/verify-mock-clients.sh`。
 
 ## 後續 Phase 2
 

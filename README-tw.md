@@ -28,6 +28,7 @@ Debug APK：`app/build/outputs/apk/debug/app-debug.apk`
 - [技術架構與平台決策](docs/ARCHITECTURE.md)
 - [開發里程碑與任務清單](docs/TASKS.md)
 - [裝置可靠度矩陣](docs/DEVICE_MATRIX.md)
+- [上架／可靠度收尾](docs/RELEASE_HARDENING.md)
 
 ## 已確定方向
 
