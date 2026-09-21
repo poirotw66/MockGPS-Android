@@ -172,7 +172,8 @@
     <string name="recent_routes_title">最近使用</string>
     <string name="recent_locations_title">最近位置</string>
     <string name="route_library_distance">%1$s km</string>
-    <string name="action_route_library">路線</string>
+    <string name="action_route_library">路線資料庫</string>
+    <string name="action_open_route_library">開啟路線資料庫</string>
     <string name="action_save_route">儲存路線</string>
     <string name="action_load_route">載入</string>
     <string name="action_reverse_route">反向</string>

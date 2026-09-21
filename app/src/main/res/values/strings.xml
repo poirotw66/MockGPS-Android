@@ -176,7 +176,8 @@
     <string name="recent_routes_title">Recent routes</string>
     <string name="recent_locations_title">Recent locations</string>
     <string name="route_library_distance">%1$s km</string>
-    <string name="action_route_library">Routes</string>
+    <string name="action_route_library">Route library</string>
+    <string name="action_open_route_library">Open route library</string>
     <string name="action_save_route">Save route</string>
     <string name="action_load_route">Load</string>
     <string name="action_reverse_route">Reverse</string>

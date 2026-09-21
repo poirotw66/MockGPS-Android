@@ -58,6 +58,16 @@ class PlaceSearchRepositoryTest {
         assertEquals(24.68, parts[3].toDouble(), 1e-9)
     }
 
+    @Test fun `place search bias keeps soft viewbox without hard country filter`() {
+        val bias = buildPlaceSearchBias(
+            cameraCenter = Coordinate(25.03, 121.5),
+            acceptLanguage = "zh-TW",
+        )
+        assertEquals(null, bias.countryCodes)
+        assertEquals(viewboxAround(Coordinate(25.03, 121.5)), bias.viewbox)
+        assertEquals("zh-TW", bias.acceptLanguage)
+    }
+
     @Test fun `merge keeps landmarks first and drops near-duplicate remotes`() {
         val landmark = PlaceSearchResult(
             "Taipei 101",

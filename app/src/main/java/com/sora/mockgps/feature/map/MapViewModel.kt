@@ -5,14 +5,13 @@ import androidx.annotation.StringRes
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.sora.mockgps.R
-import com.sora.mockgps.feature.search.PlaceSearchBias
 import com.sora.mockgps.feature.search.PlaceSearchException
 import com.sora.mockgps.feature.search.PlaceSearchResult
 import com.sora.mockgps.feature.search.PlaceSearchSource
+import com.sora.mockgps.feature.search.buildPlaceSearchBias
 import com.sora.mockgps.feature.search.formatCoordinateSearchLabel
 import com.sora.mockgps.feature.search.mergePlaceSearchResults
 import com.sora.mockgps.feature.search.parseCoordinateSearchQuery
-import com.sora.mockgps.feature.search.viewboxAround
 import com.sora.mockgps.core.model.Coordinate
 import com.sora.mockgps.core.settings.nextAccuracyMeters
 import com.sora.mockgps.core.settings.nextUpdateIntervalMillis
@@ -254,15 +253,12 @@ class MapViewModel @JvmOverloads constructor(
         }
     }
 
-    private fun placeSearchBias(): PlaceSearchBias {
-        val center = mutableUiState.value.camera.coordinate
-        val locale = currentSearchLocale()
-        return PlaceSearchBias(
-            countryCodes = nearestJourneyRegion(center).nominatimCountryCode(),
-            viewbox = viewboxAround(center),
-            acceptLanguage = if (locale.usesTraditionalChinese()) "zh-TW" else locale.toLanguageTag(),
-        )
-    }
+    private fun placeSearchBias() = buildPlaceSearchBias(
+        cameraCenter = mutableUiState.value.camera.coordinate,
+        acceptLanguage = currentSearchLocale().let { locale ->
+            if (locale.usesTraditionalChinese()) "zh-TW" else locale.toLanguageTag()
+        },
+    )
 
     private fun currentSearchLocale(): Locale =
         getApplication<Application>().resources.configuration.locales[0]

@@ -1,6 +1,8 @@
 package com.sora.mockgps.feature.map
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.rememberScrollState
@@ -65,7 +67,6 @@ import com.sora.mockgps.R
 import com.sora.mockgps.core.model.Coordinate
 import com.sora.mockgps.feature.search.PlaceSearchResult
 import com.sora.mockgps.feature.search.PlaceSearchSource
-import com.sora.mockgps.feature.search.looksLikeLandmarkNickname
 import com.sora.mockgps.route.PlannedRoute
 import com.sora.mockgps.service.RouteCompleted
 import com.sora.mockgps.service.RouteFailed
@@ -156,6 +157,7 @@ internal fun MapControlPanel(
 ) {
     val uriHandler = LocalUriHandler.current
     var activeDetail by remember { mutableStateOf<MapDetailGroup?>(null) }
+    val detailSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val dockActions = remember(
         routePlanningStep,
         isSelectingRouteWaypoint,
@@ -273,12 +275,15 @@ internal fun MapControlPanel(
     activeDetail?.let { detailGroup ->
         ModalBottomSheet(
             onDismissRequest = { activeDetail = null },
+            sheetState = detailSheetState,
             containerColor = MaterialTheme.colorScheme.surface,
         ) {
         Column(
             modifier = Modifier
+                .navigationBarsPadding()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 16.dp)
+                .padding(top = 12.dp, bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
                 Text(
@@ -340,6 +345,16 @@ internal fun MapControlPanel(
                         stringResource(R.string.selected_coordinate, pendingCoordinate.latitude.formatCoordinate(), pendingCoordinate.longitude.formatCoordinate()),
                         style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
+                    // Keep quick actions above results so they stay reachable when the list grows.
+                    TextButton(onClick = { onShowCoordinatesChange(!showCoordinates) }, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(if (showCoordinates) R.string.action_hide_coordinates else R.string.action_show_coordinates))
+                    }
+                    TextButton(onClick = {
+                        activeDetail = null
+                        onUseCurrentLocation()
+                    }, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.action_use_current_location))
+                    }
                     PlaceSearchContent(
                         query = placeSearchQuery,
                         isSearching = isPlaceSearching,
@@ -351,15 +366,6 @@ internal fun MapControlPanel(
                             onPlaceSelected(result)
                         },
                     )
-                    TextButton(onClick = { onShowCoordinatesChange(!showCoordinates) }, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(if (showCoordinates) R.string.action_hide_coordinates else R.string.action_show_coordinates))
-                    }
-                    TextButton(onClick = {
-                        activeDetail = null
-                        onUseCurrentLocation()
-                    }, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.action_use_current_location))
-                    }
                 }
                 if (detailGroup == MapDetailGroup.More) {
                     Row(
@@ -451,7 +457,7 @@ internal fun MapControlPanel(
                         activeDetail = null
                         onShowRouteLibrary()
                     }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                        Text(stringResource(R.string.action_route_library))
+                        Text(stringResource(R.string.action_open_route_library))
                     }
                 }
                 if (detailGroup == MapDetailGroup.Joystick) {

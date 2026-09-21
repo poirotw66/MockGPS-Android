@@ -158,6 +158,20 @@ internal fun viewboxAround(center: Coordinate, deltaDegrees: Double = 0.35): Str
     return "$left,$top,$right,$bottom"
 }
 
+/**
+ * Soft geographic bias for remote place search.
+ * Do not set [PlaceSearchBias.countryCodes]: Nominatim treats it as a hard filter and
+ * drops international hits (e.g. "Tokyo Station" while the camera is in Taiwan).
+ */
+internal fun buildPlaceSearchBias(
+    cameraCenter: Coordinate,
+    acceptLanguage: String?,
+): PlaceSearchBias = PlaceSearchBias(
+    countryCodes = null,
+    viewbox = viewboxAround(cameraCenter),
+    acceptLanguage = acceptLanguage?.takeIf { it.isNotBlank() },
+)
+
 /** Local landmarks first; drop remote hits that roughly duplicate a landmark coordinate. */
 internal fun mergePlaceSearchResults(
     local: List<PlaceSearchResult>,
