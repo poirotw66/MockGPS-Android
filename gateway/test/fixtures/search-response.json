@@ -1,0 +1,15 @@
+{
+  "requestId": "7fa29c99-6507-4618-94d8-4af824f57e64",
+  "providerRevision": "geoapify-v1",
+  "results": [
+    {
+      "name": "台北車站",
+      "address": "臺北市",
+      "coordinate": { "latitude": 25.0478, "longitude": 121.517 }
+    }
+  ],
+  "attribution": [
+    { "label": "Powered by Geoapify", "url": "https://www.geoapify.com/" },
+    { "label": "© OpenStreetMap contributors", "url": "https://www.openstreetmap.org/copyright" }
+  ]
+}

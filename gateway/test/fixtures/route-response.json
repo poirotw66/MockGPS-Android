@@ -1,0 +1,15 @@
+{
+  "requestId": "7fa29c99-6507-4618-94d8-4af824f57e64",
+  "providerRevision": "geoapify-v1",
+  "mode": "bicycle",
+  "points": [
+    { "latitude": 25.033964, "longitude": 121.564468 },
+    { "latitude": 25.0478, "longitude": 121.517 }
+  ],
+  "distanceMeters": 4800,
+  "providerDurationSeconds": 1200,
+  "attribution": [
+    { "label": "Powered by Geoapify", "url": "https://www.geoapify.com/" },
+    { "label": "© OpenStreetMap contributors", "url": "https://www.openstreetmap.org/copyright" }
+  ]
+}

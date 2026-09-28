@@ -21,3 +21,8 @@ externalNativeBuild/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Gateway
+gateway/node_modules/
+gateway/.wrangler/
+gateway/.dev.vars

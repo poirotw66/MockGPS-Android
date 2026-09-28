@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "revision": "geoapify-v1",
+  "searchEnabled": true,
+  "routingEnabled": false,
+  "purchasesEnabled": false,
+  "adsEnabled": false,
+  "routingMaxWaypoints": 25,
+  "routingMaxInputDistanceMeters": 100000,
+  "privacyPolicyUrl": "https://example.invalid/privacy",
+  "supportUrl": "https://example.invalid/support"
+}
