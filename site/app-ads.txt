@@ -1,0 +1,5 @@
+# Replace this placeholder with the exact publisher record from AdMob Console.
+# Do not put an ad unit ID here. Host this file at the developer-website root.
+# google.com, pub-0000000000000000, DIRECT, f08c47fec0942fa0
+#
+# This repository copy is deployable, not live. Owner gate B07 remains open.

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BloomWalk GPS Privacy Policy</title>
+</head>
+<body>
+  <h1>BloomWalk GPS Privacy Policy</h1>
+  <p>This is a deployable draft. It is not a live policy URL until the owner publishes it under HTTPS.</p>
+  <p>BloomWalk GPS is a developer and QA mock-location app. Core mock location, favorites, saved routes, and settings stay on the device until you delete them or uninstall the app.</p>
+  <h2>Services</h2>
+  <ul>
+    <li>Maps: OpenFreeMap / OpenStreetMap tiles in the app.</li>
+    <li>Online search and road routing: BloomWalk HTTPS gateway and Geoapify, only after an explicit Search or Plan action.</li>
+    <li>Purchases: Google Play Billing for the one-time <code>remove_ads_lifetime</code> product. Purchase tokens are sent to the gateway for verification.</li>
+    <li>Ads and consent: Google AdMob and UMP on the free tier only. We do not send mock or real coordinates, search queries, routes, favorites, or purchase tokens to the ads SDK.</li>
+    <li>Hosting: Cloudflare Workers and Durable Objects for the gateway and quota ledger.</li>
+  </ul>
+  <h2>Retention</h2>
+  <p>Device data remains until you delete it. Gateway quota records use a rolling 24-hour window. Purchase grants remain while active. The app does not create a BloomWalk account, so there is no in-app account-deletion control.</p>
+  <h2>Contact</h2>
+  <p>Replace this paragraph with the owner support email before store review. Do not send purchase tokens to support.</p>
+</body>
+</html>

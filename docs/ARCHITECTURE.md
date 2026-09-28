@@ -31,6 +31,8 @@ MockLocationCoordinator
 ├── app/                 Application、MainActivity、navigation
 ├── core/model/          Coordinate、MockPayload、SimulationState
 ├── core/location/       engine contracts、payload factory、coordinator
+├── core/network/        GatewayClient、GET /v1/config poll (6h / 24h cache)
+├── monetization/        EntitlementStore、Play Billing、UMP、AdsController
 ├── service/             foreground service、notification、commands
 ├── feature/setup/       Developer Options 引導
 ├── feature/map/         MapScreen、MapPicker、MapControlPanel、MapViewModel、MapRoutingCoordinator
@@ -142,16 +144,18 @@ Idle → Starting → Active → Stopping → Idle
 - 拖曳與縮放只瀏覽，不會改變已選位置
 - MVP 不需要 reverse geocoding camera center；無 place name 時顯示座標，避免額外 API 成本與延遲
 - 地圖使用 OpenFreeMap 的 Bright／Dark 樣式，保留 MapLibre、OpenFreeMap 與 OpenStreetMap attribution
-- 搜尋透過可替換介面包裝 OSM 相容服務，只保留名稱、格式化地址與座標
-- 搜尋必須遵守供應商的 rate limit，並對文字輸入做 debounce/cancellation；unit test 使用 fake repository
+- 搜尋透過可替換介面。本機座標／景點在輸入時解析；線上查詢只在明確 submit 後經 gateway adapter
+- 文字輸入不得觸發遠端呼叫。IME Search 與可見搜尋按鈕共用同一 submit。Unit test 使用 fake repository
+- App 啟動／回前景輪詢 `GET /v1/config`，最多每 6 小時一次；有效快取最多 24 小時。無設定時本機功能可用，廣告與新購買關閉，線上地理顯示暫不可用。遠端設定不可用時不得清除既有付費權益。
 
 ## 9. 地圖供應與設定
 
 - MapLibre Compose 負責 Android 地圖渲染，OpenFreeMap 提供 OSM 向量圖磚與樣式
-- 目前不需要 Google Cloud、Billing、Secrets Plugin 或 API key
+- 線上搜尋／路由經 BloomWalk HTTPS gateway；供應商 API key 只存在 Worker secrets，不進 APK
+- Play Billing、AdMob 與 UMP 已接入 composition；正式 `routingEnabled` / `adsEnabled` / `purchasesEnabled` 維持 false，直到擁有者 gate 關閉
 - style URL 集中定義，不硬散落在畫面邏輯，方便切換相容供應商或自架
 - OpenFreeMap 為無 SLA 的公共服務；Release 前需記錄可用性風險與替代策略
-- 未來搜尋服務若需要 token，必須從不進版控的本機設定注入，且不得與其他服務共用
+- 供應商 token、Play service account 與 receipt 私鑰從不進版控，且不得與其他服務共用
 
 ## 10. 本機資料
 
@@ -185,7 +189,7 @@ recent_location
 
 ### 外部搜尋與路由
 
-`NominatimPlaceSearchRepository` 與 `FossgisBicycleRoutingRepository` 是可替換 adapter。兩者都有可注入設定與 bounded HTTP body；公共端點以 mutex 節流到每秒最多一個請求，離線不可用且沒有 SLA。搜尋輸入由 ViewModel debounce 350ms，新的輸入會取消舊工作，並以 typed error 對應本地化畫面訊息。
+Production composition 注入 `GatewayPlaceSearchRepository` 與 `GatewayRoutingRepository`。公共 Nominatim／FOSSGIS demo 不再是正式路徑，也不是自動備援。Gateway 使用固定契約、typed errors、bounded I/O。搜尋快取鍵為 normalized query + language + exact bias + provider revision；路線快取鍵為 contract/provider revision + mode + 有序座標 + options。`RouteTransportMode` 只保留 Walk/Bicycle/Drive，供應商 URL 不在 domain enum。權威規格見 [MONETIZATION_IMPLEMENTATION_SPEC.md](MONETIZATION_IMPLEMENTATION_SPEC.md)。
 
 路線資料庫的 observable library query 只投影 id、名稱、距離與時間摘要；geometry 僅在載入、反向、備份或實際模擬時按需解碼，避免清單更新時重複配置完整 polyline。
 
@@ -203,7 +207,7 @@ recent_location
 - payload 時間、accuracy、speed、bearing
 - state reducer 與重複 Start/Stop
 - repository sorting、upsert、50 筆裁切
-- ViewModel 搜尋 debounce、stale result cancellation
+- Explicit search submit、stale submission ID、gateway typed errors
 
 ### Instrumentation / fake tests
 

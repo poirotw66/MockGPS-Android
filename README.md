@@ -10,9 +10,9 @@ Android mock-location app for developers and QA. Pick a coordinate on the map, r
 - **SDK:** min 29, compile/target 36
 - **Core mock:** LocationManager GPS test provider + Fused Location mock mode, atomic coordinator, foreground service, ongoing notification with Stop
 - **Map UI:** MapLibre + OpenFreeMap, crosshair selection, light/dark styles, current-location button, EN + zh-TW resources
-- **Search:** Nominatim remote search, 91 offline landmarks, direct coordinate parsing (e.g. `25.033964, 121.564468`)
+- **Search:** Local landmarks and coordinate parsing while typing; online search only after explicit submit through the BloomWalk gateway
 - **Favorites & recents:** Room-backed local storage, deduplicated to 6 decimal places, 50-entry cap
-- **Route planning:** FOSSGIS OpenStreetMap routing, A/B + waypoints, road polyline preview
+- **Route planning:** Gateway road routing (production disabled until B01), A/B + waypoints, local perfect-shape routes
 - **Route simulation:** walk / run / bicycle / drive / custom speed, smooth acceleration, stop / loop / return, optional GPS drift
 - **Automatic journey:** Taiwan / Japan / Korea landmarks (including Jeju) or **current location**; **perfect shape** or **road-adapted** routing
 - **Joystick (standalone):** dedicated dock tab, 6 speed presets (walk 5, run 10, bike 18, car 100, HSR 300, plane 1000 km/h)
@@ -29,6 +29,8 @@ Debug APK: `app/build/outputs/apk/debug/app-debug.apk`
 - [Milestones & task list](docs/TASKS.md)
 - [Device reliability matrix](docs/DEVICE_MATRIX.md)
 - [Release hardening (Play / soak / providers)](docs/RELEASE_HARDENING.md)
+- [Monetization implementation spec](docs/MONETIZATION_IMPLEMENTATION_SPEC.md)
+- [Owner setup checklist](docs/OWNER_SETUP_CHECKLIST.md)
 
 ## Product decisions
 
@@ -67,7 +69,7 @@ Reliability checklist (record device, API, result): 8-hour static soak, lockscre
 
 ## Open decisions
 
-1. Place-search provider policy and rate limits
+1. Owner gates B01–B12 in `docs/OWNER_SETUP_CHECKLIST.md` (routing cost, Geoapify terms, Cloudflare, Play, AdMob)
 2. OpenFreeMap availability monitoring and self-host strategy
 3. At least one test device with Developer Options → mock location app enabled
 
@@ -77,7 +79,7 @@ MapLibre Compose with OpenFreeMap vector tiles (Bright light / Dark). No account
 
 ## Routing provider
 
-Default: FOSSGIS OpenStreetMap demo router, no API key. Coordinates are sent only when the user taps plan route. Swap via `RoutingProviderConfig` for a self-hosted endpoint.
+Default production composition uses the BloomWalk gateway. Public FOSSGIS demo URLs are not a fallback. Production `routingEnabled` stays false until the owner cost gate (B01) is resolved. Local perfect-shape playback and saved routes do not need the gateway.
 
 ## Build locally
 

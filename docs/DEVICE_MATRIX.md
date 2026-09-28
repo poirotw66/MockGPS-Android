@@ -86,5 +86,5 @@ Independent clients: `./scripts/verify-mock-clients.sh`, plus a second LocationM
 
 - Sony XQ-BC72 (Android 13) covered a large subset of core flows in 2026-08 and again on 2026-09-21 for static mock + UI.
 - API 26 was dropped from product scope after MapLibre Vulkan crashed on the API 26 Google APIs emulator; raising `minSdk` to 29 avoids that compatibility tax for a developer/QA tool.
-- Public OpenFreeMap / Nominatim / FOSSGIS outages are expected; record network failures separately from mock-engine failures.
+- Public OpenFreeMap or BloomWalk gateway outages are expected; record network failures separately from mock-engine failures. Public Nominatim / FOSSGIS demo endpoints are not a production fallback.
 - Local AVDs: `api34_ga`, `api36_ga` (and optional `api29_ga`) under `ANDROID_HOME=/opt/homebrew/share/android-commandlinetools`.

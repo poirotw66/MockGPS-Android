@@ -10,9 +10,9 @@ Android Mock Location 工具。支援靜態選點、喜愛地點、路線模擬�
 - SDK：min 29、compile/target 36
 - 已完成：LocationManager GPS test provider、Fused Location mock mode、原子化 coordinator、前景服務、持續通知與 Stop action
 - Map UI：MapLibre + OpenFreeMap、中央準星選點、明亮／深色樣式、目前位置按鈕、繁中／英文資源
-- 搜尋：Nominatim 遠端搜尋 + 91 個離線著名景點 + 座標直接解析（如 `25.033964, 121.564468`）
+- 搜尋：輸入時只解析本機景點與座標；按下搜尋後才經 BloomWalk 閘道查詢線上地點
 - 喜愛地點與最近位置：Room 本機儲存、Active 後寫入、六位小數去重、50 筆上限
-- 路線規劃：FOSSGIS OpenStreetMap 路由、A/B 與中繼點、道路 polyline 預覽
+- 路線規劃：閘道路線規劃（B01 完成前正式環境維持關閉）、A/B 與中繼點、本機完美圖形路線
 - 路線模擬：步行／跑步／自行車／駕車／自訂速度、平滑加減速、停止／循環／原路返回、可選 GPS 漂移
 - 自動旅途：台灣／日本／韓國景點（含濟州島）或**目前位置**；**完美圖形**或**適配道路**兩種路線模式
 - **搖桿（獨立功能）**：底部 Dock「搖桿」分頁，6 檔速度（步行 5、跑步 10、單車 18、汽車 100、高鐵 300、飛機 1000 km/h）
@@ -29,6 +29,8 @@ Debug APK：`app/build/outputs/apk/debug/app-debug.apk`
 - [開發里程碑與任務清單](docs/TASKS.md)
 - [裝置可靠度矩陣](docs/DEVICE_MATRIX.md)
 - [上架／可靠度收尾](docs/RELEASE_HARDENING.md)
+- [營利實作規格](docs/MONETIZATION_IMPLEMENTATION_SPEC.md)
+- [擁有者設定清單](docs/OWNER_SETUP_CHECKLIST.md)
 
 ## 已確定方向
 
@@ -67,7 +69,7 @@ Reliability checklist（需記錄結果）：8 小時 static soak、鎖屏、swi
 
 ## 開工前需確定
 
-1. 地點搜尋服務的供應商與使用政策
+1. 擁有者門檻 B01–B12（見 `docs/OWNER_SETUP_CHECKLIST.md`）
 2. OpenFreeMap 可用性監控與未來自架策略
 3. 至少一台可開啟「開發人員選項 → 選取模擬位置應用程式」的測試裝置
 
@@ -77,7 +79,7 @@ MapLibre Compose + OpenFreeMap 向量圖磚（Bright / Dark）。不需要帳號
 
 ## 路由服務
 
-預設 FOSSGIS OpenStreetMap demo router，不需要 API key。僅在使用者按下規劃時送出座標。可透過 `RoutingProviderConfig` 換成自架 endpoint。
+正式 composition 使用 BloomWalk 閘道。公共 FOSSGIS demo 不是備援。B01 費用門檻完成前，正式 `routingEnabled` 維持關閉。本機完美圖形與已儲存路線不需要閘道。
 
 ## 本機建置
 

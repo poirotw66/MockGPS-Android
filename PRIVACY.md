@@ -1,7 +1,29 @@
 # Privacy and Data Safety
 
-BloomWalk GPS stores favorites, route history, app settings, and the last successfully active coordinate only on the device. It does not include analytics, advertising SDKs, accounts, or a backend.
+This is the engineering inventory for BloomWalk GPS. It is not a claim that Play Console forms have been submitted. The public privacy pages live as deployable drafts in `site/privacy/` until the owner publishes HTTPS URLs.
 
-When the user explicitly plans a route, ordered route coordinates are sent to the configured FOSSGIS-compatible OSRM endpoint. When the user types a place search, the query is sent to the configured OpenStreetMap-compatible search endpoint; public endpoints are rate-limited to one request per second, are unavailable offline, and have no SLA.
+## On-device data
 
-Before publishing, the Play Data Safety form must accurately declare optional precise location used for the core feature, locally stored favorites/routes/settings, and the above user-initiated search and route-planning network transfers. This document is an engineering inventory, not a legal determination or a claim that the Play Console form has been submitted. Do not add a signing key, API key, or provider token to this repository.
+Favorites, saved routes, recent locations, app settings, and the last active coordinate stay on the device until the user deletes them or uninstalls the app. Import/export formats are unchanged. Entitlement receipts and purchase tokens are stored in an app-private encrypted file (`entitlement.store`) using Android Keystore. That file is not part of Room, JSON backup, or favorites export.
+
+## Online geography
+
+Typing never sends a search. Only an explicit Search or Plan action may call the BloomWalk HTTPS gateway. The gateway talks to Geoapify. There is no public Nominatim or FOSSGIS demo fallback. Production road routing stays disabled while B01 is unresolved. Map tiles still come from OpenFreeMap independently of gateway quota.
+
+Requests include a random install ID, client version, and request ID. The install ID is not an account and is not an advertising ID.
+
+## Advertising and consent
+
+The free tier may show one anchored adaptive banner after UMP `canRequestAds()` is true, the server `adsEnabled` flag is true, and the layout is eligible. Paid, unknown, pending, and verification states do not load ads. The app does not send mock or real coordinates, search queries, routes, favorites, or purchase tokens to the ads SDK. AdMob/UMP still process their own device and interaction signals; Data Safety must follow the locked SDK versions.
+
+## Purchases
+
+Google Play Billing is used for the one-time product `remove_ads_lifetime`. Purchase tokens are sent over TLS to `POST /v1/purchases/verify`. The gateway verifies against the Play Developer API. Receipts are ES256 JWS and do not contain raw tokens, email, or geography.
+
+## Backend retention
+
+Gateway application logs must not include query text, coordinates, tokens, or API keys. GeoBudget Durable Object stores reservation timestamps, credit amounts, and HMAC request digests for a rolling 24-hour window. Purchase Durable Object stores grant state and an encrypted token only while acknowledgement retry is required. Platform access logs are not the same as application logs and must not be described as “zero retention.”
+
+## What changed from earlier drafts
+
+Previous text that claimed “no advertising SDKs” and “no backend” is obsolete. The app now includes AdMob/UMP, a Cloudflare gateway, Geoapify, OpenFreeMap, and Google Play Billing.

@@ -16,10 +16,45 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
+      - name: Conservative committed-secret scan
+        run: |
+          matches="$(git grep -nE 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY' -- ':!gateway/test/' || true)"
+          if [ -n "$matches" ]; then
+            printf '%s\n' "$matches"
+            echo "Committed private key material is not allowed outside gateway/test."
+            exit 1
+          fi
+          if git ls-files --error-unmatch gateway/.dev.vars >/dev/null 2>&1; then
+            echo "gateway/.dev.vars must not be committed."
+            exit 1
+          fi
       - name: Unit tests, debug APK and lint
         run: ./gradlew testDebugUnitTest assembleDebug lintDebug --stacktrace
       - name: Release verification
         run: ./gradlew assembleRelease bundleRelease --stacktrace
+      - name: Release configuration check
+        run: ./gradlew validateReleaseConfig --stacktrace
+
+  gateway:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: gateway
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: gateway/package-lock.json
+      - name: Gateway lint, types and tests
+        run: |
+          npm ci
+          npm run format:check
+          npm run lint
+          npm run typecheck
+          npm test
 
   instrumentation:
     runs-on: ubuntu-latest

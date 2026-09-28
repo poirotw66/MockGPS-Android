@@ -1,5 +1,7 @@
 # 開發里程碑與任務清單
 
+現行 monetization 工作以 [`MONETIZATION_IMPLEMENTATION_SPEC.md`](MONETIZATION_IMPLEMENTATION_SPEC.md) 為準。正式 composition 使用 BloomWalk gateway；Play Billing / AdMob 已接入，但 production `routingEnabled` / `adsEnabled` / `purchasesEnabled` 維持 false。下列清單是歷史 milestone，不代表目前生產設定。
+
 估算以一位熟悉 Kotlin/Android 的工程師為基準，只表示相對工作量；Play 審查、外部地圖服務與 OEM 相容性等待時間不包含在內。
 
 ## Gate 0：產品識別與外部資源（0.5–1 天）

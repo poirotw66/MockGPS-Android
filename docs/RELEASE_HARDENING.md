@@ -78,7 +78,7 @@ Record results in `DEVICE_MATRIX.md` **Optional soak** table (device, start/end 
 
 1. Create app listing for `com.bloss0m.bloomwalk` (or promote Internal Testing).
 2. **App content → Foreground service**: declare **Location** type; short description that the FGS keeps injecting developer-selected mock coordinates while the user explicitly runs a session, with a persistent notification and Stop.
-3. **Data Safety**: mirror [PRIVACY.md](../PRIVACY.md) — precise location (optional, feature), local favorites/routes/settings, user-initiated Nominatim search + FOSSGIS route planning; no ads/analytics/account backend.
+3. **Data Safety**: mirror [PRIVACY.md](../PRIVACY.md) — precise location (optional, feature), local favorites/routes/settings, user-initiated gateway search/routing, AdMob/UMP on the free tier, Play Billing, Cloudflare backend. Do not claim “no ads / no backend.”
 4. Host a public Privacy Policy URL (current `PRIVACY.md` is inventory only).
 5. Upload signed AAB to Internal Testing; complete target API 36 declarations.
 
@@ -93,19 +93,19 @@ Record results in `DEVICE_MATRIX.md` **Optional soak** table (device, start/end 
 | Service | Current default | SLA | RC policy |
 |---|---|---|---|
 | Map tiles / style | OpenFreeMap Bright/Dark via MapLibre | None | Keep for RC; attribute OSM + OpenFreeMap. If outage: show map error/retry; offline landmarks/coords still work for mock. |
-| Place search | Nominatim (`nominatim.openstreetmap.org`) | None; 1 req/s | Soft viewbox only (no hard `countrycodes`). Document ToS/UA. Swap via `PlaceSearchProviderConfig` if blocked. |
-| Routing | FOSSGIS OSRM demos (`routing.openstreetmap.de`) | None; 1 req/s | Keep for RC demo traffic only. Production / paid traffic → self-hosted OSRM or contract provider via `RoutingProviderConfig`. |
+| Place search | BloomWalk gateway → Geoapify | Free-tier quota | Explicit submit only. Production flags stay false until B01–B04. |
+| Routing | BloomWalk gateway → Geoapify | Free-tier quota; B01 blocks production | No public FOSSGIS fallback. Local perfect-shape and saved routes stay offline. |
 
 ### Decision for 0.1.x RC
 
-- **Ship on public endpoints** with clear in-app “no SLA” copy (already present for search/routing).
-- **Do not** embed API keys in the repo.
-- **Before public scale**: stand up self-hosted tiles (or MapTiler/OpenMapTiles account) + self-hosted Nominatim/Photon + self-hosted OSRM; inject base URLs from local/release config.
-- Treat provider HTTP failures as **network**, not mock-engine failures, in matrix notes.
+- **Do not** call public Nominatim or FOSSGIS demo endpoints in production composition.
+- **Do not** embed API keys, Play service accounts, or receipt private keys in the APK or git.
+- Production `routingEnabled` / `adsEnabled` / `purchasesEnabled` stay false until owner gates close.
+- Treat provider HTTP failures as **network**, not mock-engine failures.
 
 ### Monitoring (lightweight)
 
-Before each Internal Testing upload: curl style URL, Nominatim `Tokyo Station`, and a short FOSSGIS route; record HTTP status in the release PR description.
+Before each Internal Testing upload: check OpenFreeMap style URL and the gateway `/v1/config` kill switches. Do not spend live Geoapify credits just to prove CI.
 
 ## 5. Exit criteria for claiming RC
 
@@ -115,3 +115,20 @@ Before each Internal Testing upload: curl style URL, Nominatim `Tokyo Station`, 
 - [ ] ≥ 1 hour soak recorded; 8 hour soak recorded or explicitly deferred with owner
 - [ ] Play FGS + Data Safety draft text ready for account owner
 - [ ] Provider strategy section reviewed; self-host ticket filed if public launch is intended
+
+## 6. 16 KB page size (64-bit native libraries)
+
+Play's 16 KB page-size requirement applies to **64-bit** native libraries, not 32-bit ABIs ([S14](https://developer.android.com/guide/practices/page-sizes)).
+
+Evidence from a local **unsigned** AAB (not a signed Play artifact):
+
+| ABI | `libmaplibre.so` ELF LOAD align | 16 KB |
+|---|---|---|
+| `arm64-v8a` | 16384 | OK |
+| `x86_64` | 16384 | OK |
+| `armeabi-v7a` | 4096 | N/A (32-bit) |
+| `x86` | 4096 | N/A (32-bit) |
+
+**Packaging decision:** release/Play builds ship **64-bit only** (`arm64-v8a`, `x86_64`) via `ndk.abiFilters` on the `release` build type. That keeps 16 KB-aligned 64-bit MapLibre and omits 32-bit MapLibre that cannot satisfy a 16 KB ELF align. Debug/instrumentation is unfiltered so local and CI `x86_64` emulators still work. `packaging.jniLibs.useLegacyPackaging = false` so native libs stay uncompressed, which Play requires for 16 KB extraction.
+
+This does **not** close B10. Recheck ELF align on a signed Play AAB before upload.
