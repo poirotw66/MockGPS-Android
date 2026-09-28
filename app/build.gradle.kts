@@ -19,6 +19,39 @@ android {
         versionName = "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        val gatewayBaseUrl = providers.gradleProperty("BLOOMWALK_GATEWAY_BASE_URL")
+            .orElse(providers.environmentVariable("BLOOMWALK_GATEWAY_BASE_URL"))
+            .orElse("https://bloomwalk-gateway.example.invalid")
+            .get()
+        val admobAppId = providers.gradleProperty("BLOOMWALK_ADMOB_APP_ID")
+            .orElse(providers.environmentVariable("BLOOMWALK_ADMOB_APP_ID"))
+            .orElse("ca-app-pub-3940256099942544~3347511713")
+            .get()
+        val admobBannerUnitId = providers.gradleProperty("BLOOMWALK_ADMOB_BANNER_UNIT_ID")
+            .orElse(providers.environmentVariable("BLOOMWALK_ADMOB_BANNER_UNIT_ID"))
+            .orElse("ca-app-pub-3940256099942544/9214589741")
+            .get()
+        val privacyPolicyUrl = providers.gradleProperty("BLOOMWALK_PRIVACY_POLICY_URL")
+            .orElse(providers.environmentVariable("BLOOMWALK_PRIVACY_POLICY_URL"))
+            .orElse("https://privacy.example.invalid")
+            .get()
+        val supportUrl = providers.gradleProperty("BLOOMWALK_SUPPORT_URL")
+            .orElse(providers.environmentVariable("BLOOMWALK_SUPPORT_URL"))
+            .orElse("https://support.example.invalid")
+            .get()
+        val receiptPublicKeysJson = providers.gradleProperty("BLOOMWALK_RECEIPT_PUBLIC_KEYS_JSON")
+            .orElse(providers.environmentVariable("BLOOMWALK_RECEIPT_PUBLIC_KEYS_JSON"))
+            .orElse("[]")
+            .get()
+        buildConfigField("String", "GATEWAY_BASE_URL", "\"$gatewayBaseUrl\"")
+        buildConfigField("String", "ADMOB_APP_ID", "\"$admobAppId\"")
+        buildConfigField("String", "ADMOB_BANNER_UNIT_ID", "\"$admobBannerUnitId\"")
+        buildConfigField("String", "BILLING_PRODUCT_ID", "\"remove_ads_lifetime\"")
+        buildConfigField("String", "PRIVACY_POLICY_URL", "\"$privacyPolicyUrl\"")
+        buildConfigField("String", "SUPPORT_URL", "\"$supportUrl\"")
+        buildConfigField("String", "RECEIPT_PUBLIC_KEYS_JSON", "\"${receiptPublicKeysJson.replace("\"", "\\\"")}\"")
+        buildConfigField("String", "API_CONTRACT_REVISION", "\"v1\"")
+        manifestPlaceholders["admobAppId"] = admobAppId
         javaCompileOptions {
             annotationProcessorOptions {
                 arguments["room.schemaLocation"] = "$projectDir/schemas"
@@ -37,10 +70,20 @@ android {
         }
     }
 
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             signingConfig = signingConfigs.findByName("release")
+            ndk {
+                // Play 16 KB applies to 64-bit native libs. Omit 32-bit MapLibre (4 KB ELF).
+                abiFilters += listOf("arm64-v8a", "x86_64")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
@@ -59,6 +102,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     sourceSets {
@@ -87,6 +131,9 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.billing.ktx)
+    implementation(libs.play.services.ads)
+    implementation(libs.user.messaging.platform)
 
     ksp(libs.androidx.room.compiler)
 
@@ -103,4 +150,40 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui)
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.compose.ui.tooling)
+}
+
+tasks.register("validateReleaseConfig") {
+    group = "verification"
+    description = "Rejects upload-unsafe release configuration; unsigned CI builds stay allowed."
+    doLast {
+        val upload = providers.environmentVariable("BLOOMWALK_RELEASE_UPLOAD").orNull == "true"
+        val gateway = providers.environmentVariable("BLOOMWALK_GATEWAY_BASE_URL")
+            .orElse("https://bloomwalk-gateway.example.invalid").get()
+        val privacy = providers.environmentVariable("BLOOMWALK_PRIVACY_POLICY_URL")
+            .orElse("https://privacy.example.invalid").get()
+        val support = providers.environmentVariable("BLOOMWALK_SUPPORT_URL")
+            .orElse("https://support.example.invalid").get()
+        val admobApp = providers.environmentVariable("BLOOMWALK_ADMOB_APP_ID")
+            .orElse("ca-app-pub-3940256099942544~3347511713").get()
+        val banner = providers.environmentVariable("BLOOMWALK_ADMOB_BANNER_UNIT_ID")
+            .orElse("ca-app-pub-3940256099942544/9214589741").get()
+        val usesInvalid = listOf(gateway, privacy, support).any { it.contains(".invalid") || it.contains(".example") }
+        val usesTestAds = admobApp.contains("3940256099942544") || banner.contains("3940256099942544")
+        val empty = listOf(gateway, privacy, support, admobApp, banner).any { it.isBlank() }
+        val debugSigning = releaseKeystorePath == null
+        val manifest = file("src/main/AndroidManifest.xml").readText()
+        val allowsCleartext = Regex("""android:usesCleartextTraffic\s*=\s*"true"""").containsMatchIn(manifest)
+        if (!upload) {
+            logger.lifecycle(
+                "Release configuration check: UNSIGNED_NOT_UPLOADABLE " +
+                    "(invalidUrls=$usesInvalid testAds=$usesTestAds empty=$empty debugSigning=$debugSigning cleartext=$allowsCleartext)",
+            )
+            return@doLast
+        }
+        require(!usesInvalid) { "Upload release rejects .invalid or example URLs." }
+        require(!usesTestAds) { "Upload release rejects AdMob test IDs." }
+        require(!empty) { "Upload release rejects empty public config." }
+        require(!debugSigning) { "Upload release rejects debug signing." }
+        require(!allowsCleartext) { "Upload release rejects debug cleartext traffic." }
+    }
 }

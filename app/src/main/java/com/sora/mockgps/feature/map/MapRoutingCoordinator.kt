@@ -10,7 +10,14 @@ import com.sora.mockgps.feature.routes.domain.RouteRepository
 import com.sora.mockgps.route.PlannedRoute
 import com.sora.mockgps.route.RoutePolyline
 import com.sora.mockgps.route.RouteTransportMode
+import com.sora.mockgps.route.RoutingNetworkException
+import com.sora.mockgps.route.RoutingNoRouteException
+import com.sora.mockgps.route.RoutingOutOfScopeException
+import com.sora.mockgps.route.RoutingQuotaException
 import com.sora.mockgps.route.RoutingRepository
+import com.sora.mockgps.route.RoutingServiceDisabledException
+import com.sora.mockgps.route.RoutingTooComplexException
+import com.sora.mockgps.route.RoutingUnavailableException
 import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -530,12 +537,7 @@ internal class MapRoutingCoordinator(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Throwable) {
-                val message = when (failure) {
-                    is com.sora.mockgps.route.RoutingNetworkException,
-                    is com.sora.mockgps.route.RoutingUnavailableException,
-                    -> application.getString(R.string.route_error_network)
-                    else -> application.getString(R.string.route_error_unavailable)
-                }
+                val message = application.getString(routingUserMessageId(failure))
                 uiState.update { current ->
                     if (current.isRoutePlanningMode &&
                         current.routeOrigin == origin && current.routeDestination == destination &&
@@ -570,7 +572,12 @@ internal class MapRoutingCoordinator(
                     if (current.isRoutePlanningMode && current.isPlanningRoute &&
                         current.activeRouteName == routeName
                     ) {
-                        AutomaticJourneyStateReducer.success(current, result.route, result.journey)
+                        AutomaticJourneyStateReducer.success(
+                            current,
+                            result.route,
+                            result.journey,
+                            result.exceededTargetDueToAdmissionFailure,
+                        )
                     } else {
                         current
                     }
@@ -752,6 +759,18 @@ internal class MapRoutingCoordinator(
 }
 
 private fun routeDistance(points: List<Coordinate>): Double = RoutePolyline(points).totalDistanceMeters
+
+internal fun routingUserMessageId(failure: Throwable): Int = when (failure) {
+    is RoutingNoRouteException -> R.string.route_error_no_route
+    is RoutingTooComplexException -> R.string.route_error_too_complex
+    is RoutingOutOfScopeException -> R.string.route_error_out_of_scope
+    is RoutingQuotaException -> R.string.route_error_quota
+    is RoutingServiceDisabledException -> R.string.route_error_disabled
+    is RoutingNetworkException,
+    is RoutingUnavailableException,
+    -> R.string.route_error_network
+    else -> R.string.route_error_unavailable
+}
 
 private fun String.safeFileName(extension: String): String {
     val base = trim()

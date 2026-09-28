@@ -26,15 +26,16 @@ class PlaceSearchRepositoryTest {
             baseUrl = "https://nominatim.openstreetmap.org/search",
             query = "101",
             bias = PlaceSearchBias(
-                countryCodes = "tw",
-                viewbox = "121.2,25.4,121.9,24.7",
+                latitude = 25.05,
+                longitude = 121.55,
+                language = "zh-TW",
             ),
         )
         assertTrue(url.contains("q=101"))
-        assertTrue(url.contains("countrycodes=tw"))
         assertTrue(url.contains("viewbox="))
         assertTrue(url.contains("bounded=0"))
         assertTrue(url.contains("format=jsonv2"))
+        assertFalse(url.contains("countrycodes="))
     }
 
     @Test fun `nominatim url without bias stays minimal`() {
@@ -58,14 +59,14 @@ class PlaceSearchRepositoryTest {
         assertEquals(24.68, parts[3].toDouble(), 1e-9)
     }
 
-    @Test fun `place search bias keeps soft viewbox without hard country filter`() {
+    @Test fun `place search bias uses map center and language without country filter`() {
         val bias = buildPlaceSearchBias(
             cameraCenter = Coordinate(25.03, 121.5),
             acceptLanguage = "zh-TW",
         )
-        assertEquals(null, bias.countryCodes)
-        assertEquals(viewboxAround(Coordinate(25.03, 121.5)), bias.viewbox)
-        assertEquals("zh-TW", bias.acceptLanguage)
+        assertEquals(25.03, bias.latitude, 1e-9)
+        assertEquals(121.5, bias.longitude, 1e-9)
+        assertEquals("zh-TW", bias.language)
     }
 
     @Test fun `merge keeps landmarks first and drops near-duplicate remotes`() {
@@ -86,6 +87,17 @@ class PlaceSearchRepositoryTest {
         )
         val merged = mergePlaceSearchResults(listOf(landmark), listOf(nearDuplicate, other))
         assertEquals(listOf(landmark, other), merged)
+    }
+
+    @Test fun `explicit remote query requires two to two hundred code points`() {
+        assertFalse(isExplicitSearchQuerySubmittable(""))
+        assertFalse(isExplicitSearchQuerySubmittable("a"))
+        assertTrue(isExplicitSearchQuerySubmittable("台北"))
+        assertTrue(isExplicitSearchQuerySubmittable("台".repeat(200)))
+        assertFalse(isExplicitSearchQuerySubmittable("台".repeat(201)))
+        assertEquals(1, placeQueryCodePointCount("😀"))
+        assertTrue(isExplicitSearchQuerySubmittable("😀".repeat(200)))
+        assertFalse(isExplicitSearchQuerySubmittable("😀".repeat(201)))
     }
 
     @Test fun `nickname heuristic flags short and numeric queries`() {

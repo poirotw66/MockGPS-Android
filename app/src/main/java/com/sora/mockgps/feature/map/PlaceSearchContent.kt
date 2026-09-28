@@ -14,6 +14,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -22,14 +23,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.sora.mockgps.R
+import com.sora.mockgps.core.network.AttributionLink
+import com.sora.mockgps.feature.search.PlaceSearchPhase
 import com.sora.mockgps.feature.search.PlaceSearchResult
 import com.sora.mockgps.feature.search.PlaceSearchSource
+import com.sora.mockgps.feature.search.isExplicitSearchQuerySubmittable
 import com.sora.mockgps.feature.search.looksLikeLandmarkNickname
+import com.sora.mockgps.feature.search.parseCoordinateSearchQuery
 
 @Composable
 internal fun PlaceSearchContent(
@@ -39,16 +45,30 @@ internal fun PlaceSearchContent(
     error: PlaceSearchError?,
     onQueryChanged: (String) -> Unit,
     onPlaceSelected: (PlaceSearchResult) -> Unit,
+    phase: PlaceSearchPhase = if (isSearching) PlaceSearchPhase.Submitting else PlaceSearchPhase.LocalOnly,
+    attribution: List<AttributionLink> = emptyList(),
+    submitEnabled: Boolean = !isSearching,
+    onSubmit: () -> Unit = {},
 ) {
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val uriHandler = LocalUriHandler.current
     val coordinateResults = results.filter { it.source == PlaceSearchSource.Coordinate }
     val landmarkResults = results.filter { it.source == PlaceSearchSource.Landmark }
     val remoteResults = results.filter { it.source == PlaceSearchSource.Remote }
-    val showNicknameHint = !isSearching &&
+    val canSubmit = submitEnabled &&
+        isExplicitSearchQuerySubmittable(query) &&
+        parseCoordinateSearchQuery(query) == null
+    val showNicknameHint = phase == PlaceSearchPhase.LocalOnly &&
         looksLikeLandmarkNickname(query) &&
         coordinateResults.isEmpty() &&
         landmarkResults.isEmpty()
+    fun submitSearch() {
+        if (!canSubmit) return
+        keyboardController?.hide()
+        focusManager.clearFocus()
+        onSubmit()
+    }
     OutlinedTextField(
         value = query,
         onValueChange = onQueryChanged,
@@ -68,16 +88,18 @@ internal fun PlaceSearchContent(
             null
         },
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-        keyboardActions = KeyboardActions(
-            onSearch = {
-                keyboardController?.hide()
-                focusManager.clearFocus()
-            },
-        ),
+        keyboardActions = KeyboardActions(onSearch = { submitSearch() }),
         modifier = Modifier.fillMaxWidth(),
         singleLine = true,
     )
-    if (isSearching) {
+    OutlinedButton(
+        onClick = { submitSearch() },
+        enabled = canSubmit,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(stringResource(R.string.action_search_online))
+    }
+    if (phase == PlaceSearchPhase.Submitting) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -90,9 +112,20 @@ internal fun PlaceSearchContent(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-    } else if (query.trim().length >= 2 && results.isEmpty() && error == null) {
+    } else if (phase == PlaceSearchPhase.EmptyRemoteResults) {
         Text(
             stringResource(R.string.place_search_empty),
+            modifier = Modifier.padding(vertical = 8.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    } else if (phase == PlaceSearchPhase.LocalOnly &&
+        isExplicitSearchQuerySubmittable(query) &&
+        coordinateResults.isEmpty() &&
+        error == null
+    ) {
+        Text(
+            stringResource(R.string.place_search_submit_hint),
             modifier = Modifier.padding(vertical = 8.dp),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -103,10 +136,14 @@ internal fun PlaceSearchContent(
         Text(
             stringResource(
                 when {
-                    hasOfflineHits -> R.string.place_search_remote_unavailable_offline
-                    searchError == PlaceSearchError.Network -> R.string.place_search_error_network
+                    searchError == PlaceSearchError.GlobalQuota -> R.string.place_search_error_quota
                     searchError == PlaceSearchError.RateLimited -> R.string.place_search_error_rate
+                    searchError == PlaceSearchError.RequestTooLarge -> R.string.place_search_error_too_large
+                    searchError == PlaceSearchError.InvalidRequest -> R.string.place_search_error_invalid
                     searchError == PlaceSearchError.InvalidResponse -> R.string.place_search_error_invalid
+                    hasOfflineHits -> R.string.place_search_remote_unavailable_offline
+                    searchError == PlaceSearchError.Unavailable -> R.string.place_search_remote_unavailable_offline
+                    searchError == PlaceSearchError.Network -> R.string.place_search_error_network
                     else -> R.string.place_search_error_network
                 },
             ),
@@ -134,6 +171,16 @@ internal fun PlaceSearchContent(
         PlaceSearchSectionHeader(stringResource(R.string.place_search_section_places))
         remoteResults.forEach { result ->
             PlaceSearchResultButton(result, onPlaceSelected)
+        }
+    }
+    if (attribution.isNotEmpty() && remoteResults.isNotEmpty()) {
+        attribution.forEach { link ->
+            TextButton(
+                onClick = { uriHandler.openUri(link.url) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(link.label, style = MaterialTheme.typography.labelSmall)
+            }
         }
     }
     if (showNicknameHint) {
@@ -165,6 +212,7 @@ private fun PlaceSearchResultButton(
         onClick = { onPlaceSelected(result) },
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Text(result.name, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        val label = if (result.address.isNullOrBlank()) result.name else "${result.name}\n${result.address}"
+        Text(label, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }

@@ -67,9 +67,12 @@ class BicycleRoutingRepositoryTest {
 
     @Test
     fun `transport modes select matching FOSSGIS profiles`() {
-        assertEquals(RoutingProviderConfig.FOSSGIS_FOOT_BASE_URL, RouteTransportMode.Walk.providerBaseUrl)
-        assertEquals(RoutingProviderConfig.FOSSGIS_BICYCLE_BASE_URL, RouteTransportMode.Bicycle.providerBaseUrl)
-        assertEquals(RoutingProviderConfig.FOSSGIS_DRIVING_BASE_URL, RouteTransportMode.Drive.providerBaseUrl)
+        assertEquals(RoutingProviderConfig.FOSSGIS_FOOT_BASE_URL, RouteTransportMode.Walk.fossgisProfileBaseUrl())
+        assertEquals(RoutingProviderConfig.FOSSGIS_BICYCLE_BASE_URL, RouteTransportMode.Bicycle.fossgisProfileBaseUrl())
+        assertEquals(RoutingProviderConfig.FOSSGIS_DRIVING_BASE_URL, RouteTransportMode.Drive.fossgisProfileBaseUrl())
+        assertEquals("walk", RouteTransportMode.Walk.wireName)
+        assertEquals("bicycle", RouteTransportMode.Bicycle.wireName)
+        assertEquals("drive", RouteTransportMode.Drive.wireName)
     }
 
     @Test

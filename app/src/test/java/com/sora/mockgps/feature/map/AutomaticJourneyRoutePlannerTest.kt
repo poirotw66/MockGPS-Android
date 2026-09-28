@@ -4,6 +4,7 @@ import com.sora.mockgps.core.model.Coordinate
 import com.sora.mockgps.route.PlannedRoute
 import com.sora.mockgps.route.RoutePolyline
 import com.sora.mockgps.route.RouteTransportMode
+import com.sora.mockgps.route.RoutingQuotaException
 import com.sora.mockgps.route.RoutingRepository
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -96,6 +97,55 @@ class AutomaticJourneyRoutePlannerTest {
             JourneyPlanner.estimatedShapeRadiusMeters(result.journey) <
                 JourneyPlanner.estimatedShapeRadiusMeters(journey),
         )
+        assertFalse(result.exceededTargetDueToAdmissionFailure)
+    }
+
+    @Test
+    fun `quota during later shrink keeps the last valid candidate`() = runBlocking {
+        val repository = QuotaAfterFirstRoutingRepository()
+        val planner = AutomaticJourneyRoutePlanner(repository, Random(19))
+        val options = AutoJourneyOptions(
+            duration = JourneyDuration.Medium,
+            transportMode = RouteTransportMode.Bicycle,
+            routeStyle = AutoJourneyRouteStyle.RoadAdapted,
+        )
+        val journey = planner.generate(options)
+        val target = JourneyPlanner.targetDistanceMeters(options) / 10.0
+
+        val result = planner.planWithinTargetDistance(journey, options.transportMode, target)
+
+        assertEquals(2, repository.planCount)
+        assertTrue(result.exceededTargetDueToAdmissionFailure)
+        assertTrue(result.route.distanceMeters > 0.0)
+    }
+
+    @Test
+    fun `road adapted planning stops after four admitted attempts`() = runBlocking {
+        val repository = InflatingRoutingRepository(inflationFactor = 50.0)
+        val planner = AutomaticJourneyRoutePlanner(repository, Random(31))
+        val options = AutoJourneyOptions(
+            duration = JourneyDuration.Medium,
+            transportMode = RouteTransportMode.Bicycle,
+            routeStyle = AutoJourneyRouteStyle.RoadAdapted,
+        )
+        val journey = planner.generate(options)
+        val target = JourneyPlanner.targetDistanceMeters(options)
+
+        val result = planner.planWithinTargetDistance(journey, options.transportMode, target)
+
+        assertEquals(4, repository.planCount)
+        assertTrue(result.route.distanceMeters > 0.0)
+    }
+
+    @Test
+    fun `first planning failure does not invent a successful road result`() = runBlocking {
+        val repository = RecordingRoutingRepository(failure = RoutingQuotaException("GLOBAL_QUOTA_EXHAUSTED"))
+        val planner = AutomaticJourneyRoutePlanner(repository, Random(23))
+        val journey = planner.generate(AutoJourneyOptions())
+        val failure = runCatching {
+            planner.planWithinTargetDistance(journey, RouteTransportMode.Bicycle, 1_000.0)
+        }.exceptionOrNull()
+        assertTrue(failure is RoutingQuotaException)
     }
 
     @Test
@@ -157,6 +207,20 @@ class AutomaticJourneyRoutePlannerTest {
                 distanceMeters = geometric * inflationFactor,
                 providerDurationSeconds = 0.0,
             )
+        }
+    }
+
+    private class QuotaAfterFirstRoutingRepository : RoutingRepository {
+        var planCount: Int = 0
+
+        override suspend fun planRoute(
+            waypoints: List<Coordinate>,
+            transportMode: RouteTransportMode,
+        ): PlannedRoute {
+            planCount += 1
+            if (planCount > 1) throw RoutingQuotaException("GLOBAL_QUOTA_EXHAUSTED")
+            val geometric = RoutePolyline(waypoints).totalDistanceMeters
+            return PlannedRoute(waypoints, geometric * 3.000, 0.0)
         }
     }
 }

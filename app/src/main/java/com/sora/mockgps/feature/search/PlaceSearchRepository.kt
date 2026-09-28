@@ -1,44 +1,21 @@
 package com.sora.mockgps.feature.search
 
-import com.sora.mockgps.core.model.Coordinate
 import com.sora.mockgps.core.io.readBoundedUtf8
+import com.sora.mockgps.core.model.Coordinate
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URL
 import java.net.URLEncoder
-import kotlin.math.abs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.util.Locale
 import org.json.JSONArray
 
-enum class PlaceSearchSource { Coordinate, Landmark, Remote }
-
-data class PlaceSearchResult(
-    val name: String,
-    val coordinate: Coordinate,
-    val source: PlaceSearchSource = PlaceSearchSource.Remote,
-)
-
-/** Soft geographic bias for Nominatim (viewbox uses bounded=0). */
-data class PlaceSearchBias(
-    val countryCodes: String? = null,
-    val viewbox: String? = null,
-    val acceptLanguage: String? = null,
-)
-
-sealed class PlaceSearchException(message: String, cause: Throwable? = null) : Exception(message, cause) {
-    class Network(cause: Throwable? = null) : PlaceSearchException("network", cause)
-    class RateLimited : PlaceSearchException("rate_limited")
-    class InvalidResponse(cause: Throwable? = null) : PlaceSearchException("invalid_response", cause)
-}
-
 interface PlaceSearchRepository {
-    suspend fun search(query: String, bias: PlaceSearchBias? = null): List<PlaceSearchResult>
+    suspend fun search(query: String, bias: PlaceSearchBias? = null): PlaceSearchPage
 }
 
 data class PlaceSearchProviderConfig(
@@ -69,13 +46,19 @@ class RequestRateLimiter(private val minimumIntervalMillis: Long, private val no
     }
 }
 
+/**
+ * Legacy public Nominatim adapter retained for fixture tests only.
+ * Production composition must inject [GatewayPlaceSearchRepository].
+ */
 class NominatimPlaceSearchRepository(
     private val config: PlaceSearchProviderConfig = PlaceSearchProviderConfig(),
     private val limiter: RequestRateLimiter = RequestRateLimiter(config.requestIntervalMillis),
 ) : PlaceSearchRepository {
-    override suspend fun search(query: String, bias: PlaceSearchBias?): List<PlaceSearchResult> = withContext(Dispatchers.IO) {
-        val normalized = query.trim()
-        if (normalized.length < 2) return@withContext emptyList()
+    override suspend fun search(query: String, bias: PlaceSearchBias?): PlaceSearchPage = withContext(Dispatchers.IO) {
+        val normalized = normalizePlaceQuery(query)
+        if (!isExplicitSearchQuerySubmittable(normalized)) {
+            return@withContext PlaceSearchPage(emptyList())
+        }
         limiter.awaitTurn()
         val endpoint = buildNominatimSearchUrl(config.baseUrl, normalized, bias)
         val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
@@ -84,13 +67,15 @@ class NominatimPlaceSearchRepository(
             readTimeout = 12_000
             setRequestProperty("Accept", "application/json")
             setRequestProperty("User-Agent", config.userAgent)
-            bias?.acceptLanguage?.takeIf { it.isNotBlank() }?.let { language ->
+            bias?.language?.takeIf { it.isNotBlank() }?.let { language ->
                 setRequestProperty("Accept-Language", language)
             }
         }
         try {
             when (val status = connection.responseCode) {
-                in 200..299 -> parseNominatimResults(connection.inputStream.readBoundedUtf8(config.maxResponseBytes))
+                in 200..299 -> PlaceSearchPage(
+                    results = parseNominatimResults(connection.inputStream.readBoundedUtf8(config.maxResponseBytes)),
+                )
                 429 -> throw PlaceSearchException.RateLimited()
                 else -> throw PlaceSearchException.Network(IOException("HTTP $status"))
             }
@@ -114,40 +99,13 @@ internal fun buildNominatimSearchUrl(
 ): String {
     val encoded = URLEncoder.encode(query.trim(), Charsets.UTF_8.name())
     val builder = StringBuilder("$baseUrl?format=jsonv2&limit=$limit&q=$encoded")
-    bias?.countryCodes?.takeIf { it.isNotBlank() }?.let { codes ->
-        builder.append("&countrycodes=").append(URLEncoder.encode(codes, Charsets.UTF_8.name()))
-    }
-    bias?.viewbox?.takeIf { it.isNotBlank() }?.let { box ->
-        builder.append("&viewbox=").append(URLEncoder.encode(box, Charsets.UTF_8.name()))
+    bias?.let { searchBias ->
+        val viewbox = viewboxAround(Coordinate(searchBias.latitude, searchBias.longitude))
+        builder.append("&viewbox=").append(URLEncoder.encode(viewbox, Charsets.UTF_8.name()))
         builder.append("&bounded=0")
     }
     return builder.toString()
 }
-
-/**
- * Parses "lat, lon" / "lat lon" / "lon, lat" when one value is outside latitude range.
- * Returns null when the query is not exactly two numeric components in valid ranges.
- */
-internal fun parseCoordinateSearchQuery(query: String): Coordinate? {
-    val parts = query.trim().split(Regex("[,\\s;]+")).filter { it.isNotBlank() }
-    if (parts.size != 2) return null
-    val first = parts[0].toDoubleOrNull() ?: return null
-    val second = parts[1].toDoubleOrNull() ?: return null
-    val (latitude, longitude) = if (abs(first) > 90.0 && abs(second) <= 90.0) {
-        second to first
-    } else {
-        first to second
-    }
-    return Coordinate(latitude, longitude).takeIf {
-        it.latitude.isFinite() && it.latitude in -90.0..90.0 &&
-            it.longitude.isFinite() && it.longitude in -180.0..180.0
-    }
-}
-
-internal fun formatCoordinateSearchLabel(coordinate: Coordinate): String =
-    "${coordinate.latitude.formatSearchCoordinate()}, ${coordinate.longitude.formatSearchCoordinate()}"
-
-private fun Double.formatSearchCoordinate(): String = String.format(Locale.US, "%.6f", this)
 
 /** Soft viewbox around [center]; Nominatim order is left,top,right,bottom. */
 internal fun viewboxAround(center: Coordinate, deltaDegrees: Double = 0.35): String {
@@ -156,43 +114,6 @@ internal fun viewboxAround(center: Coordinate, deltaDegrees: Double = 0.35): Str
     val top = center.latitude + deltaDegrees
     val bottom = center.latitude - deltaDegrees
     return "$left,$top,$right,$bottom"
-}
-
-/**
- * Soft geographic bias for remote place search.
- * Do not set [PlaceSearchBias.countryCodes]: Nominatim treats it as a hard filter and
- * drops international hits (e.g. "Tokyo Station" while the camera is in Taiwan).
- */
-internal fun buildPlaceSearchBias(
-    cameraCenter: Coordinate,
-    acceptLanguage: String?,
-): PlaceSearchBias = PlaceSearchBias(
-    countryCodes = null,
-    viewbox = viewboxAround(cameraCenter),
-    acceptLanguage = acceptLanguage?.takeIf { it.isNotBlank() },
-)
-
-/** Local landmarks first; drop remote hits that roughly duplicate a landmark coordinate. */
-internal fun mergePlaceSearchResults(
-    local: List<PlaceSearchResult>,
-    remote: List<PlaceSearchResult>,
-): List<PlaceSearchResult> {
-    val filteredRemote = remote.filter { remoteHit ->
-        local.none { roughlySameCoordinate(it.coordinate, remoteHit.coordinate) }
-    }
-    return local + filteredRemote
-}
-
-private fun roughlySameCoordinate(first: Coordinate, second: Coordinate): Boolean =
-    abs(first.latitude - second.latitude) < 0.002 &&
-        abs(first.longitude - second.longitude) < 0.002
-
-/** Short or digit-heavy queries often intend a landmark nickname. */
-internal fun looksLikeLandmarkNickname(query: String): Boolean {
-    val normalized = query.trim()
-    if (normalized.length < 2) return false
-    if (normalized.all { it.isDigit() }) return true
-    return normalized.length <= 4
 }
 
 internal fun parseNominatimResults(body: String): List<PlaceSearchResult> = try {

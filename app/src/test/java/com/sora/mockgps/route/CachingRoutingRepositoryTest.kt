@@ -53,6 +53,22 @@ class CachingRoutingRepositoryTest {
     }
 
     @Test
+    fun `NO_ROUTE is not replaced by a stale cached route`() = runBlocking {
+        val clock = MutableClock(0L)
+        val delegate = FakeRoutingRepository { _ -> route }
+        val repository = CachingRoutingRepository(
+            delegate = delegate,
+            policy = RoutingCachePolicy(freshTtlMillis = 10L, maximumEntries = 2),
+            clock = clock,
+        )
+        repository.planBicycleRoute(origin, destination)
+        clock.now = 11L
+        delegate.response = { throw RoutingNoRouteException() }
+        val failure = runCatching { repository.planBicycleRoute(origin, destination) }.exceptionOrNull()
+        assertTrue(failure is RoutingNoRouteException)
+    }
+
+    @Test
     fun `network failure without cache exposes an unavailable routing error`() = runBlocking {
         val delegate = FakeRoutingRepository { _ -> throw RoutingNetworkException("offline") }
         val repository = CachingRoutingRepository(delegate)
@@ -70,19 +86,21 @@ class CachingRoutingRepositoryTest {
     }
 
     @Test
-    fun `cache key keeps provider and waypoint order and bounded cache evicts least recently used`() {
-        val provider = RoutingProviderConfig(baseUrl = "https://one.example/route/")
-        val otherProvider = RoutingProviderConfig(baseUrl = "https://two.example/route/")
-        val forward = RoutingCacheKey.create(provider, listOf(origin, via, destination))
-        val reversed = RoutingCacheKey.create(provider, listOf(destination, via, origin))
-        val other = RoutingCacheKey.create(otherProvider, listOf(origin, via, destination))
+    fun `cache key keeps provider revision mode and waypoint order and bounded cache evicts least recently used`() {
+        val identity = RoutingCacheIdentity(contractRevision = "v1", providerRevision = "geoapify-v1")
+        val otherIdentity = RoutingCacheIdentity(contractRevision = "v1", providerRevision = "other-v1")
+        val forward = RoutingCacheKey.create(identity, RouteTransportMode.Bicycle, listOf(origin, via, destination))
+        val reversed = RoutingCacheKey.create(identity, RouteTransportMode.Bicycle, listOf(destination, via, origin))
+        val otherProvider = RoutingCacheKey.create(otherIdentity, RouteTransportMode.Bicycle, listOf(origin, via, destination))
+        val otherMode = RoutingCacheKey.create(identity, RouteTransportMode.Walk, listOf(origin, via, destination))
         assertFalse(forward == reversed)
-        assertFalse(forward == other)
+        assertFalse(forward == otherProvider)
+        assertFalse(forward == otherMode)
 
         val cache = InMemoryRoutingCache(maximumEntries = 2)
-        val first = RoutingCacheKey.create(provider, listOf(origin, destination))
-        val second = RoutingCacheKey.create(provider, listOf(origin, via))
-        val third = RoutingCacheKey.create(provider, listOf(via, destination))
+        val first = RoutingCacheKey.create(identity, RouteTransportMode.Bicycle, listOf(origin, destination))
+        val second = RoutingCacheKey.create(identity, RouteTransportMode.Bicycle, listOf(origin, via))
+        val third = RoutingCacheKey.create(identity, RouteTransportMode.Bicycle, listOf(via, destination))
         cache.put(first, CachedRoute(route, 0L))
         cache.put(second, CachedRoute(route, 0L))
         cache.get(first) // first is now most recently used, so second should be evicted.
@@ -91,6 +109,21 @@ class CachingRoutingRepositoryTest {
         assertTrue(cache.get(first) != null)
         assertEquals(null, cache.get(second))
         assertTrue(cache.get(third) != null)
+    }
+
+    @Test
+    fun `negative clock age is treated as zero and stays fresh`() = runBlocking {
+        val clock = MutableClock(5_000L)
+        val delegate = FakeRoutingRepository { _ -> route }
+        val repository = CachingRoutingRepository(
+            delegate = delegate,
+            policy = RoutingCachePolicy(freshTtlMillis = 1_000L, maximumEntries = 2),
+            clock = clock,
+        )
+        repository.planBicycleRoute(origin, destination)
+        clock.now = 0L
+        repository.planBicycleRoute(origin, destination)
+        assertEquals(1, delegate.calls)
     }
 
     private class MutableClock(var now: Long) : RoutingCacheClock {

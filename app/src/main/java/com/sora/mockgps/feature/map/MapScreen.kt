@@ -15,7 +15,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -55,10 +57,22 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.currentStateAsState
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sora.mockgps.R
+import com.sora.mockgps.BloomWalkApplication
+import com.sora.mockgps.BuildConfig
 import com.sora.mockgps.core.model.Coordinate
+import com.sora.mockgps.monetization.ads.AdaptiveBanner
+import com.sora.mockgps.monetization.ads.AdsAction
+import com.sora.mockgps.monetization.ads.AdsEligibility
+import com.sora.mockgps.monetization.entitlement.EntitlementSnapshot
+import com.sora.mockgps.monetization.entitlement.EntitlementState
+import com.sora.mockgps.monetization.ui.AboutAndPrivacyDialog
+import com.sora.mockgps.monetization.ui.RemoveAdsDialog
 import com.sora.mockgps.feature.favorites.domain.FavoriteLocation
 import com.sora.mockgps.feature.routes.domain.SavedRouteSummary
 import com.sora.mockgps.route.JoystickSpeed
@@ -79,7 +93,9 @@ import com.sora.mockgps.ui.theme.BloomWalkSage
 import java.util.Locale
 import kotlin.math.cos
 import kotlin.math.log2
+import com.google.android.gms.ads.MobileAds
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonArray
@@ -157,6 +173,17 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     var joystickMagnitude by rememberSaveable { mutableFloatStateOf(0f) }
     var lastJoystickBearing by rememberSaveable { mutableFloatStateOf(0f) }
     var joystickMode by rememberSaveable { mutableStateOf(false) }
+    var showRemoveAds by remember { mutableStateOf(false) }
+    var showAboutPrivacy by remember { mutableStateOf(false) }
+    val monetization = (context.applicationContext as? BloomWalkApplication)?.monetization
+    val emptyEntitlement = remember { MutableStateFlow(EntitlementSnapshot()) }
+    val emptyConsent = remember { MutableStateFlow(com.sora.mockgps.monetization.consent.ConsentSnapshot()) }
+    val entitlement by (monetization?.entitlementRepository?.state ?: emptyEntitlement)
+        .collectAsStateWithLifecycle()
+    val consent by (monetization?.consentRepository?.snapshot ?: emptyConsent)
+        .collectAsStateWithLifecycle()
+    var adsInitialized by remember { mutableStateOf(false) }
+    var bannerLoadToken by remember { mutableStateOf(0) }
 
     val createRouteFileLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream"),
@@ -700,6 +727,39 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             }
         }
         val currentLocationLabel = stringResource(R.string.action_use_current_location)
+        val configuration = LocalConfiguration.current
+        val imeVisible = WindowInsets.ime.asPaddingValues().calculateBottomPadding() > 0.dp
+        val slotEligible = !compactLayout &&
+            maxHeight >= 560.dp &&
+            !imeVisible &&
+            configuration.fontScale <= 1.6f
+        val pausedByInteraction = showJoystick ||
+            isStarting ||
+            showSetupGuide ||
+            showRemoveAds ||
+            showAutoJourney
+        val lifecycleOwner = LocalLifecycleOwner.current
+        val lifecycleState by lifecycleOwner.lifecycle.currentStateAsState()
+        val adsEligibility = AdsEligibility(
+            activityResumed = lifecycleState.isAtLeast(Lifecycle.State.RESUMED),
+            entitlement = entitlement.state,
+            adsEnabled = uiState.remoteAdsEnabled,
+            canRequestAds = consent.canRequestAds,
+            slotEligible = slotEligible,
+            pausedByInteraction = pausedByInteraction,
+        )
+        val adsController = monetization?.adsController
+        val adsAction = remember(adsEligibility, adsController) {
+            adsController?.onEligibilityChanged(adsEligibility) ?: AdsAction.Destroy
+        }
+        val showBanner = adsAction == AdsAction.Load || adsAction == AdsAction.Keep
+        val chromeBottomPadding = if (compactLayout) 24.dp else if (showBanner) 228.dp else 156.dp
+        LaunchedEffect(showBanner) {
+            if (showBanner && !adsInitialized) {
+                adsInitialized = true
+                MobileAds.initialize(context)
+            }
+        }
         if (showJoystick) {
             JoystickOverlay(
                 enabled = true,
@@ -725,7 +785,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     .navigationBarsPadding()
                     .padding(
                         start = 16.dp,
-                        bottom = if (compactLayout) 24.dp else 156.dp,
+                        bottom = chromeBottomPadding,
                     ),
             )
         }
@@ -735,7 +795,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 .navigationBarsPadding()
                 .padding(
                     end = if (compactLayout) (panelMaxWidth + 20.dp) else 16.dp,
-                    bottom = if (compactLayout) 24.dp else 156.dp,
+                    bottom = chromeBottomPadding,
                 ),
             shape = CircleShape,
             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
@@ -760,6 +820,14 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 }
             }
         }
+        Column(
+            modifier = Modifier
+                .align(if (compactLayout) Alignment.CenterEnd else Alignment.BottomCenter)
+                .then(if (compactLayout) Modifier else Modifier.fillMaxWidth())
+                .navigationBarsPadding()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
         MapControlPanel(
             pendingCoordinate = uiState.pendingCoordinate,
             activeCoordinate = activeCoordinate,
@@ -788,14 +856,19 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             plannedRoute = uiState.plannedRoute,
             isPlanningRoute = uiState.isPlanningRoute,
             routeError = uiState.routeError,
+            automaticJourneyMayExceedTarget = uiState.automaticJourneyMayExceedTarget,
             automaticJourneyRecoveryAvailable = uiState.automaticJourneyRecoveryAvailable,
             automaticJourneyRecoveryKind = uiState.automaticJourneyRecoveryKind,
             activeRouteName = uiState.activeRouteName,
             placeSearchQuery = uiState.placeSearchQuery,
             isPlaceSearching = uiState.isPlaceSearching,
+            placeSearchPhase = uiState.placeSearchPhase,
             placeSearchResults = uiState.placeSearchResults,
+            placeSearchAttribution = uiState.placeSearchAttribution,
             placeSearchError = uiState.placeSearchError,
+            placeSearchSubmitEnabled = uiState.placeSearchSubmitEnabled,
             onPlaceSearchQueryChanged = viewModel::onPlaceSearchQueryChanged,
+            onPlaceSearchSubmit = viewModel::submitPlaceSearch,
             onPlaceSelected = { result ->
                 viewModel.selectCoordinate(result.coordinate)
                 coroutineScope.launch { cameraState.animateTo(cameraState.position.copy(target = result.coordinate.toPosition())) }
@@ -810,6 +883,8 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             onOpenDeveloperOptions = { openDeveloperOptions() },
             onOpenBatterySettings = { openBatterySettings() },
             onShowSetupGuide = { showSetupGuide = true },
+            onShowRemoveAds = { showRemoveAds = true },
+            onShowAboutPrivacy = { showAboutPrivacy = true },
             onUseCurrentLocation = goToCurrentLocation,
             onSaveFavorite = { saveFavoriteCoordinate = uiState.pendingCoordinate },
             onShowFavorites = { showFavorites = true },
@@ -917,10 +992,39 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 joystickMode = false
                 context.startService(MockLocationForegroundService.stopIntent(context, routeState.sessionToken))
             },
-            modifier = Modifier
-                .align(if (compactLayout) Alignment.CenterEnd else Alignment.BottomCenter)
-                .navigationBarsPadding()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        AdaptiveBanner(
+            adUnitId = BuildConfig.ADMOB_BANNER_UNIT_ID,
+            visible = showBanner,
+            loadToken = bannerLoadToken,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        }
+    }
+    if (showRemoveAds && monetization != null) {
+        val activity = context as? android.app.Activity
+        RemoveAdsDialog(
+            snapshot = entitlement,
+            onPurchase = {
+                activity?.let { monetization.entitlementRepository.launchPurchase(it) }
+            },
+            onRestore = {
+                coroutineScope.launch { monetization.entitlementRepository.restore() }
+            },
+            onDismiss = { showRemoveAds = false },
+        )
+    }
+    if (showAboutPrivacy) {
+        val activity = context as? android.app.Activity
+        AboutAndPrivacyDialog(
+            privacyPolicyUrl = BuildConfig.PRIVACY_POLICY_URL,
+            supportUrl = BuildConfig.SUPPORT_URL,
+            privacyOptionsRequired = consent.privacyOptionsRequired,
+            onPrivacyOptions = {
+                activity?.let { monetization?.consentRepository?.showPrivacyOptions(it) }
+            },
+            onDismiss = { showAboutPrivacy = false },
         )
     }
 }

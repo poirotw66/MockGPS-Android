@@ -68,6 +68,7 @@ import com.sora.mockgps.core.model.Coordinate
 import com.sora.mockgps.feature.search.PlaceSearchResult
 import com.sora.mockgps.feature.search.PlaceSearchSource
 import com.sora.mockgps.route.PlannedRoute
+import com.sora.mockgps.route.RoutingCacheStatus
 import com.sora.mockgps.service.RouteCompleted
 import com.sora.mockgps.service.RouteFailed
 import com.sora.mockgps.service.RouteProgress
@@ -104,14 +105,19 @@ internal fun MapControlPanel(
     plannedRoute: PlannedRoute?,
     isPlanningRoute: Boolean,
     routeError: String?,
+    automaticJourneyMayExceedTarget: Boolean = false,
     automaticJourneyRecoveryAvailable: Boolean,
     automaticJourneyRecoveryKind: AutomaticJourneyRecoveryKind?,
     activeRouteName: String?,
     placeSearchQuery: String,
     isPlaceSearching: Boolean,
+    placeSearchPhase: com.sora.mockgps.feature.search.PlaceSearchPhase,
     placeSearchResults: List<com.sora.mockgps.feature.search.PlaceSearchResult>,
+    placeSearchAttribution: List<com.sora.mockgps.core.network.AttributionLink>,
     placeSearchError: PlaceSearchError?,
+    placeSearchSubmitEnabled: Boolean,
     onPlaceSearchQueryChanged: (String) -> Unit,
+    onPlaceSearchSubmit: () -> Unit,
     onPlaceSelected: (com.sora.mockgps.feature.search.PlaceSearchResult) -> Unit,
     onShowCoordinatesChange: (Boolean) -> Unit,
     onShowLandmarksChange: (Boolean) -> Unit,
@@ -123,6 +129,8 @@ internal fun MapControlPanel(
     onOpenDeveloperOptions: () -> Unit,
     onOpenBatterySettings: () -> Unit,
     onShowSetupGuide: () -> Unit,
+    onShowRemoveAds: () -> Unit,
+    onShowAboutPrivacy: () -> Unit,
     onUseCurrentLocation: () -> Unit,
     onSaveFavorite: () -> Unit,
     onShowFavorites: () -> Unit,
@@ -320,6 +328,21 @@ internal fun MapControlPanel(
             routeError?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
+            if (automaticJourneyMayExceedTarget) {
+                Text(
+                    stringResource(R.string.auto_journey_exceeded_target),
+                    color = MaterialTheme.colorScheme.tertiary,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            (plannedRoute?.cacheStatus as? RoutingCacheStatus.StaleFallback)?.let { stale ->
+                val ageMinutes = (stale.ageMillis / 60_000L).coerceAtLeast(1L)
+                Text(
+                    stringResource(R.string.route_stale_cache_warning, ageMinutes),
+                    color = MaterialTheme.colorScheme.tertiary,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
             if (automaticJourneyRecoveryAvailable &&
                 (activeDetail == null || activeDetail == MapDetailGroup.Route)
             ) {
@@ -365,6 +388,10 @@ internal fun MapControlPanel(
                             activeDetail = null
                             onPlaceSelected(result)
                         },
+                        phase = placeSearchPhase,
+                        attribution = placeSearchAttribution,
+                        submitEnabled = placeSearchSubmitEnabled,
+                        onSubmit = onPlaceSearchSubmit,
                     )
                 }
                 if (detailGroup == MapDetailGroup.More) {
@@ -421,6 +448,18 @@ internal fun MapControlPanel(
                         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                     ) {
                         Text(stringResource(R.string.action_show_setup_guide))
+                    }
+                    TextButton(
+                        onClick = onShowRemoveAds,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    ) {
+                        Text(stringResource(R.string.action_remove_ads))
+                    }
+                    TextButton(
+                        onClick = onShowAboutPrivacy,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    ) {
+                        Text(stringResource(R.string.action_about_privacy))
                     }
                     Text(
                         stringResource(R.string.setup_guide_is_mock),

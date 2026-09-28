@@ -2,17 +2,20 @@ package com.sora.mockgps.feature.map
 
 import com.sora.mockgps.route.PlannedRoute
 import com.sora.mockgps.route.RouteTransportMode
+import com.sora.mockgps.route.RoutingException
+import com.sora.mockgps.route.RoutingNetworkException
+import com.sora.mockgps.route.RoutingQuotaException
 import com.sora.mockgps.route.RoutingRepository
-import kotlin.random.Random
 
 internal data class RoadAdaptedPlanResult(
     val journey: GeneratedJourney,
     val route: PlannedRoute,
+    val exceededTargetDueToAdmissionFailure: Boolean = false,
 )
 
 internal class AutomaticJourneyRoutePlanner(
     private val routingRepository: RoutingRepository,
-    private val random: Random = Random.Default,
+    private val random: kotlin.random.Random = kotlin.random.Random.Default,
 ) {
     private var previousLandmark: JourneyLandmark? = null
 
@@ -27,7 +30,8 @@ internal class AutomaticJourneyRoutePlanner(
 
     /**
      * Plans a road-adapted route, shrinking the geometric shape and retrying when the
-     * adapted distance exceeds the duration-based target.
+     * adapted distance exceeds the duration-based target. Each shrink is a separately
+     * admitted gateway attempt. At most four attempts; stop when the budget is exhausted.
      */
     suspend fun planWithinTargetDistance(
         journey: GeneratedJourney,
@@ -38,8 +42,15 @@ internal class AutomaticJourneyRoutePlanner(
         var current = journey
         var best: RoadAdaptedPlanResult? = null
 
-        repeat(maxAttempts.coerceAtLeast(1)) {
-            val route = plan(current, transportMode)
+        repeat(maxAttempts.coerceAtLeast(1)) { attemptIndex ->
+            val route = try {
+                plan(current, transportMode)
+            } catch (failure: RoutingException) {
+                if (best != null && isAdmissionOrTransientFailure(failure)) {
+                    return best!!.copy(exceededTargetDueToAdmissionFailure = true)
+                }
+                throw failure
+            }
             val candidate = RoadAdaptedPlanResult(current, route)
             best = when {
                 best == null -> candidate
@@ -48,6 +59,9 @@ internal class AutomaticJourneyRoutePlanner(
             }
             if (route.distanceMeters <= targetDistanceMeters * DISTANCE_OVERAGE_TOLERANCE) {
                 return candidate
+            }
+            if (attemptIndex == maxAttempts.coerceAtLeast(1) - 1) {
+                return best!!
             }
             val scale = (targetDistanceMeters / route.distanceMeters).coerceIn(MIN_RADIUS_SCALE, MAX_RADIUS_SCALE)
             val nextRadius = JourneyPlanner.estimatedShapeRadiusMeters(current) * scale
@@ -59,6 +73,9 @@ internal class AutomaticJourneyRoutePlanner(
         }
         return best!!
     }
+
+    private fun isAdmissionOrTransientFailure(failure: RoutingException): Boolean =
+        failure is RoutingQuotaException || failure is RoutingNetworkException
 
     private companion object {
         const val MAX_SHRINK_ATTEMPTS = 4
@@ -94,10 +111,12 @@ internal object AutomaticJourneyStateReducer {
         state: MapUiState,
         route: PlannedRoute,
         journey: GeneratedJourney? = null,
+        exceededTargetDueToAdmissionFailure: Boolean = false,
     ): MapUiState = state.copy(
         plannedRoute = route,
         isPlanningRoute = false,
         routeError = null,
+        automaticJourneyMayExceedTarget = exceededTargetDueToAdmissionFailure,
         automaticJourneyRecoveryAvailable = false,
         automaticJourneyRecoveryKind = null,
         routeOrigin = journey?.points?.first() ?: state.routeOrigin,

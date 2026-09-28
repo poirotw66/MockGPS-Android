@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -20,6 +21,7 @@ import com.sora.mockgps.feature.search.PlaceSearchSource
 import com.sora.mockgps.feature.search.formatCoordinateSearchLabel
 import com.sora.mockgps.feature.search.parseCoordinateSearchQuery
 import com.sora.mockgps.ui.theme.BloomWalkTheme
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -72,6 +74,7 @@ class PlaceSearchContentInstrumentedTest {
                     error = null,
                     onQueryChanged = {},
                     onPlaceSelected = {},
+                    phase = com.sora.mockgps.feature.search.PlaceSearchPhase.EmptyRemoteResults,
                 )
             }
         }
@@ -139,5 +142,49 @@ class PlaceSearchContentInstrumentedTest {
         val expected = formatCoordinateSearchLabel(Coordinate(25.033964, 121.564468))
         composeRule.onNodeWithText(context.getString(R.string.place_search_section_coordinates)).assertIsDisplayed()
         composeRule.onAllNodesWithText(expected).assertCountEquals(2)
+    }
+
+    @Test
+    fun searchButtonDispatchesSubmitOnce() {
+        var submitCount = 0
+        composeRule.setContent {
+            BloomWalkTheme {
+                PlaceSearchContent(
+                    query = "Tokyo Station",
+                    isSearching = false,
+                    results = emptyList(),
+                    error = null,
+                    onQueryChanged = {},
+                    onPlaceSelected = {},
+                    onSubmit = { submitCount += 1 },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(context.getString(R.string.action_search_online)).performClick()
+        composeRule.waitForIdle()
+        assertEquals(1, submitCount)
+    }
+
+    @Test
+    fun imeSearchDispatchesSubmitOnce() {
+        var submitCount = 0
+        composeRule.setContent {
+            BloomWalkTheme {
+                PlaceSearchContent(
+                    query = "Tokyo Station",
+                    isSearching = false,
+                    results = emptyList(),
+                    error = null,
+                    onQueryChanged = {},
+                    onPlaceSelected = {},
+                    onSubmit = { submitCount += 1 },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Tokyo Station").performImeAction()
+        composeRule.waitForIdle()
+        assertEquals(1, submitCount)
     }
 }

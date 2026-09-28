@@ -53,10 +53,24 @@ interface RoutingRepository {
         planBicycleRoute(listOf(origin, destination))
 }
 
-enum class RouteTransportMode(val providerBaseUrl: String) {
-    Walk(RoutingProviderConfig.FOSSGIS_FOOT_BASE_URL),
-    Bicycle(RoutingProviderConfig.FOSSGIS_BICYCLE_BASE_URL),
-    Drive(RoutingProviderConfig.FOSSGIS_DRIVING_BASE_URL),
+enum class RouteTransportMode {
+    Walk,
+    Bicycle,
+    Drive,
+    ;
+
+    val wireName: String
+        get() = when (this) {
+            Walk -> "walk"
+            Bicycle -> "bicycle"
+            Drive -> "drive"
+        }
+}
+
+fun RouteTransportMode.fossgisProfileBaseUrl(): String = when (this) {
+    RouteTransportMode.Walk -> RoutingProviderConfig.FOSSGIS_FOOT_BASE_URL
+    RouteTransportMode.Bicycle -> RoutingProviderConfig.FOSSGIS_BICYCLE_BASE_URL
+    RouteTransportMode.Drive -> RoutingProviderConfig.FOSSGIS_DRIVING_BASE_URL
 }
 
 /**
@@ -132,7 +146,7 @@ class FossgisBicycleRoutingRepository(
         transportMode: RouteTransportMode,
     ): PlannedRoute = withContext(Dispatchers.IO) {
         throttle.awaitTurn()
-        val modeProviderConfig = providerConfig.copy(baseUrl = transportMode.providerBaseUrl)
+        val modeProviderConfig = providerConfig.copy(baseUrl = transportMode.fossgisProfileBaseUrl())
         val endpoint = buildOsrmBicycleRouteUrl(BicycleRouteRequest(waypoints), modeProviderConfig)
         val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
@@ -193,7 +207,7 @@ internal fun buildOsrmBicycleRouteUrl(
 internal fun parseOsrmRoute(json: String): PlannedRoute {
     val root = runCatching { JSONObject(json) }
         .getOrElse { throw RoutingException("Routing response is not valid JSON.", it) }
-    if (root.optString("code") != "Ok") throw RoutingException("No bicycle route was found.")
+    if (root.optString("code") != "Ok") throw RoutingNoRouteException("No bicycle route was found.")
     val route = root.optJSONArray("routes")?.optJSONObject(0)
         ?: throw RoutingException("Routing response did not contain a route.")
     val coordinates = route.optJSONObject("geometry")?.optJSONArray("coordinates")
@@ -228,10 +242,21 @@ internal fun parseOsrmRoute(json: String): PlannedRoute {
 open class RoutingException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
 /** A transport-level failure for which a previously cached route may be safe to show. */
-class RoutingNetworkException(message: String, cause: Throwable? = null) : RoutingException(message, cause)
+open class RoutingNetworkException(message: String, cause: Throwable? = null) : RoutingException(message, cause)
 
 /** No fresh provider result and no usable stale cached route were available. */
 class RoutingUnavailableException(message: String, cause: RoutingNetworkException) : RoutingException(message, cause)
+
+class RoutingNoRouteException(message: String = "No route was found.") : RoutingException(message)
+
+class RoutingTooComplexException(message: String = "The route is too complex for this preview.") : RoutingException(message)
+
+class RoutingOutOfScopeException(message: String = "The route is outside the supported distance.") : RoutingException(message)
+
+class RoutingQuotaException(
+    message: String,
+    cause: Throwable? = null,
+) : RoutingNetworkException(message, cause)
 
 private const val MAX_ROUTE_POINTS = 5_000
 private const val MAX_ROUTE_DISTANCE_METERS = 100_000.0

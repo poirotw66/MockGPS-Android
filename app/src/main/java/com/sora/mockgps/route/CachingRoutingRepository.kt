@@ -11,41 +11,85 @@ fun interface RoutingCacheClock {
 data class RoutingCachePolicy(
     val freshTtlMillis: Long = DEFAULT_FRESH_TTL_MILLIS,
     val maximumEntries: Int = DEFAULT_MAXIMUM_ENTRIES,
+    val maxStaleAgeMillis: Long = DEFAULT_MAX_STALE_AGE_MILLIS,
     val allowStaleOnNetworkFailure: Boolean = true,
 ) {
     init {
         require(freshTtlMillis >= 0L) { "Fresh route cache TTL cannot be negative." }
         require(maximumEntries > 0) { "Route cache must allow at least one entry." }
+        require(maxStaleAgeMillis >= freshTtlMillis) { "Stale age must be at least the fresh TTL." }
     }
 
     companion object {
         const val DEFAULT_FRESH_TTL_MILLIS = 5 * 60 * 1_000L
         const val DEFAULT_MAXIMUM_ENTRIES = 32
+        const val DEFAULT_MAX_STALE_AGE_MILLIS = 24 * 60 * 60 * 1_000L
     }
 }
 
+data class RoutingCacheIdentity(
+    val contractRevision: String,
+    val providerRevision: String,
+    val optionsFingerprint: String = "",
+)
+
 /**
- * Provider and ordered waypoint identity. A reversed route deliberately has a different key.
- * The private constructor forces callers to snapshot the waypoint list before hashing it.
+ * Provider revision, transport mode, ordered waypoints, and options.
+ * A reversed route deliberately has a different key.
  */
 class RoutingCacheKey private constructor(
-    val providerBaseUrl: String,
+    val contractRevision: String,
+    val providerRevision: String,
+    val transportMode: RouteTransportMode,
     val orderedWaypoints: List<Coordinate>,
+    val optionsFingerprint: String,
 ) {
     override fun equals(other: Any?): Boolean = other is RoutingCacheKey &&
-        providerBaseUrl == other.providerBaseUrl && orderedWaypoints == other.orderedWaypoints
+        contractRevision == other.contractRevision &&
+        providerRevision == other.providerRevision &&
+        transportMode == other.transportMode &&
+        orderedWaypoints == other.orderedWaypoints &&
+        optionsFingerprint == other.optionsFingerprint
 
-    override fun hashCode(): Int = 31 * providerBaseUrl.hashCode() + orderedWaypoints.hashCode()
+    override fun hashCode(): Int {
+        var result = contractRevision.hashCode()
+        result = 31 * result + providerRevision.hashCode()
+        result = 31 * result + transportMode.hashCode()
+        result = 31 * result + orderedWaypoints.hashCode()
+        result = 31 * result + optionsFingerprint.hashCode()
+        return result
+    }
 
     companion object {
+        fun create(
+            identity: RoutingCacheIdentity,
+            transportMode: RouteTransportMode,
+            waypoints: List<Coordinate>,
+        ): RoutingCacheKey = RoutingCacheKey(
+            contractRevision = identity.contractRevision,
+            providerRevision = identity.providerRevision,
+            transportMode = transportMode,
+            orderedWaypoints = waypoints.toList(),
+            optionsFingerprint = identity.optionsFingerprint,
+        )
+
+        @Deprecated("Use identity-based cache keys. Kept for tests migrating off provider URLs.")
         fun create(providerConfig: RoutingProviderConfig, waypoints: List<Coordinate>): RoutingCacheKey =
-            RoutingCacheKey(providerConfig.normalizedBaseUrl, waypoints.toList())
+            create(
+                identity = RoutingCacheIdentity(
+                    contractRevision = "v1",
+                    providerRevision = providerConfig.normalizedBaseUrl,
+                ),
+                transportMode = RouteTransportMode.Bicycle,
+                waypoints = waypoints,
+            )
     }
 }
 
 data class CachedRoute(
     val route: PlannedRoute,
     val storedAtMillis: Long,
+    val providerRevision: String = "geoapify-v1",
 )
 
 interface RoutingCache {
@@ -82,30 +126,61 @@ class InMemoryRoutingCache(
  */
 class CachingRoutingRepository(
     private val delegate: RoutingRepository,
-    private val providerConfig: RoutingProviderConfig = RoutingProviderConfig(),
+    private val identity: RoutingCacheIdentity = RoutingCacheIdentity(
+        contractRevision = "v1",
+        providerRevision = "geoapify-v1",
+    ),
     private val policy: RoutingCachePolicy = RoutingCachePolicy(),
     private val clock: RoutingCacheClock = RoutingCacheClock(System::currentTimeMillis),
     private val cache: RoutingCache = InMemoryRoutingCache(policy.maximumEntries),
+    @Deprecated("Provider URLs no longer form cache keys.")
+    private val providerConfig: RoutingProviderConfig? = null,
 ) : RoutingRepository {
+    constructor(
+        delegate: RoutingRepository,
+        providerConfig: RoutingProviderConfig = RoutingProviderConfig(),
+        policy: RoutingCachePolicy = RoutingCachePolicy(),
+        clock: RoutingCacheClock = RoutingCacheClock(System::currentTimeMillis),
+        cache: RoutingCache = InMemoryRoutingCache(policy.maximumEntries),
+    ) : this(
+        delegate = delegate,
+        identity = RoutingCacheIdentity(
+            contractRevision = "v1",
+            providerRevision = providerConfig.normalizedBaseUrl,
+        ),
+        policy = policy,
+        clock = clock,
+        cache = cache,
+        providerConfig = providerConfig,
+    )
+
     override suspend fun planRoute(
         waypoints: List<Coordinate>,
         transportMode: RouteTransportMode,
     ): PlannedRoute {
         val request = BicycleRouteRequest(waypoints)
-        val modeProviderConfig = providerConfig.copy(baseUrl = transportMode.providerBaseUrl)
-        val key = RoutingCacheKey.create(modeProviderConfig, request.waypoints)
+        val key = RoutingCacheKey.create(identity, transportMode, request.waypoints)
         val now = clock.currentTimeMillis()
         val cached = cache.get(key)
-        if (cached != null && ageMillis(now, cached) <= policy.freshTtlMillis) {
+        if (cached != null &&
+            cached.providerRevision == identity.providerRevision &&
+            ageMillis(now, cached) <= policy.freshTtlMillis
+        ) {
             return cached.route.withCacheStatus(RoutingCacheStatus.Fresh(ageMillis(now, cached)))
         }
 
         return try {
             val planned = delegate.planRoute(request.waypoints, transportMode).withoutCacheStatus()
-            cache.put(key, CachedRoute(planned, now))
+            cache.put(key, CachedRoute(planned, now, identity.providerRevision))
             planned
+        } catch (failure: RoutingNoRouteException) {
+            throw failure
         } catch (failure: RoutingNetworkException) {
-            if (cached != null && policy.allowStaleOnNetworkFailure) {
+            if (cached != null &&
+                cached.providerRevision == identity.providerRevision &&
+                policy.allowStaleOnNetworkFailure &&
+                ageMillis(now, cached) <= policy.maxStaleAgeMillis
+            ) {
                 cached.route.withCacheStatus(
                     RoutingCacheStatus.StaleFallback(ageMillis(now, cached), failure),
                 )
@@ -118,7 +193,8 @@ class CachingRoutingRepository(
         }
     }
 
-    private fun ageMillis(now: Long, cached: CachedRoute): Long = (now - cached.storedAtMillis).coerceAtLeast(0L)
+    private fun ageMillis(now: Long, cached: CachedRoute): Long =
+        (now - cached.storedAtMillis).coerceAtLeast(0L)
 }
 
 private fun PlannedRoute.withCacheStatus(status: RoutingCacheStatus): PlannedRoute = copy(cacheStatus = status)

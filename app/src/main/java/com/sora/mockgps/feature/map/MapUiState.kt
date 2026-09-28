@@ -28,6 +28,7 @@ data class MapUiState(
     val routeError: String? = null,
     val automaticJourneyRecoveryAvailable: Boolean = false,
     val automaticJourneyRecoveryKind: AutomaticJourneyRecoveryKind? = null,
+    val automaticJourneyMayExceedTarget: Boolean = false,
     val favoriteMessage: String? = null,
     /** The saved route that supplied [plannedRoute], if it was loaded from storage. */
     val activeSavedRouteId: Long? = null,
@@ -37,14 +38,22 @@ data class MapUiState(
     val routeOperationResult: RouteOperationResult? = null,
     val placeSearchQuery: String = "",
     val isPlaceSearching: Boolean = false,
+    val placeSearchPhase: com.sora.mockgps.feature.search.PlaceSearchPhase =
+        com.sora.mockgps.feature.search.PlaceSearchPhase.LocalOnly,
     val placeSearchResults: List<PlaceSearchResult> = emptyList(),
+    val placeSearchAttribution: List<com.sora.mockgps.core.network.AttributionLink> = emptyList(),
     val placeSearchError: PlaceSearchError? = null,
+    val placeSearchSubmitEnabled: Boolean = true,
     val showCoordinates: Boolean = true,
     val updateIntervalMillis: Long = 1_000L,
     val accuracyMeters: Float = 5f,
     /** False until DataStore settings have been applied at least once. */
     val settingsReady: Boolean = false,
     val setupGuideDismissed: Boolean = false,
+    val remoteSearchEnabled: Boolean = false,
+    val remoteRoutingEnabled: Boolean = false,
+    val remoteAdsEnabled: Boolean = false,
+    val remotePurchasesEnabled: Boolean = false,
 ) {
     val routePlanningStep: RoutePlanningStep
         get() = when {
@@ -57,7 +66,15 @@ data class MapUiState(
         }
 }
 
-enum class PlaceSearchError { Network, RateLimited, InvalidResponse }
+enum class PlaceSearchError {
+    Network,
+    RateLimited,
+    GlobalQuota,
+    InvalidRequest,
+    RequestTooLarge,
+    InvalidResponse,
+    Unavailable,
+}
 
 data class RouteOperationResult(
     val message: String,
