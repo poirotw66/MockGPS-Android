@@ -11,7 +11,7 @@ Missing owner secrets and accounts must not block implementable code. Do not pas
 | B05 | Play app, `remove_ads_lifetime`, base price, regions, license testers | Live purchase launch | Product ID wired. Price comes from ProductDetails. |
 | B06 | Play Developer API + least-privilege service account | Server purchase verification | Live lookup uses `purchases.productsv2` `getproductpurchasev2`; ack stays `products.acknowledge`. Fail-closed without secrets (401/403/404/timeout/5xx ≠ revoked). Missing credentials return unavailable, not owned. |
 | B07 | AdMob app/ad unit, app-ads.txt crawler, readiness | Real ads | Test IDs in debug. `site/app-ads.txt` is a placeholder. `adsEnabled` false. |
-| B08 | Public privacy/support URLs, support email, Data Safety, ads declaration | Store review | Deployable drafts in `site/`. URLs are `.invalid` until published. |
+| B08 | Public privacy/support URLs, support email, Data Safety, ads declaration | Store review | Privacy/support URLs published on Cloudflare Pages (`bloomwalk-gps.pages.dev`; zh-Hant for Play Console). Support email `justin@bloss0m.com`. Data Safety form and ads declaration still pending. |
 | B09 | FGS/location declaration, demo video, developer-options instructions | Store review | Manifest and setup guide exist. Video/console form are owner work. |
 | B10 | Release signing, device matrix, 16 KB, pre-launch report | Release readiness | `validateReleaseConfig` rejects upload-unsafe config. Unsigned CI may still assemble. Release packaging is 64-bit only (`arm64-v8a`, `x86_64`); debug keeps default ABIs for emulators. Prior unsigned AAB: 64-bit LOAD 16384; 32-bit MapLibre 4096 and now omitted from release. Not a signed Play artifact. |
 | B11 | 12 testers / 14-day closed testing if required | Production rollout | Not started. |
@@ -24,8 +24,8 @@ Set via Gradle properties or environment:
 - `BLOOMWALK_GATEWAY_BASE_URL`
 - `BLOOMWALK_ADMOB_APP_ID`
 - `BLOOMWALK_ADMOB_BANNER_UNIT_ID`
-- `BLOOMWALK_PRIVACY_POLICY_URL`
-- `BLOOMWALK_SUPPORT_URL`
+- `BLOOMWALK_PRIVACY_POLICY_URL` (default: `https://bloomwalk-gps.pages.dev/privacy/zh-Hant/`)
+- `BLOOMWALK_SUPPORT_URL` (default: `https://bloomwalk-gps.pages.dev/support/zh-Hant/`)
 - `BLOOMWALK_RECEIPT_PUBLIC_KEYS_JSON`
 
 `BILLING_PRODUCT_ID` is fixed to `remove_ads_lifetime`.

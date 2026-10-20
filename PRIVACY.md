@@ -1,6 +1,6 @@
 # Privacy and Data Safety
 
-This is the engineering inventory for BloomWalk GPS. It is not a claim that Play Console forms have been submitted. The public privacy pages live as deployable drafts in `site/privacy/` until the owner publishes HTTPS URLs.
+This is the engineering inventory for BloomWalk GPS. It is not a claim that Play Console forms have been submitted. Public privacy and support pages are live on Cloudflare Pages (`https://bloomwalk-gps.pages.dev/`); Play Console uses the zh-Hant privacy URL. Policy effective date: 2026-10-20. Support contact: justin@bloss0m.com.
 
 ## On-device data
 
