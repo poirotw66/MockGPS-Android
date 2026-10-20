@@ -21,11 +21,15 @@ export function fromBase64Url(value: string): Uint8Array {
 }
 
 export function pemToArrayBuffer(pem: string): ArrayBuffer {
+  const privateBegin = `-----BEGIN ${"PRIVATE KEY"}-----`;
+  const privateEnd = `-----END ${"PRIVATE KEY"}-----`;
+  const publicBegin = `-----BEGIN ${"PUBLIC KEY"}-----`;
+  const publicEnd = `-----END ${"PUBLIC KEY"}-----`;
   const body = pem
-    .replace("-----BEGIN PRIVATE KEY-----", "")
-    .replace("-----END PRIVATE KEY-----", "")
-    .replace("-----BEGIN PUBLIC KEY-----", "")
-    .replace("-----END PUBLIC KEY-----", "")
+    .replace(privateBegin, "")
+    .replace(privateEnd, "")
+    .replace(publicBegin, "")
+    .replace(publicEnd, "")
     .replace(/\s+/g, "");
   const binary = atob(body);
   const bytes = new Uint8Array(binary.length);

@@ -18,7 +18,7 @@ import {
   type SearchResponse,
 } from "./contracts/index";
 import { hmacHex } from "./crypto-utils";
-import { estimateMaximumCredits, GeoBudget } from "./geo-budget";
+import { estimateMaximumCredits, GeoBudget, type AdmitInput, type AdmitResult } from "./geo-budget";
 import {
   bodyLimitForPath,
   errorFromUnknown,
@@ -29,7 +29,7 @@ import {
 } from "./http";
 import { logSafe } from "./logging";
 import { Purchase } from "./purchase-state";
-import { planRoute, searchPlaces, type ProviderBehavior } from "./providers/geoapify";
+import { type ProviderBehavior } from "./providers/geoapify";
 import {
   assertUuid,
   canonicalPayload,
@@ -177,17 +177,33 @@ async function handleSearch(
   if (estimate.kind === "unsupported") {
     throw typedError("SERVICE_DISABLED");
   }
-  const reservation = await admitGeo(request, env, context, "search", estimate.credits, search);
   const behavior = providerBehavior(request, env);
-  try {
-    const result = await searchPlaces(search, {
+  const stub = await geoBudgetStub(request, env);
+  const dispatched = await stub.dispatchSearch({
+    admit: await admitInput(request, env, context, "search", estimate.credits, search),
+    search,
+    provider: {
       mode: env.GEO_PROVIDER_MODE === "live" ? "live" : "stub",
       apiKey: env.GEOAPIFY_API_KEY,
       timeoutMs: readLimits(env).providerTimeoutMs,
       behavior,
-    });
+    },
+  });
+  if (dispatched.kind === "rejected") {
+    throwFromAdmit(dispatched.admit);
+  }
+  const reservationId = dispatched.reservationId;
+  const finalize = async (status: string) => {
+    await stub.finalize({ reservationId, nowMs: readClockMs(env), status });
+  };
+  try {
+    if (dispatched.kind === "failed") {
+      await finalize(dispatched.code);
+      throw typedError(dispatched.code);
+    }
+    const result = dispatched.result;
     if (behavior === "lost") {
-      await reservation.finalize("lost");
+      await finalize("lost");
       throw typedError("PROVIDER_UNAVAILABLE");
     }
     const response: SearchResponse = {
@@ -198,14 +214,14 @@ async function handleSearch(
     };
     const encoded = JSON.stringify(response);
     if (new TextEncoder().encode(encoded).byteLength > SEARCH_RESPONSE_MAX_BYTES) {
-      await reservation.finalize("oversized");
+      await finalize("oversized");
       throw typedError("INVALID_PROVIDER_RESPONSE");
     }
-    await reservation.finalize("ok");
+    await finalize("ok");
     logSafe("search_ok", { requestId: context.requestId, resultCount: result.results.length });
     return jsonResponse(response, 200, context.requestId, { "Cache-Control": "no-store" });
   } catch (error) {
-    await reservation.finalize(error instanceof GatewayError ? error.code : "unknown");
+    await finalize(error instanceof GatewayError ? error.code : "unknown");
     throw error;
   }
 }
@@ -226,17 +242,33 @@ async function handleRoute(
   if (estimate.kind === "unsupported") {
     throw typedError("SERVICE_DISABLED");
   }
-  const reservation = await admitGeo(request, env, context, "route", estimate.credits, route);
   const behavior = providerBehavior(request, env);
-  try {
-    const result = await planRoute(route, {
+  const stub = await geoBudgetStub(request, env);
+  const dispatched = await stub.dispatchRoute({
+    admit: await admitInput(request, env, context, "route", estimate.credits, route),
+    route,
+    provider: {
       mode: env.GEO_PROVIDER_MODE === "live" ? "live" : "stub",
       apiKey: env.GEOAPIFY_API_KEY,
       timeoutMs: readLimits(env).providerTimeoutMs,
       behavior,
-    });
+    },
+  });
+  if (dispatched.kind === "rejected") {
+    throwFromAdmit(dispatched.admit);
+  }
+  const reservationId = dispatched.reservationId;
+  const finalize = async (status: string) => {
+    await stub.finalize({ reservationId, nowMs: readClockMs(env), status });
+  };
+  try {
+    if (dispatched.kind === "failed") {
+      await finalize(dispatched.code);
+      throw typedError(dispatched.code);
+    }
+    const result = dispatched.result;
     if (behavior === "lost") {
-      await reservation.finalize("lost");
+      await finalize("lost");
       throw typedError("PROVIDER_UNAVAILABLE");
     }
     const response: RouteResponse = {
@@ -250,31 +282,30 @@ async function handleRoute(
     };
     const encoded = JSON.stringify(response);
     if (new TextEncoder().encode(encoded).byteLength > ROUTE_RESPONSE_MAX_BYTES) {
-      await reservation.finalize("oversized");
+      await finalize("oversized");
       throw typedError("INVALID_PROVIDER_RESPONSE");
     }
-    await reservation.finalize("ok");
+    await finalize("ok");
     logSafe("route_ok", { requestId: context.requestId, pointCount: result.points.length });
     return jsonResponse(response, 200, context.requestId, { "Cache-Control": "no-store" });
   } catch (error) {
-    await reservation.finalize(error instanceof GatewayError ? error.code : "unknown");
+    await finalize(error instanceof GatewayError ? error.code : "unknown");
     throw error;
   }
 }
 
-async function admitGeo(
+async function admitInput(
   request: Request,
   env: Env,
   context: { requestId: string; installId: string },
   operation: "search" | "route",
   credits: number,
   payload: unknown,
-): Promise<{ finalize: (status: string) => Promise<void> }> {
+): Promise<AdmitInput> {
   const nowMs = readClockMs(env);
   const secret = rateSecret(env);
   const ip = trustedClientIp(request);
-  const stub = await geoBudgetStub(request, env);
-  const result = await stub.admit({
+  return {
     expectedLedgerId: ledgerName(request, env),
     allowEmptyInit:
       parseBooleanFlag(env.ALLOW_EMPTY_LEDGER_INIT) && env.ENVIRONMENT !== "production",
@@ -287,7 +318,10 @@ async function admitGeo(
     ipDayHmac: await hmacHex(secret, `ip:${ip}:${dateKey(nowMs)}`),
     ipMinuteHmac: await hmacHex(secret, `ip:${ip}:${minuteKey(nowMs)}`),
     limits: readLimits(env),
-  });
+  };
+}
+
+function throwFromAdmit(result: AdmitResult): never {
   if (result.outcome === "unavailable") {
     throw typedError("BUDGET_UNAVAILABLE");
   }
@@ -302,15 +336,7 @@ async function admitGeo(
       requestConflict: true,
     });
   }
-  if (result.outcome === "duplicate") {
-    throw typedError("CLIENT_RATE_LIMITED", 60);
-  }
-  const reservationId = result.reservationId;
-  return {
-    finalize: async (status: string) => {
-      await stub.finalize({ reservationId, nowMs: readClockMs(env), status });
-    },
-  };
+  throw typedError("CLIENT_RATE_LIMITED", 60);
 }
 
 async function handlePurchase(

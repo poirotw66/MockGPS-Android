@@ -67,6 +67,7 @@ export interface PurchaseInspect {
   deadlineExceeded: boolean;
   pendingAttempts: number;
   nextAckAt: number | null;
+  purchasedAt: number | null;
 }
 
 function sqlText(value: unknown): string {
@@ -150,6 +151,9 @@ export class Purchase extends DurableObject<Env> {
     const next = this.ctx.storage.sql
       .exec("SELECT MIN(next_ack_at) AS next_at FROM grants WHERE next_ack_at IS NOT NULL")
       .toArray()[0]?.next_at;
+    const purchased = this.ctx.storage.sql
+      .exec("SELECT MIN(purchased_at) AS purchased_at FROM grants WHERE purchased_at IS NOT NULL")
+      .toArray()[0]?.purchased_at;
     return {
       grantCount: sqlNumber(grants[0]?.n ?? 0),
       pendingAck: sqlNumber(pending[0]?.n ?? 0),
@@ -158,6 +162,7 @@ export class Purchase extends DurableObject<Env> {
       deadlineExceeded: this.deadlineExceeded,
       pendingAttempts: sqlNumber(attempts[0]?.n ?? 0),
       nextAckAt: typeof next === "number" ? next : null,
+      purchasedAt: typeof purchased === "number" ? purchased : null,
     };
   }
 
@@ -413,8 +418,27 @@ export class Purchase extends DurableObject<Env> {
     }
     const encrypted = await encryptUtf8(input.input.encryptionKey, input.input.purchaseToken);
     const alreadyAcked = input.lookup.acknowledged;
+    const existing = this.ctx.storage.sql
+      .exec(
+        "SELECT purchased_at, attempts, next_ack_at, ack_status FROM grants WHERE token_hmac = ?",
+        input.tokenHmac,
+      )
+      .toArray()[0];
+    const existingPurchasedAt =
+      existing && typeof existing.purchased_at === "number" ? existing.purchased_at : null;
+    const purchasedAt = existingPurchasedAt ?? input.nowMs;
+    const keepPendingAck =
+      !alreadyAcked &&
+      existing !== undefined &&
+      sqlText(existing.ack_status) === "pending" &&
+      typeof existing.next_ack_at === "number";
     const ackStatus = alreadyAcked ? "acked" : "pending";
-    const nextAck = alreadyAcked ? null : nextAckAt(input.nowMs, 0, input.nowMs);
+    const attempts = keepPendingAck ? sqlNumber(existing.attempts) : 0;
+    const nextAck = alreadyAcked
+      ? null
+      : keepPendingAck
+        ? sqlNumber(existing.next_ack_at)
+        : nextAckAt(purchasedAt, 0, input.nowMs);
     try {
       this.writeGrant({
         tokenHmac: input.tokenHmac,
@@ -423,14 +447,16 @@ export class Purchase extends DurableObject<Env> {
         ackStatus,
         installId: input.input.installId,
         nowMs: input.nowMs,
-        purchasedAt: input.nowMs,
-        attempts: 0,
+        purchasedAt,
+        attempts,
         nextAckAt: nextAck,
       });
     } catch {
       throw new GatewayError("PROVIDER_UNAVAILABLE", "durable grant could not be saved");
     }
     if (!alreadyAcked) {
+      const alarmAt = nextAck ?? input.nowMs + MINUTE_MS;
+      await this.ctx.storage.setAlarm(alarmAt);
       const ack = await acknowledgeGooglePurchase({
         mode: input.input.playMode,
         purchaseToken: input.input.purchaseToken,
@@ -445,8 +471,6 @@ export class Purchase extends DurableObject<Env> {
           input.nowMs,
           input.tokenHmac,
         );
-      } else {
-        await this.ctx.storage.setAlarm(nextAck ?? input.nowMs + MINUTE_MS);
       }
     }
     const receipt = await signReceipt({
@@ -492,7 +516,7 @@ export class Purchase extends DurableObject<Env> {
         ack_status = excluded.ack_status,
         install_id = excluded.install_id,
         updated_at = excluded.updated_at,
-        purchased_at = excluded.purchased_at,
+        purchased_at = COALESCE(grants.purchased_at, excluded.purchased_at),
         attempts = excluded.attempts,
         next_ack_at = excluded.next_ack_at,
         last_success_at = excluded.last_success_at`,

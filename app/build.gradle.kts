@@ -170,19 +170,24 @@ tasks.register("validateReleaseConfig") {
         val usesInvalid = listOf(gateway, privacy, support).any { it.contains(".invalid") || it.contains(".example") }
         val usesTestAds = admobApp.contains("3940256099942544") || banner.contains("3940256099942544")
         val empty = listOf(gateway, privacy, support, admobApp, banner).any { it.isBlank() }
+        val receiptKeysJson = providers.environmentVariable("BLOOMWALK_RECEIPT_PUBLIC_KEYS_JSON")
+            .orElse("[]").get()
+        val receiptKeysMissing = receiptKeysJson.isBlank() || receiptKeysJson == "[]"
         val debugSigning = releaseKeystorePath == null
         val manifest = file("src/main/AndroidManifest.xml").readText()
         val allowsCleartext = Regex("""android:usesCleartextTraffic\s*=\s*"true"""").containsMatchIn(manifest)
         if (!upload) {
             logger.lifecycle(
                 "Release configuration check: UNSIGNED_NOT_UPLOADABLE " +
-                    "(invalidUrls=$usesInvalid testAds=$usesTestAds empty=$empty debugSigning=$debugSigning cleartext=$allowsCleartext)",
+                    "(invalidUrls=$usesInvalid testAds=$usesTestAds empty=$empty " +
+                    "receiptKeysMissing=$receiptKeysMissing debugSigning=$debugSigning cleartext=$allowsCleartext)",
             )
             return@doLast
         }
         require(!usesInvalid) { "Upload release rejects .invalid or example URLs." }
         require(!usesTestAds) { "Upload release rejects AdMob test IDs." }
         require(!empty) { "Upload release rejects empty public config." }
+        require(!receiptKeysMissing) { "Upload release rejects missing receipt public keys." }
         require(!debugSigning) { "Upload release rejects debug signing." }
         require(!allowsCleartext) { "Upload release rejects debug cleartext traffic." }
     }

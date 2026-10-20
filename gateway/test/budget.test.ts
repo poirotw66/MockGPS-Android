@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { runInDurableObject } from "cloudflare:test";
 import { hmacHex } from "../src/crypto-utils";
 import { estimateMaximumCredits } from "../src/geo-budget";
 import type { GatewayErrorBody } from "../src/contracts/index";
@@ -372,5 +373,58 @@ describe("GeoBudget Durable Object", () => {
     expect(refused.outcome).toBe("quota");
     const afterMargin = t0 + 1_000 + 24 * 60 * 60 * 1000 + 10_000 + 60_000 + 1;
     expect((await stub.inspect(afterMargin)).usedCredits).toBe(0);
+  });
+
+  it("invokes the provider fetch inside the DO and does not fetch when min-interval refuses", async () => {
+    const ledger = `dispatch-interval-${uuid()}`;
+    const stub = await initLedger(ledger, {
+      creditBudget24h: 20,
+      globalMinIntervalMs: 300,
+      clientMinIntervalMs: 0,
+      maxInFlightGeo: 10,
+    });
+    const t0 = Date.UTC(2026, 8, 28, 0, 0, 0);
+    const fetchTimes: number[] = [];
+    const outcome = await runInDurableObject(stub, async (instance) => {
+      const fetchImpl: typeof fetch = async () => {
+        fetchTimes.push(Date.now());
+        return new Response(
+          JSON.stringify({
+            results: [{ name: "x", formatted: "y", lat: 25.0478, lon: 121.517 }],
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      };
+      const first = await instance.dispatchSearch({
+        admit: await admitArgs({
+          ledger,
+          nowMs: t0,
+          operation: "search",
+          credits: 1,
+          requestId: uuid(),
+          payload: "dispatch-a",
+        }),
+        search: { query: "台北車站", language: "zh-TW" },
+        provider: { mode: "live", apiKey: "test-key", timeoutMs: 10_000 },
+        fetchImpl,
+      });
+      const second = await instance.dispatchSearch({
+        admit: await admitArgs({
+          ledger,
+          nowMs: t0 + 100,
+          operation: "search",
+          credits: 1,
+          requestId: uuid(),
+          payload: "dispatch-b",
+        }),
+        search: { query: "台北車站", language: "zh-TW" },
+        provider: { mode: "live", apiKey: "test-key", timeoutMs: 10_000 },
+        fetchImpl,
+      });
+      return { first: first.kind, second: second.kind, secondOutcome: second };
+    });
+    expect(outcome.first).toBe("admitted");
+    expect(outcome.second).toBe("rejected");
+    expect(fetchTimes).toHaveLength(1);
   });
 });

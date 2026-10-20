@@ -30,6 +30,11 @@ class EntitlementRepository(
     private val acknowledged = mutableSetOf<String>()
     private var purchaseInFlight = false
     private var emptyAccountQueryConfirmations = 0
+    private var lastRemoteVerifyAtMillis = 0L
+
+    companion object {
+        const val ROUTINE_VERIFY_INTERVAL_MS = 24L * 60 * 60 * 1000
+    }
 
     suspend fun start() {
         mutex.withLock {
@@ -46,6 +51,18 @@ class EntitlementRepository(
             refreshProduct()
             refreshPurchases(force = true)
         }
+    }
+
+    suspend fun refreshOnForeground() {
+        mutex.withLock {
+            billing.connect()
+            refreshProduct()
+            refreshPurchases(force = false)
+        }
+    }
+
+    fun onPurchaseFlowFinished() {
+        purchaseInFlight = false
     }
 
     fun launchPurchase(activity: Activity): Boolean {
@@ -83,11 +100,9 @@ class EntitlementRepository(
         val stored = store.read() ?: return
         val receipt = stored.receiptJws
         val installId = installIdProvider()
-        val storedReceiptVerifier = receiptVerifier
-        if (storedReceiptVerifier != null) {
-            val claims = runCatching { storedReceiptVerifier.verify(receipt, installId) }.getOrNull()
-            if (claims == null) return
-        }
+        val storedReceiptVerifier = receiptVerifier ?: return
+        val claims = runCatching { storedReceiptVerifier.verify(receipt, installId) }.getOrNull()
+        if (claims == null) return
         mutableState.update {
             it.copy(
                 state = EntitlementState.OwnedOffline,
@@ -152,8 +167,15 @@ class EntitlementRepository(
             return
         }
         val purchase = purchased.first()
+        val withinRoutineWindow =
+            lastRemoteVerifyAtMillis > 0L &&
+                clock() - lastRemoteVerifyAtMillis < ROUTINE_VERIFY_INTERVAL_MS
+        if (!force && withinRoutineWindow) {
+            return
+        }
         mutableState.update { it.copy(state = EntitlementState.VerificationPending) }
         val verification = verifier.verify(purchase.purchaseToken, installIdProvider())
+        lastRemoteVerifyAtMillis = clock()
         when (verification.status) {
             PurchaseVerifyStatus.Owned -> {
                 val receipt = verification.receipt
@@ -162,11 +184,13 @@ class EntitlementRepository(
                     return
                 }
                 val ownedReceiptVerifier = receiptVerifier
-                if (ownedReceiptVerifier != null) {
-                    runCatching { ownedReceiptVerifier.verify(receipt, installIdProvider()) }.getOrElse {
-                        mutableState.update { it.copy(state = EntitlementState.VerificationPending) }
-                        return
-                    }
+                if (ownedReceiptVerifier == null) {
+                    mutableState.update { it.copy(state = EntitlementState.VerificationPending) }
+                    return
+                }
+                runCatching { ownedReceiptVerifier.verify(receipt, installIdProvider()) }.getOrElse {
+                    mutableState.update { it.copy(state = EntitlementState.VerificationPending) }
+                    return
                 }
                 store.write(
                     StoredEntitlement(
@@ -203,9 +227,6 @@ class EntitlementRepository(
                     mutableState.update { it.copy(state = EntitlementState.VerificationPending) }
                 }
             }
-        }
-        if (!force) {
-            // Background refresh remains at most once per 24h at the caller.
         }
     }
 

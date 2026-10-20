@@ -390,6 +390,78 @@ class EntitlementRepositoryTest {
         assertEquals(EntitlementState.Free, repository.state.value.state)
     }
 
+    @Test
+    fun `cancelled billing flow clears in-flight and allows another purchase`() = runBlocking {
+        val billing = FakeBillingRepository(product = BillingProduct("remove_ads_lifetime", "NT$90"))
+        val repository = repository(billing = billing)
+        repository.start()
+        repository.setPurchasesEnabled(true)
+        val activity = android.app.Activity()
+        assertTrue(repository.launchPurchase(activity))
+        assertFalse(repository.launchPurchase(activity))
+        repository.onPurchaseFlowFinished()
+        assertTrue(repository.launchPurchase(activity))
+    }
+
+    @Test
+    fun `missing receipt verifier refuses a new owned grant`() = runBlocking {
+        val keys = testKeys()
+        val receipt = signReceipt(keys, "install-1")
+        val billing = FakeBillingRepository(
+            product = BillingProduct("remove_ads_lifetime", "NT$90"),
+            queryResult = BillingQueryResult.Success(
+                listOf(PlayPurchase("tok", "remove_ads_lifetime", PlayPurchaseState.Purchased, false)),
+            ),
+        )
+        val store = InMemoryEntitlementStore()
+        val repository = EntitlementRepository(
+            store = store,
+            billing = billing,
+            verifier = RecordingPurchaseVerifier(PurchaseVerifyResult(PurchaseVerifyStatus.Owned, receipt)),
+            receiptVerifier = null,
+            installIdProvider = { "install-1" },
+            productId = "remove_ads_lifetime",
+        )
+        repository.start()
+        assertEquals(EntitlementState.VerificationPending, repository.state.value.state)
+        assertEquals(null, store.read())
+    }
+
+    @Test
+    fun `routine foreground refresh does not re-verify within 24 hours`() = runBlocking {
+        val keys = testKeys()
+        val receipt = signReceipt(keys, "install-1")
+        val billing = FakeBillingRepository(
+            product = BillingProduct("remove_ads_lifetime", "NT$90"),
+            queryResult = BillingQueryResult.Success(
+                listOf(PlayPurchase("tok", "remove_ads_lifetime", PlayPurchaseState.Purchased, true)),
+            ),
+        )
+        var now = 1_000L
+        val verifier = RecordingPurchaseVerifier(PurchaseVerifyResult(PurchaseVerifyStatus.Owned, receipt))
+        val repository = EntitlementRepository(
+            store = InMemoryEntitlementStore(),
+            billing = billing,
+            verifier = verifier,
+            receiptVerifier = ReceiptVerifier(mapOf("test" to keys.public), "com.bloss0m.bloomwalk"),
+            installIdProvider = { "install-1" },
+            productId = "remove_ads_lifetime",
+            clock = { now },
+        )
+        repository.start()
+        assertEquals(1, verifier.verifyCount)
+        repository.refreshOnForeground()
+        assertEquals(1, verifier.verifyCount)
+        now += EntitlementRepository.ROUTINE_VERIFY_INTERVAL_MS - 1
+        repository.refreshOnForeground()
+        assertEquals(1, verifier.verifyCount)
+        now += 2
+        repository.refreshOnForeground()
+        assertEquals(2, verifier.verifyCount)
+        repository.restore()
+        assertEquals(3, verifier.verifyCount)
+    }
+
     private fun repository(
         store: EntitlementStore = InMemoryEntitlementStore(),
         billing: FakeBillingRepository = FakeBillingRepository(),
@@ -407,7 +479,13 @@ class EntitlementRepositoryTest {
     private class RecordingPurchaseVerifier(
         private val result: PurchaseVerifyResult,
     ) : PurchaseVerifier(client = unusedClient()) {
-        override suspend fun verify(purchaseToken: String, installId: String): PurchaseVerifyResult = result
+        var verifyCount = 0
+            private set
+
+        override suspend fun verify(purchaseToken: String, installId: String): PurchaseVerifyResult {
+            verifyCount += 1
+            return result
+        }
     }
 }
 

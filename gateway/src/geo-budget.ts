@@ -4,9 +4,19 @@ import {
   GatewayError,
   type BillingPolicy,
   type CreditEstimate,
+  type ErrorCode,
   type GeoOperation,
+  type RouteRequest,
+  type SearchRequest,
   type ValidatedGeoRequest,
 } from "./contracts/index";
+import {
+  planRoute,
+  searchPlaces,
+  type ProviderBehavior,
+  type RouteProviderResult,
+  type SearchProviderResult,
+} from "./providers/geoapify";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const CLEANUP_BATCH = 200;
@@ -32,6 +42,25 @@ export type AdmitResult =
   | { outcome: "quota"; retryAfterSeconds: number }
   | { outcome: "rate"; retryAfterSeconds: number }
   | { outcome: "unavailable"; reason: string };
+
+export type RejectedAdmit = Exclude<AdmitResult, { outcome: "admitted" }>;
+
+export interface DispatchProviderConfig {
+  mode: "stub" | "live";
+  apiKey?: string;
+  timeoutMs: number;
+  behavior?: ProviderBehavior;
+}
+
+export type DispatchSearchResult =
+  | { kind: "rejected"; admit: RejectedAdmit }
+  | { kind: "admitted"; reservationId: string; result: SearchProviderResult }
+  | { kind: "failed"; reservationId: string; code: ErrorCode; message: string };
+
+export type DispatchRouteResult =
+  | { kind: "rejected"; admit: RejectedAdmit }
+  | { kind: "admitted"; reservationId: string; result: RouteProviderResult }
+  | { kind: "failed"; reservationId: string; code: ErrorCode; message: string };
 
 export interface FinalizeInput {
   reservationId: string;
@@ -230,6 +259,54 @@ export class GeoBudget extends DurableObject<Env> {
         return { outcome: "unavailable", reason: error.message };
       }
       return { outcome: "unavailable", reason: "quota store failure" };
+    }
+  }
+
+  async dispatchSearch(input: {
+    admit: AdmitInput;
+    search: SearchRequest;
+    provider: DispatchProviderConfig;
+    fetchImpl?: typeof fetch;
+  }): Promise<DispatchSearchResult> {
+    const admit = await this.admit(input.admit);
+    if (admit.outcome !== "admitted") {
+      return { kind: "rejected", admit };
+    }
+    try {
+      const result = await searchPlaces(input.search, {
+        mode: input.provider.mode,
+        apiKey: input.provider.apiKey,
+        timeoutMs: input.provider.timeoutMs,
+        behavior: input.provider.behavior,
+        fetchImpl: input.fetchImpl,
+      });
+      return { kind: "admitted", reservationId: admit.reservationId, result };
+    } catch (error) {
+      return failedDispatch(admit.reservationId, error);
+    }
+  }
+
+  async dispatchRoute(input: {
+    admit: AdmitInput;
+    route: RouteRequest;
+    provider: DispatchProviderConfig;
+    fetchImpl?: typeof fetch;
+  }): Promise<DispatchRouteResult> {
+    const admit = await this.admit(input.admit);
+    if (admit.outcome !== "admitted") {
+      return { kind: "rejected", admit };
+    }
+    try {
+      const result = await planRoute(input.route, {
+        mode: input.provider.mode,
+        apiKey: input.provider.apiKey,
+        timeoutMs: input.provider.timeoutMs,
+        behavior: input.provider.behavior,
+        fetchImpl: input.fetchImpl,
+      });
+      return { kind: "admitted", reservationId: admit.reservationId, result };
+    } catch (error) {
+      return failedDispatch(admit.reservationId, error);
     }
   }
 
@@ -459,4 +536,16 @@ export class GeoBudget extends DurableObject<Env> {
     );
     return { outcome: "admitted", reservationId };
   }
+}
+
+function failedDispatch(
+  reservationId: string,
+  error: unknown,
+): { kind: "failed"; reservationId: string; code: ErrorCode; message: string } {
+  return {
+    kind: "failed",
+    reservationId,
+    code: error instanceof GatewayError ? error.code : "PROVIDER_UNAVAILABLE",
+    message: error instanceof Error ? error.message : "provider failed",
+  };
 }

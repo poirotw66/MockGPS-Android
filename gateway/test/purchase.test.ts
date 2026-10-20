@@ -232,4 +232,34 @@ describe("POST /v1/purchases/verify", () => {
     );
     expect((await jsonOf<GatewayErrorBody>(response)).error.code).toBe("PROVIDER_UNAVAILABLE");
   });
+
+  it("keeps the original purchasedAt when the same token is verified again", async () => {
+    const installId = uuid();
+    const purchaseToken = "purchased-ack-fail-001";
+    const first = await purchase(undefined, { purchaseToken, installId }, { installId });
+    expect((await jsonOf<PurchaseVerifyResponse>(first)).status).toBe("owned");
+    const stub = purchaseDo();
+    const original = await runInDurableObject(stub, async (instance) => instance.inspect());
+    expect(original.purchasedAt).not.toBeNull();
+    const later = (original.purchasedAt ?? 0) + 3_600_000;
+    await runInDurableObject(stub, async (instance) => {
+      await instance.verify({
+        nowMs: later,
+        purchaseToken,
+        installId,
+        hmacSecret: "test-rate-key-hmac-secret-not-production",
+        encryptionKey: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        playMode: "stub",
+        stubTokensJson: JSON.stringify({
+          "purchased-ack-fail-001": { state: "PURCHASED", acknowledged: false, ackFails: true },
+        }),
+        receiptPrivateKey: TEST_RECEIPT_PRIVATE_KEY,
+        receiptKid: "test-kid-1",
+        receiptIssuer: "bloomwalk-gps-gateway",
+        receiptAudience: "com.bloss0m.bloomwalk",
+      });
+    });
+    const again = await runInDurableObject(stub, async (instance) => instance.inspect());
+    expect(again.purchasedAt).toBe(original.purchasedAt);
+  });
 });

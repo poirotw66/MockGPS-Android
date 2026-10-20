@@ -21,6 +21,7 @@ class PlayBillingRepository(
     private val productId: String,
     private val onPurchases: (List<PlayPurchase>) -> Unit,
     private val onQueryExistingPurchases: () -> Unit = {},
+    private val onPurchaseFlowFinished: () -> Unit = {},
 ) : BillingRepository, PurchasesUpdatedListener {
     private var productDetails: ProductDetails? = null
     private val client: BillingClient = BillingClient.newBuilder(context.applicationContext)
@@ -38,9 +39,11 @@ class PlayBillingRepository(
                 if (mapped.isNotEmpty()) {
                     onPurchases(mapped)
                 } else {
+                    onPurchaseFlowFinished()
                     onQueryExistingPurchases()
                 }
             }
+            else -> onPurchaseFlowFinished()
         }
     }
 

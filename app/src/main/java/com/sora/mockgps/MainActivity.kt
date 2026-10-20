@@ -31,7 +31,7 @@ class MainActivity : ComponentActivity() {
         val app = application as? BloomWalkApplication ?: return
         lifecycleScope.launch {
             refreshRemoteConfig(app)
-            app.monetization.entitlementRepository.restore()
+            app.monetization.entitlementRepository.refreshOnForeground()
         }
     }
 

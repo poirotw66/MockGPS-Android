@@ -62,6 +62,7 @@ data class MonetizationDependencies(
                 onQueryExistingPurchases = {
                     scope.launch { entitlement.restore() }
                 },
+                onPurchaseFlowFinished = entitlement::onPurchaseFlowFinished,
             )
             billingHolder.delegate = playBilling
             return MonetizationDependencies(
