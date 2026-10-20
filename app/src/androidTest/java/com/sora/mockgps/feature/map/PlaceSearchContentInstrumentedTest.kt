@@ -38,6 +38,7 @@ class PlaceSearchContentInstrumentedTest {
     fun clearSearchRemovesProgressFeedback() {
         var query by mutableStateOf("Tokyo")
         var isSearching by mutableStateOf(true)
+        var phase by mutableStateOf(com.sora.mockgps.feature.search.PlaceSearchPhase.Submitting)
         composeRule.setContent {
             BloomWalkTheme {
                 PlaceSearchContent(
@@ -45,20 +46,25 @@ class PlaceSearchContentInstrumentedTest {
                     isSearching = isSearching,
                     results = emptyList(),
                     error = null,
-                    onQueryChanged = {
-                        query = it
+                    onQueryChanged = { next ->
+                        query = next
                         isSearching = false
+                        phase = com.sora.mockgps.feature.search.PlaceSearchPhase.LocalOnly
                     },
                     onPlaceSelected = {},
+                    phase = phase,
                 )
             }
         }
 
         val loading = context.getString(R.string.place_search_loading)
+        val clearLabel = context.getString(R.string.action_clear_search)
         composeRule.onNodeWithText(loading).assertIsDisplayed()
-        // Clear must work regardless of IME/focus quirks across API levels.
-        composeRule.onNodeWithContentDescription(context.getString(R.string.action_clear_search)).performClick()
-        composeRule.waitForIdle()
+        // Trailing-icon semantics are often merged into the TextField; use the unmerged tree.
+        composeRule.onNodeWithContentDescription(clearLabel, useUnmergedTree = true).performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithText(loading).fetchSemanticsNodes().isEmpty()
+        }
         composeRule.onAllNodesWithText(loading).assertCountEquals(0)
         composeRule.onAllNodesWithText("Tokyo").assertCountEquals(0)
     }

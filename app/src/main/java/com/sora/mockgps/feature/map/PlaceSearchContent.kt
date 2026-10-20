@@ -45,11 +45,18 @@ internal fun PlaceSearchContent(
     error: PlaceSearchError?,
     onQueryChanged: (String) -> Unit,
     onPlaceSelected: (PlaceSearchResult) -> Unit,
-    phase: PlaceSearchPhase = if (isSearching) PlaceSearchPhase.Submitting else PlaceSearchPhase.LocalOnly,
+    phase: PlaceSearchPhase? = null,
     attribution: List<AttributionLink> = emptyList(),
     submitEnabled: Boolean = !isSearching,
     onSubmit: () -> Unit = {},
 ) {
+    // Resolve inside the body so clearing/search state updates are not stuck on a
+    // Compose default-parameter snapshot from the first composition.
+    val resolvedPhase = phase ?: if (isSearching) {
+        PlaceSearchPhase.Submitting
+    } else {
+        PlaceSearchPhase.LocalOnly
+    }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val uriHandler = LocalUriHandler.current
@@ -59,7 +66,7 @@ internal fun PlaceSearchContent(
     val canSubmit = submitEnabled &&
         isExplicitSearchQuerySubmittable(query) &&
         parseCoordinateSearchQuery(query) == null
-    val showNicknameHint = phase == PlaceSearchPhase.LocalOnly &&
+    val showNicknameHint = resolvedPhase == PlaceSearchPhase.LocalOnly &&
         looksLikeLandmarkNickname(query) &&
         coordinateResults.isEmpty() &&
         landmarkResults.isEmpty()
@@ -69,29 +76,31 @@ internal fun PlaceSearchContent(
         focusManager.clearFocus()
         onSubmit()
     }
-    OutlinedTextField(
-        value = query,
-        onValueChange = onQueryChanged,
-        label = { Text(stringResource(R.string.place_search_label)) },
-        supportingText = { Text(stringResource(R.string.place_search_privacy)) },
-        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-        trailingIcon = if (query.isNotEmpty()) {
-            {
-                IconButton(onClick = { onQueryChanged("") }) {
-                    Icon(
-                        Icons.Filled.Close,
-                        contentDescription = stringResource(R.string.action_clear_search),
-                    )
-                }
-            }
-        } else {
-            null
-        },
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-        keyboardActions = KeyboardActions(onSearch = { submitSearch() }),
+    Row(
         modifier = Modifier.fillMaxWidth(),
-        singleLine = true,
-    )
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQueryChanged,
+            label = { Text(stringResource(R.string.place_search_label)) },
+            supportingText = { Text(stringResource(R.string.place_search_privacy)) },
+            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { submitSearch() }),
+            modifier = Modifier.weight(1f),
+            singleLine = true,
+        )
+        if (query.isNotEmpty()) {
+            IconButton(onClick = { onQueryChanged("") }) {
+                Icon(
+                    Icons.Filled.Close,
+                    contentDescription = stringResource(R.string.action_clear_search),
+                )
+            }
+        }
+    }
     OutlinedButton(
         onClick = { submitSearch() },
         enabled = canSubmit,
@@ -99,7 +108,7 @@ internal fun PlaceSearchContent(
     ) {
         Text(stringResource(R.string.action_search_online))
     }
-    if (phase == PlaceSearchPhase.Submitting) {
+    if (resolvedPhase == PlaceSearchPhase.Submitting) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -112,14 +121,14 @@ internal fun PlaceSearchContent(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-    } else if (phase == PlaceSearchPhase.EmptyRemoteResults) {
+    } else if (resolvedPhase == PlaceSearchPhase.EmptyRemoteResults) {
         Text(
             stringResource(R.string.place_search_empty),
             modifier = Modifier.padding(vertical = 8.dp),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-    } else if (phase == PlaceSearchPhase.LocalOnly &&
+    } else if (resolvedPhase == PlaceSearchPhase.LocalOnly &&
         isExplicitSearchQuerySubmittable(query) &&
         coordinateResults.isEmpty() &&
         error == null
