@@ -1,9 +1,12 @@
-# Deployable public site assets
+# Public site assets
 
-These files are the in-repo privacy, support, and `app-ads.txt` assets required by the monetization spec. They are **not** live.
+Privacy, support, language-picker, and `app-ads.txt` assets for BloomWalk GPS.
 
+**Deployed:** Cloudflare Pages project `bloomwalk-gps` (currently `https://bloomwalk-gps.pages.dev/`). Production serves these pages through a Pages `_worker.js`, so content updates in this directory require redeploying the Pages project — editing the repo alone does not update the live site.
+
+- Play Console privacy URL: `/privacy/zh-Hant/`
+- Support contact: `justin@bloss0m.com`
+- `app-ads.txt` remains a placeholder until AdMob (B07). Do not treat a repo path as crawled by AdMob; the Play developer website root must serve `/app-ads.txt`.
 - Do not modify other website repositories from this work.
-- Do not treat a repo path as crawled by AdMob. The Play developer website root must serve `/app-ads.txt`.
-- Replace the publisher record, support email, and canonical HTTPS URLs before B07/B08.
 
-Suggested local preview: copy `site/` to any static host the owner already controls, or to a free static host. The API gateway may use a different hostname.
+The API gateway may use a different hostname than the Pages site.
