@@ -170,6 +170,7 @@ internal fun MapControlPanel(
         isStarting,
         isActive,
         isRouteSession,
+        routePlanningStep,
         pendingCoordinate,
         activeCoordinate,
     ) {
@@ -178,6 +179,7 @@ internal fun MapControlPanel(
             isStarting = isStarting,
             isActive = isActive,
             isRouteSession = isRouteSession,
+            isRoutePlanning = routePlanningStep != RoutePlanningStep.Inactive,
             pendingCoordinate = pendingCoordinate,
             activeCoordinate = activeCoordinate,
         )
@@ -344,8 +346,7 @@ internal fun MapControlPanel(
                     )
                 }
             }
-            if (routePlanningStep == RoutePlanningStep.Inactive) {
-                if (detailGroup == MapDetailGroup.Search) {
+            if (detailGroup == MapDetailGroup.Search) {
                     if (showCoordinates) Text(
                         stringResource(R.string.selected_coordinate, pendingCoordinate.latitude.formatCoordinate(), pendingCoordinate.longitude.formatCoordinate()),
                         style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -554,7 +555,11 @@ internal fun MapControlPanel(
                         }
                     }
                 }
-                if (detailGroup == MapDetailGroup.Route && !isStarting && !isRouteSession) {
+                if (detailGroup == MapDetailGroup.Route &&
+                    routePlanningStep == RoutePlanningStep.Inactive &&
+                    !isStarting &&
+                    !isRouteSession
+                ) {
                     Button(
                         onClick = {
                             activeDetail = null
@@ -562,33 +567,33 @@ internal fun MapControlPanel(
                         },
                         enabled = isMapReady,
                         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                    ) { Text(stringResource(R.string.action_auto_journey), maxLines = 1) }
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(
-                            onClick = {
-                                activeDetail = null
-                                onBeginRoutePlanning()
-                            },
-                            enabled = isMapReady,
-                            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                        ) { Text(stringResource(R.string.action_plan_bicycle_route), maxLines = 1) }
-                        OutlinedButton(
-                            onClick = {
-                                activeDetail = null
-                                onShowShapeRoute()
-                            },
-                            enabled = isMapReady,
-                            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                        ) { Text(stringResource(R.string.action_shape_route), maxLines = 1) }
-                    }
+                    ) { Text(stringResource(R.string.action_auto_journey), maxLines = 2) }
+                    OutlinedButton(
+                        onClick = {
+                            activeDetail = null
+                            onBeginRoutePlanning()
+                        },
+                        enabled = isMapReady,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    ) { Text(stringResource(R.string.action_plan_bicycle_route), maxLines = 2) }
+                    OutlinedButton(
+                        onClick = {
+                            activeDetail = null
+                            onShowShapeRoute()
+                        },
+                        enabled = isMapReady,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    ) { Text(stringResource(R.string.action_shape_route), maxLines = 2) }
                     TextButton(onClick = {
                         activeDetail = null
                         onShowRouteLibrary()
                     }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                        Text(stringResource(R.string.action_open_route_library))
+                        Text(stringResource(R.string.action_open_route_library), maxLines = 2)
                     }
                 }
-            } else if (detailGroup == MapDetailGroup.Route) {
+            if (detailGroup == MapDetailGroup.Route &&
+                routePlanningStep != RoutePlanningStep.Inactive
+            ) {
                 activeRouteName?.let {
                     Text(
                         text = it,
@@ -597,17 +602,23 @@ internal fun MapControlPanel(
                     )
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.route_panel_title), style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            stringResource(R.string.route_panel_subtitle),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    if (!isStarting && !isActive) {
+                    Text(
+                        stringResource(R.string.route_panel_subtitle),
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (!isStarting && !isRouteSession) {
                         TextButton(onClick = onClearRoute, modifier = Modifier.heightIn(min = 48.dp)) {
-                            Text(stringResource(R.string.action_cancel))
+                            Text(
+                                stringResource(
+                                    if (routePlanningStep == RoutePlanningStep.Preview) {
+                                        R.string.action_clear_route
+                                    } else {
+                                        R.string.action_cancel
+                                    },
+                                ),
+                            )
                         }
                     }
                 }
@@ -660,25 +671,16 @@ internal fun MapControlPanel(
                             }
                         }
                         if (!isPlanningRoute) {
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                TextButton(onClick = {
-                                    activeDetail = null
-                                    onAddRouteWaypoint()
-                                }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
-                                    Text(stringResource(R.string.action_add_route_stop))
-                                }
-                                TextButton(onClick = onSwapRouteEndpoints, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
-                                    Text(stringResource(R.string.action_swap_endpoints))
-                                }
+                            RouteSheetAction(stringResource(R.string.action_add_route_stop)) {
+                                activeDetail = null
+                                onAddRouteWaypoint()
                             }
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                TextButton(onClick = onEditRouteOrigin, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
-                                    Text(stringResource(R.string.action_reset_route_start), maxLines = 1)
-                                }
-                                TextButton(onClick = onEditRouteDestination, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
-                                    Text(stringResource(R.string.action_change_destination), maxLines = 1)
-                                }
-                            }
+                            RouteSheetAction(stringResource(R.string.action_swap_endpoints), onSwapRouteEndpoints)
+                            RouteSheetAction(stringResource(R.string.action_reset_route_start), onEditRouteOrigin)
+                            RouteSheetAction(
+                                stringResource(R.string.action_change_destination),
+                                onEditRouteDestination,
+                            )
                         } else {
                             Text(stringResource(R.string.route_planning), style = MaterialTheme.typography.bodySmall)
                         }
@@ -696,87 +698,21 @@ internal fun MapControlPanel(
                                 color = MaterialTheme.colorScheme.primary,
                             )
                         }
-                        if (!isRouteSession) {
-                            RouteWaypointEditor(routeWaypoints, onRemoveRouteWaypoint, onMoveRouteWaypoint)
-                        }
-                        if (!isRouteSession) {
-                            RouteSimulationControls(
-                                options = routeOptions,
-                                onOptionsChange = onRouteOptionsChange,
-                            )
-                            Text(
-                                stringResource(R.string.route_replace_title),
-                                style = MaterialTheme.typography.labelLarge,
-                            )
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                TextButton(onClick = onBeginRoutePlanning, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
-                                    Text(stringResource(R.string.action_plan_bicycle_route), maxLines = 1)
-                                }
-                                TextButton(onClick = onShowAutoJourney, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
-                                    Text(stringResource(R.string.action_auto_journey), maxLines = 1)
-                                }
-                                TextButton(onClick = onShowShapeRoute, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
-                                    Text(stringResource(R.string.action_shape_route), maxLines = 1)
-                                }
-                            }
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                TextButton(onClick = {
-                                    activeDetail = null
-                                    onAddRouteWaypoint()
-                                }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
-                                    Text(stringResource(R.string.action_add_route_stop))
-                                }
-                                TextButton(onClick = onSwapRouteEndpoints, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
-                                    Text(stringResource(R.string.action_swap_endpoints))
-                                }
-                            }
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                TextButton(onClick = onSaveRoute, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
-                                    Text(stringResource(R.string.action_save_route))
-                                }
-                                TextButton(onClick = onShowRouteLibrary, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
-                                    Text(stringResource(R.string.action_route_library))
-                                }
-                                TextButton(onClick = onExportGpx, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
-                                    Text("GPX")
-                                }
-                            }
-                        }
-                        routeProgress?.let { progress ->
-                            RouteProgressSummary(progress = progress, paused = routePaused)
-                        }
-                        when (routeResult) {
-                            is RouteCompleted -> Text(
-                                stringResource(R.string.route_completed_message),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                            is RouteFailed -> Text(
-                                stringResource(R.string.route_failed_message, routeResult.message),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                            else -> Unit
-                        }
                         if (!isStarting && !isActive) {
                             Button(
                                 onClick = onStartRoute,
                                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                            ) { Text(stringResource(R.string.action_start_route_simulation), maxLines = 1) }
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                TextButton(onClick = onEditRouteDestination, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
-                                    Text(stringResource(R.string.action_change_destination), maxLines = 1)
-                                }
-                                TextButton(onClick = onClearRoute, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
-                                    Text(stringResource(R.string.action_clear_route), maxLines = 1)
-                                }
-                            }
+                            ) { Text(stringResource(R.string.action_start_route_simulation), maxLines = 2) }
                         } else if (isActive && !isRouteSession) {
                             Text(
                                 stringResource(R.string.route_stop_mock_before_simulation),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
+                            OutlinedButton(
+                                onClick = onStop,
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                            ) { Text(stringResource(R.string.action_stop_mock_location), maxLines = 2) }
                         }
                         if (isStarting) {
                             Text(stringResource(R.string.state_starting), style = MaterialTheme.typography.bodySmall)
@@ -793,6 +729,50 @@ internal fun MapControlPanel(
                                     Text(stringResource(R.string.action_stop))
                                 }
                             }
+                        }
+                        if (!isRouteSession) {
+                            RouteWaypointEditor(routeWaypoints, onRemoveRouteWaypoint, onMoveRouteWaypoint)
+                        }
+                        if (!isRouteSession) {
+                            RouteSimulationControls(
+                                options = routeOptions,
+                                onOptionsChange = onRouteOptionsChange,
+                            )
+                            Text(
+                                stringResource(R.string.route_replace_title),
+                                style = MaterialTheme.typography.labelLarge,
+                            )
+                            RouteSheetAction(stringResource(R.string.action_plan_bicycle_route), onBeginRoutePlanning)
+                            RouteSheetAction(stringResource(R.string.action_auto_journey), onShowAutoJourney)
+                            RouteSheetAction(stringResource(R.string.action_shape_route), onShowShapeRoute)
+                            RouteSheetAction(stringResource(R.string.action_add_route_stop)) {
+                                activeDetail = null
+                                onAddRouteWaypoint()
+                            }
+                            RouteSheetAction(stringResource(R.string.action_swap_endpoints), onSwapRouteEndpoints)
+                            RouteSheetAction(
+                                stringResource(R.string.action_change_destination),
+                                onEditRouteDestination,
+                            )
+                            RouteSheetAction(stringResource(R.string.action_save_route), onSaveRoute)
+                            RouteSheetAction(stringResource(R.string.action_route_library), onShowRouteLibrary)
+                            RouteSheetAction("GPX", onExportGpx)
+                        }
+                        routeProgress?.let { progress ->
+                            RouteProgressSummary(progress = progress, paused = routePaused)
+                        }
+                        when (routeResult) {
+                            is RouteCompleted -> Text(
+                                stringResource(R.string.route_completed_message),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            is RouteFailed -> Text(
+                                stringResource(R.string.route_failed_message, routeResult.message),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                            else -> Unit
                         }
                     }
                     RoutePlanningStep.Inactive -> Unit
@@ -818,6 +798,19 @@ internal fun MapControlPanel(
         }
     }
 }
+}
+
+@Composable
+private fun RouteSheetAction(
+    label: String,
+    onClick: () -> Unit,
+) {
+    TextButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+    ) {
+        Text(label, maxLines = 2)
+    }
 }
 
 internal fun formatUpdateIntervalLabel(intervalMillis: Long): String =

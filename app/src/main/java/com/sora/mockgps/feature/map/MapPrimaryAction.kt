@@ -32,11 +32,13 @@ internal fun resolveMapDockActions(
     isStarting: Boolean,
     isActive: Boolean,
     isRouteSession: Boolean,
+    isRoutePlanning: Boolean,
     pendingCoordinate: Coordinate,
     activeCoordinate: Coordinate?,
 ): MapDockActions {
     val pendingDiffers = isActive &&
         !isRouteSession &&
+        !isRoutePlanning &&
         activeCoordinate != null &&
         activeCoordinate != pendingCoordinate
     val primary = when {

@@ -4,10 +4,12 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -50,28 +52,18 @@ internal fun JoystickOverlay(
     var dragOffset by remember { mutableStateOf(Offset.Zero) }
 
     Column(
-        modifier = modifier.semantics { contentDescription = joystickDescription },
+        modifier = modifier
+            .widthIn(max = 260.dp)
+            .semantics { contentDescription = joystickDescription },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            // First row kept compact on the map overlay; full set is in the Joystick sheet.
-            listOf(JoystickSpeed.Walk, JoystickSpeed.Run, JoystickSpeed.Bicycle).forEach { speed ->
-                FilterChip(
-                    selected = selectedSpeed == speed,
-                    onClick = { if (enabled) onSpeedChange(speed) },
-                    label = {
-                        Text(
-                            text = speed.label(),
-                            style = MaterialTheme.typography.labelSmall,
-                        )
-                    },
-                    enabled = enabled,
-                )
-            }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            listOf(JoystickSpeed.Car, JoystickSpeed.HighSpeedRail, JoystickSpeed.Airplane).forEach { speed ->
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            JoystickSpeed.entries.forEach { speed ->
                 FilterChip(
                     selected = selectedSpeed == speed,
                     onClick = { if (enabled) onSpeedChange(speed) },

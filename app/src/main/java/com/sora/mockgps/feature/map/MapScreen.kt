@@ -41,6 +41,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -49,8 +50,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -656,14 +659,14 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             showLandmarks = showLandmarks,
             activeRouteCoordinate = activeCoordinate.takeIf { isRouteSession },
             pendingApplyActiveCoordinate = activeCoordinate?.takeIf {
-                isActive && !isRouteSession && it != uiState.pendingCoordinate
+                isActive && !isRouteSession && !uiState.isRoutePlanningMode &&
+                    it != uiState.pendingCoordinate
             },
             cameraState = cameraState,
             onMapLoaded = viewModel::onMapLoaded,
             onMapLoadFailed = viewModel::onMapLoadFailed,
             onCameraIdle = viewModel::onCameraIdle,
             onCoordinateSelected = { coordinate ->
-                viewModel.selectCoordinate(coordinate)
                 when {
                     selectingRouteWaypoint -> {
                         selectingRouteWaypoint = false
@@ -674,6 +677,9 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     }
                     uiState.routePlanningStep == RoutePlanningStep.SelectDestination -> {
                         viewModel.setRouteDestination(coordinate)
+                    }
+                    uiState.routePlanningStep == RoutePlanningStep.Inactive -> {
+                        viewModel.selectCoordinate(coordinate)
                     }
                 }
             },
@@ -753,7 +759,15 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             adsController?.onEligibilityChanged(adsEligibility) ?: AdsAction.Destroy
         }
         val showBanner = adsAction == AdsAction.Load || adsAction == AdsAction.Keep
-        val chromeBottomPadding = if (compactLayout) 24.dp else if (showBanner) 228.dp else 156.dp
+        val density = LocalDensity.current
+        var dockHeightPx by remember { mutableIntStateOf(0) }
+        val dockClearance = with(density) { dockHeightPx.toDp() }
+        val chromeBottomPadding = when {
+            compactLayout -> 24.dp
+            dockClearance > 0.dp -> dockClearance + 12.dp + if (showBanner) 72.dp else 0.dp
+            showBanner -> 228.dp
+            else -> 180.dp
+        }
         LaunchedEffect(showBanner) {
             if (showBanner && !adsInitialized) {
                 adsInitialized = true
@@ -825,6 +839,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 .align(if (compactLayout) Alignment.CenterEnd else Alignment.BottomCenter)
                 .then(if (compactLayout) Modifier else Modifier.fillMaxWidth())
                 .navigationBarsPadding()
+                .onSizeChanged { dockHeightPx = it.height }
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {

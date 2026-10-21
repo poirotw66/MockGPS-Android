@@ -662,11 +662,12 @@ internal class MapRoutingCoordinator(
     }
 
     fun navigateBackRoutePlanning() {
-        when (uiState.value.routePlanningStep) {
+        val state = uiState.value
+        when (state.routePlanningStep) {
             RoutePlanningStep.Preview,
             RoutePlanningStep.Planning,
-            RoutePlanningStep.ReadyToPreview,
-            -> editRouteDestination()
+            -> if (routeBackClearsPreview(state)) clearRoute() else editRouteDestination()
+            RoutePlanningStep.ReadyToPreview -> editRouteDestination()
             RoutePlanningStep.SelectDestination -> editRouteOrigin()
             RoutePlanningStep.SelectStart -> clearRoute()
             RoutePlanningStep.Inactive -> Unit

@@ -66,6 +66,16 @@ data class MapUiState(
         }
 }
 
+/**
+ * Shape routes, automatic journeys, and saved-route previews are not manual
+ * endpoint selection. Back should remove them instead of opening the A/B editor.
+ */
+internal fun routeBackClearsPreview(state: MapUiState): Boolean {
+    val step = state.routePlanningStep
+    val isGeneratedPreview = step == RoutePlanningStep.Preview || step == RoutePlanningStep.Planning
+    return isGeneratedPreview && (!state.showRouteControlPoints || state.activeSavedRouteId != null)
+}
+
 enum class PlaceSearchError {
     Network,
     RateLimited,

@@ -42,6 +42,7 @@
     <string name="foreground_service_start_failed">Android did not allow the foreground service to start. Check location services and Developer options, then try again.</string>
     <string name="action_start_mock">Start mock location</string>
     <string name="action_stop">Stop</string>
+    <string name="action_stop_mock_location">Stop mock location</string>
     <string name="action_open_developer_options">Open Developer options</string>
     <string name="action_developer_settings">Settings</string>
     <string name="developer_options_unavailable">Developer options are unavailable on this device.</string>
@@ -144,7 +145,6 @@
     <string name="route_error_out_of_scope">Online road routing is limited to 100 km of input distance. Saved, imported, and local routes are not limited.</string>
     <string name="route_error_quota">Today\'s online service allowance is exhausted. Local features remain available.</string>
     <string name="route_error_disabled">Online road routing is currently unavailable. Local perfect-shape and saved routes still work.</string>
-    <string name="route_panel_title">Route</string>
     <string name="route_panel_subtitle">Choose endpoints, stops and simulation options</string>
     <string name="route_stop_mock_before_simulation">Stop the mock location before starting this route.</string>
     <string name="route_choose_start">Choose the start</string>

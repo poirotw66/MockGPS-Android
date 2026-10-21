@@ -3,9 +3,13 @@ package com.sora.mockgps.feature.map
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.spatialk.geojson.Position
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.sora.mockgps.core.model.Coordinate
+import com.sora.mockgps.route.PlannedRoute
 import com.sora.mockgps.route.RouteTransportMode
 
 class MapStateReducerTest {
@@ -107,6 +111,52 @@ class MapStateReducerTest {
         assertEquals(points, result.plannedRoute?.points)
         assertEquals(RouteTransportMode.Bicycle, result.routeTransportMode)
         assertEquals(true, result.showRouteControlPoints)
+    }
+
+    @Test
+    fun `back clears a shape preview instead of opening endpoint selection`() {
+        val start = Coordinate(25.03, 121.50)
+        val end = Coordinate(25.05, 121.52)
+        val state = MapUiState(
+            isRoutePlanningMode = true,
+            routeOrigin = start,
+            routeDestination = end,
+            plannedRoute = PlannedRoute(listOf(start, end), 1_000.0, 0.0),
+            showRouteControlPoints = false,
+            activeRouteName = "Heart",
+        )
+        assertEquals(RoutePlanningStep.Preview, state.routePlanningStep)
+        assertTrue(routeBackClearsPreview(state))
+    }
+
+    @Test
+    fun `back clears a saved route preview`() {
+        val points = listOf(
+            Coordinate(25.033964, 121.564468),
+            Coordinate(25.047675, 121.517055),
+        )
+        val state = MapStateReducer.loadedRoutePreview(
+            state = MapUiState(),
+            points = points,
+            distanceMeters = 5_000.0,
+            name = "Morning ride",
+            savedRouteId = 42,
+        )
+        assertTrue(routeBackClearsPreview(state))
+    }
+
+    @Test
+    fun `back keeps a manual preview on endpoint editing`() {
+        val start = Coordinate(25.03, 121.50)
+        val end = Coordinate(25.05, 121.52)
+        val state = MapUiState(
+            isRoutePlanningMode = true,
+            routeOrigin = start,
+            routeDestination = end,
+            plannedRoute = PlannedRoute(listOf(start, end), 1_000.0, 0.0),
+            showRouteControlPoints = true,
+        )
+        assertFalse(routeBackClearsPreview(state))
     }
 
     @Test

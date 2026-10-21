@@ -19,6 +19,7 @@ class MapPrimaryActionTest {
             isStarting = false,
             isActive = false,
             isRouteSession = false,
+            isRoutePlanning = false,
             pendingCoordinate = pending,
             activeCoordinate = null,
         )
@@ -34,6 +35,7 @@ class MapPrimaryActionTest {
             isStarting = false,
             isActive = true,
             isRouteSession = false,
+            isRoutePlanning = false,
             pendingCoordinate = pending,
             activeCoordinate = pending,
         )
@@ -49,6 +51,7 @@ class MapPrimaryActionTest {
             isStarting = false,
             isActive = true,
             isRouteSession = false,
+            isRoutePlanning = false,
             pendingCoordinate = pending,
             activeCoordinate = active,
         )
@@ -65,8 +68,25 @@ class MapPrimaryActionTest {
             isStarting = false,
             isActive = true,
             isRouteSession = true,
+            isRoutePlanning = true,
             pendingCoordinate = pending,
             activeCoordinate = pending,
+        )
+        assertNull(actions.primary)
+        assertTrue(actions.showStop)
+        assertFalse(actions.showPendingApplyHint)
+    }
+
+    @Test
+    fun `route planning hides apply even when the pending point differs`() {
+        val actions = resolveMapDockActions(
+            isMapReady = true,
+            isStarting = false,
+            isActive = true,
+            isRouteSession = false,
+            isRoutePlanning = true,
+            pendingCoordinate = pending,
+            activeCoordinate = active,
         )
         assertNull(actions.primary)
         assertTrue(actions.showStop)
