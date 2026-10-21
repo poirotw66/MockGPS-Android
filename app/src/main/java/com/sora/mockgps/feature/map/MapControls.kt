@@ -94,7 +94,6 @@ internal fun MapControlPanel(
     routePaused: Boolean,
     routeProgress: RouteProgress?,
     routeResult: RouteServiceState?,
-    isSelectingRouteWaypoint: Boolean,
     routeOptions: RouteSimulationOptions,
     onRouteOptionsChange: (RouteSimulationOptions) -> Unit,
     favoritesCount: Int,
@@ -167,26 +166,18 @@ internal fun MapControlPanel(
     var activeDetail by remember { mutableStateOf<MapDetailGroup?>(null) }
     val detailSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val dockActions = remember(
-        routePlanningStep,
-        isSelectingRouteWaypoint,
         isMapReady,
         isStarting,
-        isPlanningRoute,
         isActive,
         isRouteSession,
-        routePaused,
         pendingCoordinate,
         activeCoordinate,
     ) {
         resolveMapDockActions(
-            routePlanningStep = routePlanningStep,
-            isSelectingRouteWaypoint = isSelectingRouteWaypoint,
             isMapReady = isMapReady,
             isStarting = isStarting,
-            isPlanningRoute = isPlanningRoute,
             isActive = isActive,
             isRouteSession = isRouteSession,
-            routePaused = routePaused,
             pendingCoordinate = pendingCoordinate,
             activeCoordinate = activeCoordinate,
         )
@@ -239,11 +230,6 @@ internal fun MapControlPanel(
                     Button(
                         onClick = {
                             when (primary) {
-                                MapPrimaryAction.CancelWaypointSelection -> onCancelRouteWaypointSelection()
-                                MapPrimaryAction.CancelRoutePlanning -> onClearRoute()
-                                MapPrimaryAction.PreviewRoute -> onPlanRoute()
-                                MapPrimaryAction.StartRoute -> onStartRoute()
-                                MapPrimaryAction.PauseRoute, MapPrimaryAction.ResumeRoute -> onPauseResumeRoute()
                                 MapPrimaryAction.ApplyLocation -> onApply()
                                 MapPrimaryAction.StartMock -> onStart()
                             }
@@ -252,11 +238,7 @@ internal fun MapControlPanel(
                         modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                         shape = MaterialTheme.shapes.large,
                     ) {
-                        if (isPlanningRoute && primary == MapPrimaryAction.PreviewRoute) {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                        } else {
-                            Text(stringResource(primary.labelRes), maxLines = 1)
-                        }
+                        Text(stringResource(primary.labelRes), maxLines = 1)
                     }
                 }
                 if (dockActions.showStop) {
@@ -492,12 +474,6 @@ internal fun MapControlPanel(
                             Text(stringResource(R.string.action_favorites, favoritesCount), maxLines = 1)
                         }
                     }
-                    TextButton(onClick = {
-                        activeDetail = null
-                        onShowRouteLibrary()
-                    }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                        Text(stringResource(R.string.action_open_route_library))
-                    }
                 }
                 if (detailGroup == MapDetailGroup.Joystick) {
                     Text(
@@ -578,7 +554,7 @@ internal fun MapControlPanel(
                         }
                     }
                 }
-                if (detailGroup == MapDetailGroup.Route && !isStarting && !isActive) {
+                if (detailGroup == MapDetailGroup.Route && !isStarting && !isRouteSession) {
                     Button(
                         onClick = {
                             activeDetail = null
@@ -605,20 +581,11 @@ internal fun MapControlPanel(
                             modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                         ) { Text(stringResource(R.string.action_shape_route), maxLines = 1) }
                     }
-                    Button(
-                        onClick = onStart,
-                        enabled = isMapReady,
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                    ) { Text(stringResource(R.string.action_start_mock), maxLines = 1) }
-                }
-                if (detailGroup == MapDetailGroup.Route && isActive && !isRouteSession && activeCoordinate != pendingCoordinate) {
-                    Button(onClick = onApply, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                        Text(stringResource(R.string.action_apply_new_location), maxLines = 1)
-                    }
-                }
-                if (detailGroup == MapDetailGroup.Route && (isStarting || isActive)) {
-                    OutlinedButton(onClick = onStop, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                        Text(stringResource(R.string.action_stop), maxLines = 1)
+                    TextButton(onClick = {
+                        activeDetail = null
+                        onShowRouteLibrary()
+                    }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                        Text(stringResource(R.string.action_open_route_library))
                     }
                 }
             } else if (detailGroup == MapDetailGroup.Route) {
@@ -804,6 +771,12 @@ internal fun MapControlPanel(
                                     Text(stringResource(R.string.action_clear_route), maxLines = 1)
                                 }
                             }
+                        } else if (isActive && !isRouteSession) {
+                            Text(
+                                stringResource(R.string.route_stop_mock_before_simulation),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                         if (isStarting) {
                             Text(stringResource(R.string.state_starting), style = MaterialTheme.typography.bodySmall)

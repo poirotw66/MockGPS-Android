@@ -146,6 +146,7 @@
     <string name="route_error_disabled">Online road routing is currently unavailable. Local perfect-shape and saved routes still work.</string>
     <string name="route_panel_title">Route</string>
     <string name="route_panel_subtitle">Choose endpoints, stops and simulation options</string>
+    <string name="route_stop_mock_before_simulation">Stop the mock location before starting this route.</string>
     <string name="route_choose_start">Choose the start</string>
     <string name="route_choose_destination">Choose the destination</string>
     <string name="route_start_label">Start</string>

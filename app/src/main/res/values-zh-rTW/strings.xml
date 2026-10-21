@@ -142,6 +142,7 @@
     <string name="route_error_disabled">線上道路規劃目前不可用。本機完美圖形與已儲存路線仍可使用。</string>
     <string name="route_panel_title">路線</string>
     <string name="route_panel_subtitle">設定起終點、停靠點與模擬選項</string>
+    <string name="route_stop_mock_before_simulation">請先停止模擬定位，再開始這條路線。</string>
     <string name="route_choose_start">選擇起點</string>
     <string name="route_choose_destination">選擇終點</string>
     <string name="route_start_label">起點</string>

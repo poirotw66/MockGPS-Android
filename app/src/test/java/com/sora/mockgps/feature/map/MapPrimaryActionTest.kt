@@ -15,14 +15,10 @@ class MapPrimaryActionTest {
     @Test
     fun `idle shows start without stop`() {
         val actions = resolveMapDockActions(
-            routePlanningStep = RoutePlanningStep.Inactive,
-            isSelectingRouteWaypoint = false,
             isMapReady = true,
             isStarting = false,
-            isPlanningRoute = false,
             isActive = false,
             isRouteSession = false,
-            routePaused = false,
             pendingCoordinate = pending,
             activeCoordinate = null,
         )
@@ -34,14 +30,10 @@ class MapPrimaryActionTest {
     @Test
     fun `active matching selection shows only stop`() {
         val actions = resolveMapDockActions(
-            routePlanningStep = RoutePlanningStep.Inactive,
-            isSelectingRouteWaypoint = false,
             isMapReady = true,
             isStarting = false,
-            isPlanningRoute = false,
             isActive = true,
             isRouteSession = false,
-            routePaused = false,
             pendingCoordinate = pending,
             activeCoordinate = pending,
         )
@@ -53,14 +45,10 @@ class MapPrimaryActionTest {
     @Test
     fun `active with new selection shows apply hint and stop`() {
         val actions = resolveMapDockActions(
-            routePlanningStep = RoutePlanningStep.Inactive,
-            isSelectingRouteWaypoint = false,
             isMapReady = true,
             isStarting = false,
-            isPlanningRoute = false,
             isActive = true,
             isRouteSession = false,
-            routePaused = false,
             pendingCoordinate = pending,
             activeCoordinate = active,
         )
@@ -71,20 +59,17 @@ class MapPrimaryActionTest {
     }
 
     @Test
-    fun `route running shows pause with stop`() {
+    fun `route session keeps stop on dock and leaves pause to the route sheet`() {
         val actions = resolveMapDockActions(
-            routePlanningStep = RoutePlanningStep.Preview,
-            isSelectingRouteWaypoint = false,
             isMapReady = true,
             isStarting = false,
-            isPlanningRoute = false,
             isActive = true,
             isRouteSession = true,
-            routePaused = false,
             pendingCoordinate = pending,
             activeCoordinate = pending,
         )
-        assertEquals(MapPrimaryAction.PauseRoute, actions.primary)
+        assertNull(actions.primary)
         assertTrue(actions.showStop)
+        assertFalse(actions.showPendingApplyHint)
     }
 }

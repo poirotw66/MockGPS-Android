@@ -845,7 +845,6 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             routePaused = isRoutePaused,
             routeProgress = routeProgress,
             routeResult = routeState.takeIf { it is RouteCompleted || it is RouteFailed },
-            isSelectingRouteWaypoint = selectingRouteWaypoint,
             routeOptions = routeOptions,
             onRouteOptionsChange = { routeOptions = it },
             favoritesCount = favorites.size,
