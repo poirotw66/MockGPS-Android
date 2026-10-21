@@ -33,7 +33,18 @@ Do not invent a guessed constant to pretend there is a hard guarantee.
 | B01-2 Hard vs soft cap | **Treat as soft** | Owner asked for a hard stop. Geoapify pricing FAQ says limits are soft: over-quota use can lead to an upgrade request, and the account may be blocked if that is ignored. Terms also allow suspension **or** overage charges. That is not a proven hard cap across keys, console tests, timeouts, cross-day windows, or in-flight requests. |
 | B01-3 Accept `waypoints - 1` as a worst-case contract | **No** | Published routing cost is `(waypoints - 1)` plus 1 credit per 500 km of the **result** length, and advanced options cost more. Result length is known only after dispatch. A 100 km input chain does not prove the billed distance. |
 
-Production `routingEnabled` stays **false**. Search may keep the existing 1-credit geocoding reservation. Do not add a guessed routing credit constant.
+Live routing is deployed with this reservation. Search stays off. The reservation is still not a provider hard cap.
+
+### Owner-accepted ledger reservation (2026-10-21)
+
+The owner asked to implement a self-imposed budget instead of waiting for a provider hard cap. This does **not** close B01 and is **not** a worst-case proof.
+
+- Policy version: `owner-accepted-route-exposure-v1`
+- Evidence token: `OWNER_ACCEPTED_SOFT_QUOTA_ROUTE_25`
+- Each admitted route reserves **25** credits: the published partial formula at the app's 25-point cap (`waypoints - 1` = 24) plus one 500 km result bucket. Any other route number stays `Unsupported` and is not dispatched.
+- Gateway daily budget stays **2,700** credits. One install stays at **10** route requests per 24 hours.
+- One automatic-journey generation sends at most **two** route requests (initial plan and one shrink). Failure keeps the local shape and explains why.
+- Deployed Worker: `https://bloomwalk-gps-gateway.poirotw66.workers.dev` with `ROUTING_ENABLED=true` and `GEO_PROVIDER_MODE=live`. Search, ads, and purchases stay off. Confirm the Geoapify account still has no payment method.
 
 ## B02 — commercial use, attribution, cache, and saved routes
 

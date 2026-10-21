@@ -4,8 +4,10 @@ import com.sora.mockgps.core.model.Coordinate
 import com.sora.mockgps.route.PlannedRoute
 import com.sora.mockgps.route.RoutePolyline
 import com.sora.mockgps.route.RouteTransportMode
+import com.sora.mockgps.route.RoutingNoRouteException
 import com.sora.mockgps.route.RoutingQuotaException
 import com.sora.mockgps.route.RoutingRepository
+import com.sora.mockgps.route.RoutingServiceDisabledException
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -134,6 +136,43 @@ class AutomaticJourneyRoutePlannerTest {
         val result = planner.planWithinTargetDistance(journey, options.transportMode, target)
 
         assertEquals(4, repository.planCount)
+        assertTrue(result.route.distanceMeters > 0.0)
+    }
+
+    @Test
+    fun `disabled routing uses the local shape instead of blaming the landmark`() {
+        val action = roadAdaptedFailureAction(RoutingServiceDisabledException())
+
+        assertEquals(RoadAdaptedFailureAction.DisabledLocalShape, action)
+    }
+
+    @Test
+    fun `a landmark with no road route keeps the local shape and explains the miss`() {
+        val action = roadAdaptedFailureAction(RoutingNoRouteException())
+
+        assertEquals(RoadAdaptedFailureAction.ExplainedLocalShape, action)
+    }
+
+    @Test
+    fun `owner routing budget allows only two shrink attempts`() = runBlocking {
+        val repository = InflatingRoutingRepository(inflationFactor = 50.0)
+        val planner = AutomaticJourneyRoutePlanner(repository, Random(31))
+        val options = AutoJourneyOptions(
+            duration = JourneyDuration.Medium,
+            transportMode = RouteTransportMode.Bicycle,
+            routeStyle = AutoJourneyRouteStyle.RoadAdapted,
+        )
+        val journey = planner.generate(options)
+        val target = JourneyPlanner.targetDistanceMeters(options)
+
+        val result = planner.planWithinTargetDistance(
+            journey,
+            options.transportMode,
+            target,
+            maxAttempts = MAX_ROAD_ADAPTED_ROUTING_ATTEMPTS,
+        )
+
+        assertEquals(MAX_ROAD_ADAPTED_ROUTING_ATTEMPTS, repository.planCount)
         assertTrue(result.route.distanceMeters > 0.0)
     }
 

@@ -102,7 +102,14 @@ describe("GeoBudget Durable Object", () => {
     expect(estimate.kind).toBe("unsupported");
     const ledger = `zero-route-${uuid()}`;
     const stub = await initLedger(ledger);
-    await route({ "X-Test-Ledger": ledger });
+    await route({
+      "X-Test-Ledger": ledger,
+      "X-Test-Billing-Policy": JSON.stringify({
+        version: "search-1-credit-v1",
+        evidence: "documented search only",
+        documentedMaximumCredits: { search: 1 },
+      }),
+    });
     const inspect = await stub.inspect(Date.now());
     expect(inspect.dispatchedCount).toBe(0);
   });

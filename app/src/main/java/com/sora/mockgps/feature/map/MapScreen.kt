@@ -99,7 +99,9 @@ import kotlin.math.log2
 import com.google.android.gms.ads.MobileAds
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -148,6 +150,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     var serviceStartErrorMessage by remember { mutableStateOf<String?>(null) }
     var notificationPermissionHandled by rememberSaveable { mutableStateOf(false) }
     var pendingRouteStart by rememberSaveable { mutableStateOf(false) }
+    var routeStartQueued by remember { mutableStateOf(false) }
     var pendingCurrentLocation by rememberSaveable { mutableStateOf(false) }
     var pendingAutoJourney by remember { mutableStateOf<AutoJourneyOptions?>(null) }
     var isResolvingCurrentLocation by remember { mutableStateOf(false) }
@@ -972,7 +975,12 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 joystickMode = false
                 uiState.plannedRoute?.points?.let { points ->
                     val permissions = context.requiredRuntimePermissions(notificationPermissionHandled)
-                    if (permissions.isEmpty()) {
+                    if (permissions.isNotEmpty()) {
+                        pendingRouteStart = true
+                        permissionLauncher.launch(permissions.toTypedArray())
+                        return@let
+                    }
+                    fun startRouteNow() {
                         pendingRecentRoute = true
                         serviceStartErrorMessage = null
                         val outcome = context.startRouteService(
@@ -985,9 +993,24 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                             pendingRecentRoute = false
                         }
                         applyServiceStartOutcome(outcome)
+                    }
+                    if (isActive && !isRouteSession) {
+                        if (routeStartQueued) return@let
+                        routeStartQueued = true
+                        context.startService(
+                            MockLocationForegroundService.stopIntent(context, routeState.sessionToken),
+                        )
+                        coroutineScope.launch {
+                            val settled = withTimeoutOrNull(ROUTE_START_AFTER_STOP_TIMEOUT_MILLIS) {
+                                MockLocationForegroundService.state.first {
+                                    it is MockServiceState.Idle || it is MockServiceState.Error
+                                }
+                            }
+                            routeStartQueued = false
+                            if (settled is MockServiceState.Idle) startRouteNow()
+                        }
                     } else {
-                        pendingRouteStart = true
-                        permissionLauncher.launch(permissions.toTypedArray())
+                        startRouteNow()
                     }
                 }
             },
@@ -1042,6 +1065,8 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
         )
     }
 }
+
+private const val ROUTE_START_AFTER_STOP_TIMEOUT_MILLIS = 5_000L
 
 private fun RouteServiceState.progressOrNull(): RouteProgress? = when (this) {
     RouteServiceState.Idle -> null

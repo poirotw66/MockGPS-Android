@@ -105,6 +105,7 @@
     <string name="action_try_another_landmark">Try another landmark</string>
     <string name="action_try_another_shape">Try another shape</string>
     <string name="auto_journey_route_error">That landmark could not produce a road route. Try another landmark.</string>
+    <string name="auto_journey_local_shape_fallback">Online road routing is unavailable, so this journey uses the local shape.</string>
     <string name="auto_journey_route_error_current_location">Could not build a road route from your current location. Try another shape, or switch to Perfect shape.</string>
     <string name="region_current_location">Current location</string>
     <string name="region_taiwan">Taiwan</string>

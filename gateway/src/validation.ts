@@ -44,29 +44,52 @@ export function assertCoordinate(value: unknown, field: string): Coordinate {
   return { latitude: record.latitude, longitude: record.longitude };
 }
 
-export function inspectJsonTree(value: unknown, depth = 0): void {
-  if (depth > JSON_MAX_DEPTH) {
+export interface JsonTreeLimits {
+  maxDepth: number;
+  maxArrayLength: number;
+  maxObjectKeys: number;
+}
+
+const DEFAULT_JSON_LIMITS: JsonTreeLimits = {
+  maxDepth: JSON_MAX_DEPTH,
+  maxArrayLength: JSON_MAX_ARRAY_LENGTH,
+  maxObjectKeys: JSON_MAX_OBJECT_KEYS,
+};
+
+/** Geoapify route GeoJSON nests legs, steps, and instructions deeper than client requests. */
+export const PROVIDER_JSON_LIMITS: JsonTreeLimits = {
+  maxDepth: 16,
+  maxArrayLength: JSON_MAX_ARRAY_LENGTH,
+  maxObjectKeys: 128,
+};
+
+export function inspectJsonTree(
+  value: unknown,
+  depth = 0,
+  limits: JsonTreeLimits = DEFAULT_JSON_LIMITS,
+): void {
+  if (depth > limits.maxDepth) {
     throw new GatewayError("INVALID_REQUEST", "json nesting exceeds limit");
   }
   if (typeof value === "number" && !Number.isFinite(value)) {
     throw new GatewayError("INVALID_REQUEST", "non-finite number");
   }
   if (Array.isArray(value)) {
-    if (value.length > JSON_MAX_ARRAY_LENGTH) {
+    if (value.length > limits.maxArrayLength) {
       throw new GatewayError("INVALID_REQUEST", "array exceeds limit");
     }
     for (const item of value) {
-      inspectJsonTree(item, depth + 1);
+      inspectJsonTree(item, depth + 1, limits);
     }
     return;
   }
   if (typeof value === "object" && value !== null) {
     const keys = Object.keys(value);
-    if (keys.length > JSON_MAX_OBJECT_KEYS) {
+    if (keys.length > limits.maxObjectKeys) {
       throw new GatewayError("INVALID_REQUEST", "object exceeds key limit");
     }
     for (const key of keys) {
-      inspectJsonTree((value as Record<string, unknown>)[key], depth + 1);
+      inspectJsonTree((value as Record<string, unknown>)[key], depth + 1, limits);
     }
   }
 }

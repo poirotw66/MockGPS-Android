@@ -100,7 +100,7 @@ Record results in `DEVICE_MATRIX.md` **Optional soak** table (device, start/end 
 
 - **Do not** call public Nominatim or FOSSGIS demo endpoints in production composition.
 - **Do not** embed API keys, Play service accounts, or receipt private keys in the APK or git.
-- Production `routingEnabled` / `adsEnabled` / `purchasesEnabled` stay false until owner gates close.
+- Production `routingEnabled` / `adsEnabled` / `purchasesEnabled` stay false until the matching owner gate is deployed. Route dispatch accepts only the owner-accepted 25-credit ledger reservation.
 - Treat provider HTTP failures as **network**, not mock-engine failures.
 
 ### Monitoring (lightweight)

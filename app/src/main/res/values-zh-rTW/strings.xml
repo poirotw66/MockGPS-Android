@@ -101,6 +101,7 @@
     <string name="action_try_another_landmark">改用其他景點</string>
     <string name="action_try_another_shape">換個形狀</string>
     <string name="auto_journey_route_error">此景點無法產生道路路線。請改用其他景點。</string>
+    <string name="auto_journey_local_shape_fallback">線上道路規劃目前不可用，已改用本機圖形。</string>
     <string name="auto_journey_route_error_current_location">無法在目前位置產生道路路線。請換個形狀，或改選「完美圖形」。</string>
     <string name="region_current_location">目前位置</string>
     <string name="region_taiwan">台灣</string>

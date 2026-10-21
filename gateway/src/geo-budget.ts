@@ -21,6 +21,10 @@ import {
 const DAY_MS = 24 * 60 * 60 * 1000;
 const CLEANUP_BATCH = 200;
 
+/** Ledger reservation the owner accepted. Not a Geoapify hard cap or worst-case proof. */
+export const OWNER_ACCEPTED_ROUTE_EVIDENCE = "OWNER_ACCEPTED_SOFT_QUOTA_ROUTE_25";
+export const OWNER_ACCEPTED_ROUTE_CREDITS = 25;
+
 export interface AdmitInput {
   expectedLedgerId: string;
   allowEmptyInit: boolean;
@@ -93,18 +97,24 @@ export function estimateMaximumCredits(
     return { kind: "bounded", credits: 1, policyVersion: billingPolicy.version };
   }
   if (validatedRequest.operation === "route") {
-    const testOnly =
-      billingPolicy.evidence.includes("TEST_ONLY_BUDGET_ACCOUNTING") &&
-      typeof documented === "number" &&
-      Number.isInteger(documented) &&
-      documented > 0;
-    if (testOnly) {
-      return { kind: "bounded", credits: documented, policyVersion: billingPolicy.version };
+    const routeCredits = positiveInteger(documented);
+    if (routeCredits !== null && billingPolicy.evidence.includes("TEST_ONLY_BUDGET_ACCOUNTING")) {
+      return { kind: "bounded", credits: routeCredits, policyVersion: billingPolicy.version };
+    }
+    if (
+      routeCredits === OWNER_ACCEPTED_ROUTE_CREDITS &&
+      billingPolicy.evidence.includes(OWNER_ACCEPTED_ROUTE_EVIDENCE)
+    ) {
+      return {
+        kind: "bounded",
+        credits: OWNER_ACCEPTED_ROUTE_CREDITS,
+        policyVersion: billingPolicy.version,
+      };
     }
     return {
       kind: "unsupported",
       reason:
-        "B01 unresolved: routing cost depends on waypoints, road distance, and options; no owner-verified billingPolicy bound exists",
+        "Routing dispatch requires the owner-accepted 25-credit ledger reservation. That reservation is not a provider hard cap.",
     };
   }
   if (typeof documented === "number" && Number.isInteger(documented) && documented > 0) {
@@ -114,6 +124,13 @@ export function estimateMaximumCredits(
     kind: "unsupported",
     reason: `no owner-verified credit bound for ${validatedRequest.operation}`,
   };
+}
+
+function positiveInteger(value: unknown): number | null {
+  if (typeof value === "number" && Number.isInteger(value) && value > 0) {
+    return value;
+  }
+  return null;
 }
 
 function sqlNumber(value: unknown): number {

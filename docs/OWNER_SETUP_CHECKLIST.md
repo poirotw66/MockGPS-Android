@@ -4,10 +4,10 @@ Missing owner secrets and accounts must not block implementable code. Do not pas
 
 | Gate | Owner input | Blocks | Repo status |
 |---|---|---|---|
-| B01 | Geoapify hard cap or official worst-case routing credit contract; confirm Free has no auto-pay | Production road routing / full-feature launch | **Open.** Owner: no auto-pay, prefer a hard stop. Public FAQ (2026-10-21): daily quota is soft and overage may mean upgrade or block; terms also allow overage charges. Do not use `waypoints - 1` as a cost cap. `routingEnabled` stays false. |
+| B01 | Geoapify hard cap or official worst-case routing credit contract; confirm Free has no auto-pay | Production road routing / full-feature launch | **Open as a proof.** Owner accepted a soft quota and a self-imposed ledger: 25 credits per route (`OWNER_ACCEPTED_SOFT_QUOTA_ROUTE_25`), 2,700 credits / 24h, at most 2 requests per automatic journey. This is not a provider hard cap. Live routing is deployed at `https://bloomwalk-gps-gateway.poirotw66.workers.dev` with search, ads, and purchases still off. |
 | B02 | Commercial, attribution, cache, and permanent save/GPX rights | Provider production enablement | **Partial.** Accept in-quota commercial use, current Geoapify + OSM attribution, and device-only cache. GPX/save is on-device user data, not a republication license. Live routing still blocked by B01. |
-| B03 | Cloudflare Free account, DO SQLite namespace, free-tier soak | Gateway release | Worker source and tests are in `gateway/`. Not deployed. |
-| B04 | Geoapify API key in Worker secrets | Live geo validation | Secret name only in `.dev.vars.example`. |
+| B03 | Cloudflare Free account, DO SQLite namespace, free-tier soak | Gateway release | Worker `bloomwalk-gps-gateway` is deployed on the free `workers.dev` hostname. Free-tier soak is still open. |
+| B04 | Geoapify API key in Worker secrets | Live geo validation | `GEOAPIFY_API_KEY` is set on the Worker. The value stays out of git. |
 | B05 | Play app, `remove_ads_lifetime`, base price, regions, license testers | Live purchase launch | Product ID wired. Price comes from ProductDetails. |
 | B06 | Play Developer API + least-privilege service account | Server purchase verification | Live lookup uses `purchases.productsv2` `getproductpurchasev2`; ack stays `products.acknowledge`. Fail-closed without secrets (401/403/404/timeout/5xx ≠ revoked). Missing credentials return unavailable, not owned. |
 | B07 | AdMob app/ad unit, app-ads.txt crawler, readiness | Real ads | Test IDs in debug. `site/app-ads.txt` is a placeholder. `adsEnabled` false. |

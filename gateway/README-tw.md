@@ -7,7 +7,7 @@
 - 正式環境功能旗標預設為 **false**：`searchEnabled`、`routingEnabled`、`purchasesEnabled`、`adsEnabled`。
 - 本機預設使用供應商 **stub**（`GEO_PROVIDER_MODE=stub`、`PLAY_API_MODE=stub`）。
 - 缺少 Geoapify 金鑰時，**不會**偽造成功的地理結果。正式 live 模式沒有金鑰會回 `PROVIDER_UNAVAILABLE`。
-- **B01 尚未解決。** 在擁有者完成可驗證、具版本的 `billingPolicy` 之前，`estimateMaximumCredits` 對路由一律回傳 `Unsupported`。正式環境的 `routingEnabled` 必須維持關閉。詳見 [../docs/GEOAPIFY_TERMS_COST_EVIDENCE.md](../docs/GEOAPIFY_TERMS_COST_EVIDENCE.md)。
+- **B01 沒有供應商硬上限。** 只有擁有者接受的 25 credit 帳本預留（`OWNER_ACCEPTED_SOFT_QUOTA_ROUTE_25`）或測試用計費政策可以送出路線；其他路線上界仍是 `Unsupported`。正式部署前 `ROUTING_ENABLED` 維持關閉。詳見 [../docs/GEOAPIFY_TERMS_COST_EVIDENCE.md](../docs/GEOAPIFY_TERMS_COST_EVIDENCE.md)。
 
 ## 端點
 

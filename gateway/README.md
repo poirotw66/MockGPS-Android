@@ -7,7 +7,7 @@ Cloudflare Worker that fronts Geoapify search/routing and Google Play purchase v
 - Production feature flags default to **false**: `searchEnabled`, `routingEnabled`, `purchasesEnabled`, `adsEnabled`.
 - Local development uses provider **stubs** (`GEO_PROVIDER_MODE=stub`, `PLAY_API_MODE=stub`).
 - Missing Geoapify keys do **not** invent successful geocoding. Live mode without a key returns `PROVIDER_UNAVAILABLE`.
-- **B01 is unresolved.** `estimateMaximumCredits` returns `Unsupported` for routing until an owner-verified, versioned `billingPolicy` exists. Production `routingEnabled` must stay false. See [../docs/GEOAPIFY_TERMS_COST_EVIDENCE.md](../docs/GEOAPIFY_TERMS_COST_EVIDENCE.md).
+- **B01 has no provider hard cap.** Routing dispatch is allowed only for the owner-accepted 25-credit ledger reservation (`OWNER_ACCEPTED_SOFT_QUOTA_ROUTE_25`) or a test-only accounting policy. Any other route bound stays `Unsupported`. `ROUTING_ENABLED` stays false until a live deploy. See [../docs/GEOAPIFY_TERMS_COST_EVIDENCE.md](../docs/GEOAPIFY_TERMS_COST_EVIDENCE.md).
 
 ## Endpoints
 

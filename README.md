@@ -79,7 +79,7 @@ MapLibre Compose with OpenFreeMap vector tiles (Bright light / Dark). No account
 
 ## Routing provider
 
-Default production composition uses the BloomWalk gateway. Public FOSSGIS demo URLs are not a fallback. Production `routingEnabled` stays false until the owner cost gate (B01) is resolved. Local perfect-shape playback and saved routes do not need the gateway.
+Default production composition uses the BloomWalk gateway. Public FOSSGIS demo URLs are not a fallback. Production `routingEnabled` stays false until the Worker is deployed with a live Geoapify key. The owner-accepted 25-credit route reservation is a ledger limit, not a provider hard cap. Local perfect-shape playback and saved routes do not need the gateway.
 
 ## Build locally
 

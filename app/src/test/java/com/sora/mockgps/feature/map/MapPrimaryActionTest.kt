@@ -20,12 +20,14 @@ class MapPrimaryActionTest {
             isActive = false,
             isRouteSession = false,
             isRoutePlanning = false,
+            hasPlannedRoute = false,
             pendingCoordinate = pending,
             activeCoordinate = null,
         )
         assertEquals(MapPrimaryAction.StartMock, actions.primary)
         assertFalse(actions.showStop)
         assertFalse(actions.showPendingApplyHint)
+        assertFalse(actions.showStartRoute)
     }
 
     @Test
@@ -36,12 +38,14 @@ class MapPrimaryActionTest {
             isActive = true,
             isRouteSession = false,
             isRoutePlanning = false,
+            hasPlannedRoute = false,
             pendingCoordinate = pending,
             activeCoordinate = pending,
         )
         assertNull(actions.primary)
         assertTrue(actions.showStop)
         assertFalse(actions.showPendingApplyHint)
+        assertFalse(actions.showStartRoute)
     }
 
     @Test
@@ -52,12 +56,14 @@ class MapPrimaryActionTest {
             isActive = true,
             isRouteSession = false,
             isRoutePlanning = false,
+            hasPlannedRoute = false,
             pendingCoordinate = pending,
             activeCoordinate = active,
         )
         assertEquals(MapPrimaryAction.ApplyLocation, actions.primary)
         assertTrue(actions.showStop)
         assertTrue(actions.showPendingApplyHint)
+        assertFalse(actions.showStartRoute)
         assertEquals(R.string.action_apply_new_location, actions.primary!!.labelRes)
     }
 
@@ -69,12 +75,14 @@ class MapPrimaryActionTest {
             isActive = true,
             isRouteSession = true,
             isRoutePlanning = true,
+            hasPlannedRoute = true,
             pendingCoordinate = pending,
             activeCoordinate = pending,
         )
         assertNull(actions.primary)
         assertTrue(actions.showStop)
         assertFalse(actions.showPendingApplyHint)
+        assertFalse(actions.showStartRoute)
     }
 
     @Test
@@ -85,11 +93,44 @@ class MapPrimaryActionTest {
             isActive = true,
             isRouteSession = false,
             isRoutePlanning = true,
+            hasPlannedRoute = false,
             pendingCoordinate = pending,
             activeCoordinate = active,
         )
         assertNull(actions.primary)
         assertTrue(actions.showStop)
         assertFalse(actions.showPendingApplyHint)
+        assertFalse(actions.showStartRoute)
+    }
+
+    @Test
+    fun `ready route shows start simulation without replacing mock controls`() {
+        val idle = resolveMapDockActions(
+            isMapReady = true,
+            isStarting = false,
+            isActive = false,
+            isRouteSession = false,
+            isRoutePlanning = true,
+            hasPlannedRoute = true,
+            pendingCoordinate = pending,
+            activeCoordinate = null,
+        )
+        assertEquals(MapPrimaryAction.StartMock, idle.primary)
+        assertTrue(idle.showStartRoute)
+
+        val mocking = resolveMapDockActions(
+            isMapReady = true,
+            isStarting = false,
+            isActive = true,
+            isRouteSession = false,
+            isRoutePlanning = true,
+            hasPlannedRoute = true,
+            pendingCoordinate = pending,
+            activeCoordinate = active,
+        )
+        assertNull(mocking.primary)
+        assertTrue(mocking.showStop)
+        assertTrue(mocking.showStartRoute)
+        assertFalse(mocking.showPendingApplyHint)
     }
 }

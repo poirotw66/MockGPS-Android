@@ -79,7 +79,7 @@ MapLibre Compose + OpenFreeMap 向量圖磚（Bright / Dark）。不需要帳號
 
 ## 路由服務
 
-正式 composition 使用 BloomWalk 閘道。公共 FOSSGIS demo 不是備援。B01 費用門檻完成前，正式 `routingEnabled` 維持關閉。本機完美圖形與已儲存路線不需要閘道。
+正式 composition 使用 BloomWalk 閘道。公共 FOSSGIS demo 不是備援。Worker 以 live Geoapify 金鑰部署前，正式 `routingEnabled` 維持關閉。擁有者接受的每次 25 credits 是帳本預留，不是供應商硬上限。本機完美圖形與已儲存路線不需要閘道。
 
 ## 本機建置
 

@@ -6,6 +6,7 @@ import com.sora.mockgps.route.RoutingException
 import com.sora.mockgps.route.RoutingNetworkException
 import com.sora.mockgps.route.RoutingQuotaException
 import com.sora.mockgps.route.RoutingRepository
+import com.sora.mockgps.route.RoutingServiceDisabledException
 
 internal data class RoadAdaptedPlanResult(
     val journey: GeneratedJourney,
@@ -19,10 +20,13 @@ internal class AutomaticJourneyRoutePlanner(
 ) {
     private var previousLandmark: JourneyLandmark? = null
 
-    fun generate(options: AutoJourneyOptions): GeneratedJourney = JourneyPlanner.automaticJourney(
+    fun generate(
+        options: AutoJourneyOptions,
+        excludedLandmarks: Set<JourneyLandmark> = emptySet(),
+    ): GeneratedJourney = JourneyPlanner.automaticJourney(
         options = options,
         random = random,
-        excludedLandmark = previousLandmark,
+        excludedLandmarks = excludedLandmarks + setOfNotNull(previousLandmark),
     ).also { previousLandmark = it.landmark }
 
     suspend fun plan(journey: GeneratedJourney, transportMode: RouteTransportMode): PlannedRoute =
@@ -128,10 +132,27 @@ internal object AutomaticJourneyStateReducer {
         state: MapUiState,
         error: String,
         recoveryKind: AutomaticJourneyRecoveryKind,
+        recoveryAvailable: Boolean = true,
     ): MapUiState = state.copy(
         isPlanningRoute = false,
         routeError = error,
-        automaticJourneyRecoveryAvailable = true,
-        automaticJourneyRecoveryKind = recoveryKind,
+        automaticJourneyRecoveryAvailable = recoveryAvailable,
+        automaticJourneyRecoveryKind = recoveryKind.takeIf { recoveryAvailable },
     )
 }
+
+/** One generate sends at most two gateway route requests (the initial plan and one shrink). */
+internal const val MAX_ROAD_ADAPTED_ROUTING_ATTEMPTS = 2
+
+internal sealed interface RoadAdaptedFailureAction {
+    data object DisabledLocalShape : RoadAdaptedFailureAction
+    data object ExplainedLocalShape : RoadAdaptedFailureAction
+}
+
+/** A failed road adaptation keeps the local shape and explains why the road route was not used. */
+internal fun roadAdaptedFailureAction(failure: Throwable): RoadAdaptedFailureAction =
+    if (failure is RoutingServiceDisabledException) {
+        RoadAdaptedFailureAction.DisabledLocalShape
+    } else {
+        RoadAdaptedFailureAction.ExplainedLocalShape
+    }

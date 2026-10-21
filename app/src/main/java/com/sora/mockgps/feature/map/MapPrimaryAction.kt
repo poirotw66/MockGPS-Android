@@ -6,7 +6,7 @@ import com.sora.mockgps.core.model.Coordinate
 
 /**
  * Dock action for a static mock-location session.
- * Route preview, start, pause, and resume stay in the route sheet.
+ * Starting a ready route is a separate dock button so it does not replace mock controls.
  */
 internal sealed class MapPrimaryAction {
     data object StartMock : MapPrimaryAction()
@@ -25,6 +25,7 @@ internal data class MapDockActions(
     val showStop: Boolean,
     val primaryEnabled: Boolean,
     val showPendingApplyHint: Boolean,
+    val showStartRoute: Boolean,
 )
 
 internal fun resolveMapDockActions(
@@ -33,6 +34,7 @@ internal fun resolveMapDockActions(
     isActive: Boolean,
     isRouteSession: Boolean,
     isRoutePlanning: Boolean,
+    hasPlannedRoute: Boolean,
     pendingCoordinate: Coordinate,
     activeCoordinate: Coordinate?,
 ): MapDockActions {
@@ -52,5 +54,6 @@ internal fun resolveMapDockActions(
         showStop = isActive,
         primaryEnabled = primaryEnabled,
         showPendingApplyHint = pendingDiffers,
+        showStartRoute = hasPlannedRoute && !isRouteSession && !isStarting,
     )
 }

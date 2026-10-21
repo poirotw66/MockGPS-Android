@@ -152,7 +152,7 @@ Idle → Starting → Active → Stopping → Idle
 
 - MapLibre Compose 負責 Android 地圖渲染，OpenFreeMap 提供 OSM 向量圖磚與樣式
 - 線上搜尋／路由經 BloomWalk HTTPS gateway；供應商 API key 只存在 Worker secrets，不進 APK
-- Play Billing、AdMob 與 UMP 已接入 composition；正式 `routingEnabled` / `adsEnabled` / `purchasesEnabled` 維持 false，直到擁有者 gate 關閉
+- Play Billing、AdMob 與 UMP 已接入 composition；正式 `routingEnabled` / `adsEnabled` / `purchasesEnabled` 維持 false。路線只有擁有者接受的 25 credit 帳本預留可以送出，且要等 live Geoapify 金鑰部署後才會打開
 - style URL 集中定義，不硬散落在畫面邏輯，方便切換相容供應商或自架
 - OpenFreeMap 為無 SLA 的公共服務；Release 前需記錄可用性風險與替代策略
 - 供應商 token、Play service account 與 receipt 私鑰從不進版控，且不得與其他服務共用

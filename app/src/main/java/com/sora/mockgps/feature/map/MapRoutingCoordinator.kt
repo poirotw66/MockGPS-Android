@@ -567,37 +567,45 @@ internal class MapRoutingCoordinator(
                     journey = journey,
                     transportMode = transportMode,
                     targetDistanceMeters = targetDistanceMeters,
+                    maxAttempts = MAX_ROAD_ADAPTED_ROUTING_ATTEMPTS,
                 )
-                uiState.update { current ->
-                    if (current.isRoutePlanningMode && current.isPlanningRoute &&
-                        current.activeRouteName == routeName
-                    ) {
-                        AutomaticJourneyStateReducer.success(
-                            current,
-                            result.route,
-                            result.journey,
-                            result.exceededTargetDueToAdmissionFailure,
-                        )
-                    } else {
-                        current
-                    }
+                publishAutomaticJourneyResult(routeName) { current ->
+                    AutomaticJourneyStateReducer.success(
+                        current,
+                        result.route,
+                        result.journey,
+                        result.exceededTargetDueToAdmissionFailure,
+                    )
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Throwable) {
-                uiState.update { current ->
-                    if (current.isRoutePlanningMode && current.isPlanningRoute &&
-                        current.activeRouteName == routeName
-                    ) {
-                        AutomaticJourneyStateReducer.failure(
-                            current,
-                            automaticJourneyRouteError(),
-                            automaticJourneyRecoveryKind(),
-                        )
-                    } else {
-                        current
-                    }
+                val message = when (roadAdaptedFailureAction(failure)) {
+                    RoadAdaptedFailureAction.DisabledLocalShape ->
+                        localized(R.string.auto_journey_local_shape_fallback)
+                    RoadAdaptedFailureAction.ExplainedLocalShape ->
+                        application.getString(routingUserMessageId(failure))
                 }
+                publishAutomaticJourneyResult(routeName) { current ->
+                    AutomaticJourneyStateReducer.success(
+                        current,
+                        perfectShapeRoute(journey.points),
+                        journey,
+                    ).copy(routeError = message)
+                }
+            }
+        }
+    }
+
+    private fun publishAutomaticJourneyResult(
+        routeName: String,
+        reduce: (MapUiState) -> MapUiState,
+    ) {
+        uiState.update { current ->
+            if (current.isRoutePlanningMode && current.isPlanningRoute && current.activeRouteName == routeName) {
+                reduce(current)
+            } else {
+                current
             }
         }
     }
@@ -731,18 +739,6 @@ internal class MapRoutingCoordinator(
             )
         }
     }
-
-    private fun automaticJourneyRouteError(): String = when (automaticJourneyOptions?.region) {
-        JourneyRegion.CurrentLocation -> localized(R.string.auto_journey_route_error_current_location)
-        else -> localized(R.string.auto_journey_route_error)
-    }
-
-    private fun automaticJourneyRecoveryKind(): AutomaticJourneyRecoveryKind =
-        if (automaticJourneyOptions?.region == JourneyRegion.CurrentLocation) {
-            AutomaticJourneyRecoveryKind.AnotherShape
-        } else {
-            AutomaticJourneyRecoveryKind.AnotherLandmark
-        }
 
     private fun perfectShapeRoute(points: List<Coordinate>): PlannedRoute = PlannedRoute(
         points = points,

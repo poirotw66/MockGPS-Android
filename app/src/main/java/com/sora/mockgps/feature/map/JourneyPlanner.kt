@@ -317,7 +317,7 @@ internal object JourneyPlanner {
     fun automaticJourney(
         options: AutoJourneyOptions,
         random: Random = Random.Default,
-        excludedLandmark: JourneyLandmark? = null,
+        excludedLandmarks: Set<JourneyLandmark> = emptySet(),
     ): GeneratedJourney {
         val targetDistanceMeters = targetDistanceMeters(options)
         // Road routing detours inflate distance; undersize the geometric shape so the
@@ -332,7 +332,7 @@ internal object JourneyPlanner {
             JourneyRegion.CurrentLocation -> currentLocationLandmark(
                 requireNotNull(options.centerCoordinate) { "Current location requires a coordinate." },
             )
-            else -> randomLandmark(options.region, random, excludedLandmark)
+            else -> randomLandmark(options.region, random, excludedLandmarks)
         }
         val startAnchor = when (options.region) {
             JourneyRegion.CurrentLocation -> landmark.coordinate
@@ -433,9 +433,9 @@ internal object JourneyPlanner {
     private fun randomLandmark(
         region: JourneyRegion,
         random: Random,
-        excludedLandmark: JourneyLandmark?,
+        excludedLandmarks: Set<JourneyLandmark>,
     ): JourneyLandmark {
-        val candidates = region.landmarks.filterNot { it == excludedLandmark }.ifEmpty { region.landmarks }
+        val candidates = region.landmarks.filterNot { it in excludedLandmarks }.ifEmpty { region.landmarks }
         return candidates[random.nextInt(candidates.size)]
     }
 

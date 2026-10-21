@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { estimateMaximumCredits } from "../src/geo-budget";
+import {
+  estimateMaximumCredits,
+  OWNER_ACCEPTED_ROUTE_CREDITS,
+  OWNER_ACCEPTED_ROUTE_EVIDENCE,
+} from "../src/geo-budget";
 import { planRoute } from "../src/providers/geoapify";
 import type { GatewayErrorBody, RouteRequest, RouteResponse } from "../src/contracts/index";
 import { GatewayError } from "../src/contracts/index";
@@ -8,7 +12,7 @@ import routeRequest from "./fixtures/route-request.json";
 import routeResponse from "./fixtures/route-response.json";
 
 describe("POST /v1/route", () => {
-  it("refuses production-like routing when B01 is unresolved", async () => {
+  it("refuses routing without the owner-accepted reservation", async () => {
     const estimate = estimateMaximumCredits(
       { operation: "route" },
       {
@@ -18,10 +22,42 @@ describe("POST /v1/route", () => {
       },
     );
     expect(estimate.kind).toBe("unsupported");
+    const wrongReservation = estimateMaximumCredits(
+      { operation: "route" },
+      {
+        version: "owner-accepted-route-exposure-v1",
+        evidence: OWNER_ACCEPTED_ROUTE_EVIDENCE,
+        documentedMaximumCredits: { route: 1 },
+      },
+    );
+    expect(wrongReservation.kind).toBe("unsupported");
     const ledger = `unsupported-route-${uuid()}`;
-    const response = await route({ "X-Test-Ledger": ledger });
+    const response = await route({
+      "X-Test-Ledger": ledger,
+      "X-Test-Billing-Policy": JSON.stringify({
+        version: "search-1-credit-v1",
+        evidence: "documented search only",
+        documentedMaximumCredits: { search: 1 },
+      }),
+    });
     expect(response.status).toBe(503);
     expect((await jsonOf<GatewayErrorBody>(response)).error.code).toBe("SERVICE_DISABLED");
+  });
+
+  it("reserves 25 credits when the owner-accepted route policy is present", () => {
+    const estimate = estimateMaximumCredits(
+      { operation: "route" },
+      {
+        version: "owner-accepted-route-exposure-v1",
+        evidence: `partial public formula; ${OWNER_ACCEPTED_ROUTE_EVIDENCE}; not a provider hard cap`,
+        documentedMaximumCredits: { search: 1, route: OWNER_ACCEPTED_ROUTE_CREDITS },
+      },
+    );
+    expect(estimate).toEqual({
+      kind: "bounded",
+      credits: OWNER_ACCEPTED_ROUTE_CREDITS,
+      policyVersion: "owner-accepted-route-exposure-v1",
+    });
   });
 
   it("returns the fixture route when a test-only accounting policy is present", async () => {
@@ -72,6 +108,50 @@ describe("POST /v1/route", () => {
     );
     expect(far.status).toBe(422);
     expect((await jsonOf<GatewayErrorBody>(far)).error.code).toBe("ROUTE_OUT_OF_SCOPE");
+  });
+
+  it("accepts nested Geoapify route instructions", async () => {
+    const payload = {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          properties: {
+            distance: 120,
+            time: 40,
+            legs: [
+              {
+                steps: [
+                  {
+                    instruction: { text: "Head north", type: "continue" },
+                  },
+                ],
+              },
+            ],
+          },
+          geometry: {
+            type: "MultiLineString",
+            coordinates: [
+              [
+                [121.564468, 25.033964],
+                [121.5652, 25.0348],
+              ],
+            ],
+          },
+        },
+      ],
+    };
+    const result = await planRoute(routeRequest as RouteRequest, {
+      mode: "live",
+      apiKey: "test-key",
+      timeoutMs: 1000,
+      fetchImpl: async () => new Response(JSON.stringify(payload), { status: 200 }),
+    });
+    expect(result.points).toEqual([
+      { latitude: 25.033964, longitude: 121.564468 },
+      { latitude: 25.0348, longitude: 121.5652 },
+    ]);
+    expect(result.distanceMeters).toBe(120);
   });
 
   it("validates provider geometry and never returns a truncated route", async () => {

@@ -171,6 +171,7 @@ internal fun MapControlPanel(
         isActive,
         isRouteSession,
         routePlanningStep,
+        plannedRoute,
         pendingCoordinate,
         activeCoordinate,
     ) {
@@ -180,6 +181,7 @@ internal fun MapControlPanel(
             isActive = isActive,
             isRouteSession = isRouteSession,
             isRoutePlanning = routePlanningStep != RoutePlanningStep.Inactive,
+            hasPlannedRoute = plannedRoute != null,
             pendingCoordinate = pendingCoordinate,
             activeCoordinate = activeCoordinate,
         )
@@ -221,6 +223,18 @@ internal fun MapControlPanel(
                     color = MaterialTheme.colorScheme.tertiary,
                     maxLines = 2,
                 )
+            }
+            if (dockActions.showStartRoute) {
+                Button(
+                    onClick = onStartRoute,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp)
+                        .heightIn(min = 48.dp),
+                    shape = MaterialTheme.shapes.large,
+                ) {
+                    Text(stringResource(R.string.action_start_route_simulation), maxLines = 2)
+                }
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),

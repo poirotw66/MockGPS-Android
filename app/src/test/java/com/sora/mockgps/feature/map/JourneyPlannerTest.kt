@@ -235,7 +235,7 @@ class JourneyPlannerTest {
         val second = JourneyPlanner.automaticJourney(
             AutoJourneyOptions(),
             random,
-            excludedLandmark = first.landmark,
+            excludedLandmarks = setOf(first.landmark),
         )
 
         assertTrue(first.landmark in JourneyRegion.Taiwan.landmarks)

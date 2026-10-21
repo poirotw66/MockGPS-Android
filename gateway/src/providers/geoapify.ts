@@ -10,7 +10,7 @@ import {
   type RouteRequest,
   type SearchRequest,
 } from "../contracts/index";
-import { inspectJsonTree, isFiniteNumber } from "../validation";
+import { inspectJsonTree, isFiniteNumber, PROVIDER_JSON_LIMITS } from "../validation";
 
 export const ATTRIBUTION_ALLOWLIST: Attribution[] = [
   { label: "Powered by Geoapify", url: "https://www.geoapify.com/" },
@@ -136,7 +136,7 @@ function parseProviderJson(text: string): unknown {
     throw new GatewayError("INVALID_PROVIDER_RESPONSE", "provider returned non-json");
   }
   try {
-    inspectJsonTree(parsed);
+    inspectJsonTree(parsed, 0, PROVIDER_JSON_LIMITS);
   } catch {
     throw new GatewayError("INVALID_PROVIDER_RESPONSE", "provider json failed validation");
   }
