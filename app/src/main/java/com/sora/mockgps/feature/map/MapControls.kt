@@ -197,9 +197,9 @@ internal fun MapControlPanel(
                 shape = MaterialTheme.shapes.extraLarge,
             ),
         shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
-        tonalElevation = 5.dp,
-        shadowElevation = 10.dp,
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+        tonalElevation = 2.dp,
+        shadowElevation = 6.dp,
     ) {
         Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
             Row(
@@ -207,11 +207,21 @@ internal fun MapControlPanel(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                MapDockButton(Icons.Filled.Search, R.string.map_group_search) { activeDetail = MapDetailGroup.Search }
-                MapDockButton(Icons.Filled.Favorite, R.string.map_group_places) { activeDetail = MapDetailGroup.Places }
-                MapDockButton(Icons.Filled.PlayArrow, R.string.map_group_route) { activeDetail = MapDetailGroup.Route }
-                MapDockButton(Icons.Filled.Place, R.string.map_group_joystick) { activeDetail = MapDetailGroup.Joystick }
-                MapDockButton(Icons.Filled.MoreVert, R.string.map_group_more) { activeDetail = MapDetailGroup.More }
+                MapDockButton(Icons.Filled.Search, R.string.map_group_search, activeDetail == MapDetailGroup.Search) {
+                    activeDetail = MapDetailGroup.Search
+                }
+                MapDockButton(Icons.Filled.Favorite, R.string.map_group_places, activeDetail == MapDetailGroup.Places) {
+                    activeDetail = MapDetailGroup.Places
+                }
+                MapDockButton(Icons.Filled.PlayArrow, R.string.map_group_route, activeDetail == MapDetailGroup.Route) {
+                    activeDetail = MapDetailGroup.Route
+                }
+                MapDockButton(Icons.Filled.Place, R.string.map_group_joystick, activeDetail == MapDetailGroup.Joystick) {
+                    activeDetail = MapDetailGroup.Joystick
+                }
+                MapDockButton(Icons.Filled.MoreVert, R.string.map_group_more, activeDetail == MapDetailGroup.More) {
+                    activeDetail = MapDetailGroup.More
+                }
             }
             if (dockActions.showPendingApplyHint) {
                 Text(
@@ -220,7 +230,7 @@ internal fun MapControlPanel(
                         .fillMaxWidth()
                         .padding(bottom = 4.dp),
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.tertiary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
                 )
             }
@@ -283,14 +293,15 @@ internal fun MapControlPanel(
             onDismissRequest = { activeDetail = null },
             sheetState = detailSheetState,
             containerColor = MaterialTheme.colorScheme.surface,
+            shape = MaterialTheme.shapes.extraLarge,
         ) {
         Column(
             modifier = Modifier
                 .navigationBarsPadding()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp)
-                .padding(top = 12.dp, bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(horizontal = 20.dp)
+                .padding(top = 4.dp, bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
                 Text(
                     stringResource(
@@ -302,13 +313,13 @@ internal fun MapControlPanel(
                             MapDetailGroup.More -> R.string.map_group_more
                         },
                     ),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleLarge,
                 )
             activeCoordinate?.let {
                 Text(
                     stringResource(R.string.active_coordinate, it.latitude.formatCoordinate(), it.longitude.formatCoordinate()),
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -366,14 +377,12 @@ internal fun MapControlPanel(
                         style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
                     // Keep quick actions above results so they stay reachable when the list grows.
-                    TextButton(onClick = { onShowCoordinatesChange(!showCoordinates) }, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(if (showCoordinates) R.string.action_hide_coordinates else R.string.action_show_coordinates))
-                    }
-                    TextButton(onClick = {
+                    RouteSheetAction(
+                        stringResource(if (showCoordinates) R.string.action_hide_coordinates else R.string.action_show_coordinates),
+                    ) { onShowCoordinatesChange(!showCoordinates) }
+                    RouteSheetAction(stringResource(R.string.action_use_current_location)) {
                         activeDetail = null
                         onUseCurrentLocation()
-                    }, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.action_use_current_location))
                     }
                     PlaceSearchContent(
                         query = placeSearchQuery,
@@ -400,22 +409,45 @@ internal fun MapControlPanel(
                         Switch(checked = showLandmarks, onCheckedChange = onShowLandmarksChange)
                     }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = onCycleUpdateInterval, modifier = Modifier.weight(1f)) {
+                        TextButton(
+                            onClick = onCycleUpdateInterval,
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                            shape = MaterialTheme.shapes.medium,
+                            colors = ButtonDefaults.textButtonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                                contentColor = MaterialTheme.colorScheme.onSurface,
+                            ),
+                        ) {
                             Text(
                                 stringResource(
                                     R.string.setting_update_interval,
                                     formatUpdateIntervalLabel(updateIntervalMillis),
                                 ),
+                                maxLines = 2,
+                                style = MaterialTheme.typography.labelLarge,
                             )
                         }
-                        TextButton(onClick = onCycleAccuracy, modifier = Modifier.weight(1f)) {
-                            Text(stringResource(R.string.setting_accuracy, accuracyMeters.toInt()))
+                        TextButton(
+                            onClick = onCycleAccuracy,
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                            shape = MaterialTheme.shapes.medium,
+                            colors = ButtonDefaults.textButtonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                                contentColor = MaterialTheme.colorScheme.onSurface,
+                            ),
+                        ) {
+                            Text(
+                                stringResource(R.string.setting_accuracy, accuracyMeters.toInt()),
+                                maxLines = 2,
+                                style = MaterialTheme.typography.labelLarge,
+                            )
                         }
                     }
                     OutlinedButton(
                         onClick = onToggleMapType,
                         enabled = isMapReady,
                         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                        shape = MaterialTheme.shapes.large,
                     ) {
                         Text(
                             stringResource(
@@ -427,6 +459,7 @@ internal fun MapControlPanel(
                     OutlinedButton(
                         onClick = onOpenDeveloperOptions,
                         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                        shape = MaterialTheme.shapes.large,
                     ) {
                         Icon(Icons.Filled.Settings, contentDescription = null)
                         Text(
@@ -437,27 +470,13 @@ internal fun MapControlPanel(
                     OutlinedButton(
                         onClick = onOpenBatterySettings,
                         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                        shape = MaterialTheme.shapes.large,
                     ) {
                         Text(stringResource(R.string.action_open_battery_settings))
                     }
-                    TextButton(
-                        onClick = onShowSetupGuide,
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                    ) {
-                        Text(stringResource(R.string.action_show_setup_guide))
-                    }
-                    TextButton(
-                        onClick = onShowRemoveAds,
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                    ) {
-                        Text(stringResource(R.string.action_remove_ads))
-                    }
-                    TextButton(
-                        onClick = onShowAboutPrivacy,
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                    ) {
-                        Text(stringResource(R.string.action_about_privacy))
-                    }
+                    RouteSheetAction(stringResource(R.string.action_show_setup_guide), onShowSetupGuide)
+                    RouteSheetAction(stringResource(R.string.action_remove_ads), onShowRemoveAds)
+                    RouteSheetAction(stringResource(R.string.action_about_privacy), onShowAboutPrivacy)
                     Text(
                         stringResource(R.string.setup_guide_is_mock),
                         style = MaterialTheme.typography.bodySmall,
@@ -476,16 +495,24 @@ internal fun MapControlPanel(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        TextButton(onClick = {
-                            activeDetail = null
-                            onSaveFavorite()
-                        }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                        OutlinedButton(
+                            onClick = {
+                                activeDetail = null
+                                onSaveFavorite()
+                            },
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                            shape = MaterialTheme.shapes.large,
+                        ) {
                             Text(stringResource(R.string.action_save_place), maxLines = 1)
                         }
-                        TextButton(onClick = {
-                            activeDetail = null
-                            onShowFavorites()
-                        }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                        OutlinedButton(
+                            onClick = {
+                                activeDetail = null
+                                onShowFavorites()
+                            },
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                            shape = MaterialTheme.shapes.large,
+                        ) {
                             Text(stringResource(R.string.action_favorites, favoritesCount), maxLines = 1)
                         }
                     }
@@ -554,6 +581,7 @@ internal fun MapControlPanel(
                                     },
                                     enabled = isMapReady && !isStarting,
                                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                                    shape = MaterialTheme.shapes.large,
                                 ) { Text(stringResource(R.string.action_enable_joystick)) }
                             }
                             else -> {
@@ -564,6 +592,7 @@ internal fun MapControlPanel(
                                     },
                                     enabled = isMapReady && !isStarting,
                                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                                    shape = MaterialTheme.shapes.large,
                                 ) { Text(stringResource(R.string.action_start_joystick)) }
                             }
                         }
@@ -598,11 +627,9 @@ internal fun MapControlPanel(
                         enabled = isMapReady,
                         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                     ) { Text(stringResource(R.string.action_shape_route), maxLines = 2) }
-                    TextButton(onClick = {
+                    RouteSheetAction(stringResource(R.string.action_open_route_library)) {
                         activeDetail = null
                         onShowRouteLibrary()
-                    }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                        Text(stringResource(R.string.action_open_route_library), maxLines = 2)
                     }
                 }
             if (detailGroup == MapDetailGroup.Route &&
@@ -796,6 +823,9 @@ internal fun MapControlPanel(
                 onClick = { uriHandler.openUri("https://openfreemap.org/") },
                 contentPadding = PaddingValues(horizontal = 4.dp),
                 modifier = Modifier.heightIn(min = 48.dp),
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
             ) { Text(stringResource(R.string.map_provider_attribution), style = MaterialTheme.typography.labelSmall) }
             if (routePlanningStep in setOf(
                     RoutePlanningStep.ReadyToPreview,
@@ -807,6 +837,9 @@ internal fun MapControlPanel(
                     onClick = { uriHandler.openUri("https://www.openstreetmap.org/fixthemap") },
                     contentPadding = PaddingValues(horizontal = 4.dp),
                     modifier = Modifier.heightIn(min = 48.dp),
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
                 ) { Text(stringResource(R.string.route_provider_attribution), style = MaterialTheme.typography.labelSmall) }
             }
         }
@@ -822,8 +855,13 @@ private fun RouteSheetAction(
     TextButton(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+        shape = MaterialTheme.shapes.medium,
+        colors = ButtonDefaults.textButtonColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
     ) {
-        Text(label, maxLines = 2)
+        Text(label, maxLines = 2, style = MaterialTheme.typography.labelLarge)
     }
 }
 

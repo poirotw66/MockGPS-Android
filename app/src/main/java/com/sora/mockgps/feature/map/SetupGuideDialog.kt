@@ -3,10 +3,12 @@ package com.sora.mockgps.feature.map
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -43,21 +45,25 @@ internal fun SetupGuideDialog(
                     stringResource(R.string.setup_guide_battery),
                     style = MaterialTheme.typography.bodyMedium,
                 )
+                OutlinedButton(
+                    onClick = onOpenDeveloperOptions,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    shape = MaterialTheme.shapes.large,
+                ) {
+                    Text(stringResource(R.string.action_open_developer_options), maxLines = 2)
+                }
+                OutlinedButton(
+                    onClick = onOpenBatterySettings,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    shape = MaterialTheme.shapes.large,
+                ) {
+                    Text(stringResource(R.string.action_open_battery_settings), maxLines = 2)
+                }
             }
         },
         confirmButton = {
-            TextButton(onClick = onOpenDeveloperOptions) {
-                Text(stringResource(R.string.action_open_developer_options))
-            }
-        },
-        dismissButton = {
-            Column {
-                TextButton(onClick = onOpenBatterySettings) {
-                    Text(stringResource(R.string.action_open_battery_settings))
-                }
-                TextButton(onClick = onDismiss) {
-                    Text(stringResource(R.string.action_got_it))
-                }
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_got_it))
             }
         },
     )

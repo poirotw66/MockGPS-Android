@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -49,7 +50,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -90,9 +90,6 @@ import com.sora.mockgps.service.RouteProgress
 import com.sora.mockgps.service.RouteRunning
 import com.sora.mockgps.service.RouteServiceState
 import com.sora.mockgps.service.RouteStarting
-import com.sora.mockgps.ui.theme.BloomWalkCoral
-import com.sora.mockgps.ui.theme.BloomWalkGold
-import com.sora.mockgps.ui.theme.BloomWalkSage
 import java.util.Locale
 import kotlin.math.cos
 import kotlin.math.log2
@@ -351,18 +348,41 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
         if (isRouteSession && joystickMode) joystickMode = false
     }
 
+    var joystickCameraFramed by remember { mutableStateOf(false) }
     LaunchedEffect(showJoystick) {
         if (showJoystick) {
+            joystickCameraFramed = true
+            val coordinate = activeCoordinate ?: uiState.pendingCoordinate
+            cameraState.animateTo(
+                cameraState.position.copy(
+                    target = coordinate.toPosition(),
+                    padding = JoystickCameraPadding,
+                ),
+            )
             context.setJoystickVector(lastJoystickBearing, joystickMagnitude, joystickSpeed, sessionToken)
-        } else if (joystickMagnitude > 0f) {
-            joystickMagnitude = 0f
-            context.setJoystickVector(lastJoystickBearing, 0f, joystickSpeed, sessionToken)
+        } else {
+            if (joystickMagnitude > 0f) {
+                joystickMagnitude = 0f
+                context.setJoystickVector(lastJoystickBearing, 0f, joystickSpeed, sessionToken)
+            }
+            if (joystickCameraFramed) {
+                joystickCameraFramed = false
+                cameraState.animateTo(cameraState.position.copy(padding = PaddingValues(0.dp)))
+            }
         }
     }
 
     LaunchedEffect(activeCoordinate, joystickMagnitude) {
         if (joystickMagnitude > 0f) {
-            activeCoordinate?.let(viewModel::selectCoordinate)
+            activeCoordinate?.let { coordinate ->
+                viewModel.selectCoordinate(coordinate)
+                cameraState.animateTo(
+                    cameraState.position.copy(
+                        target = coordinate.toPosition(),
+                        padding = JoystickCameraPadding,
+                    ),
+                )
+            }
         }
     }
 
@@ -665,6 +685,9 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 isActive && !isRouteSession && !uiState.isRoutePlanningMode &&
                     it != uiState.pendingCoordinate
             },
+            userMarker = joystickSpeed.markerIcon.takeIf { showJoystick },
+            userMarkerDescription = if (showJoystick) stringResource(joystickSpeed.labelResource()) else null,
+            userMarkerCoordinate = if (showJoystick) activeCoordinate ?: uiState.pendingCoordinate else null,
             cameraState = cameraState,
             onMapLoaded = viewModel::onMapLoaded,
             onMapLoadFailed = viewModel::onMapLoadFailed,
@@ -704,9 +727,9 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     .statusBarsPadding()
                     .padding(top = 8.dp, start = 16.dp, end = 16.dp),
                 shape = MaterialTheme.shapes.large,
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
-                tonalElevation = 3.dp,
-                shadowElevation = 5.dp,
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+                tonalElevation = 2.dp,
+                shadowElevation = 4.dp,
             ) {
                 Text(
                     text = prompt,
@@ -778,9 +801,9 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             }
         }
         if (showJoystick) {
-            JoystickOverlay(
-                enabled = true,
+            JoystickSpeedCard(
                 selectedSpeed = joystickSpeed,
+                enabled = true,
                 onSpeedChange = { speed ->
                     joystickSpeed = speed
                     if (joystickMagnitude > 0f) {
@@ -792,6 +815,14 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                         )
                     }
                 },
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(top = 48.dp, start = 16.dp, end = 16.dp),
+            )
+            JoystickOverlay(
+                enabled = true,
+                selectedSpeed = joystickSpeed,
                 onVectorChange = { bearing, magnitude ->
                     lastJoystickBearing = bearing
                     joystickMagnitude = magnitude
@@ -815,9 +846,13 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     bottom = chromeBottomPadding,
                 ),
             shape = CircleShape,
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
-            tonalElevation = 4.dp,
-            shadowElevation = 6.dp,
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+            tonalElevation = 2.dp,
+            shadowElevation = 4.dp,
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f),
+            ),
         ) {
             IconButton(
                 onClick = goToCurrentLocation,
@@ -1067,6 +1102,9 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
 }
 
 private const val ROUTE_START_AFTER_STOP_TIMEOUT_MILLIS = 5_000L
+
+/** Keeps the joystick user marker in the open map, below the speed card and above the dock. */
+private val JoystickCameraPadding = PaddingValues(top = 300.dp, bottom = 200.dp)
 
 private fun RouteServiceState.progressOrNull(): RouteProgress? = when (this) {
     RouteServiceState.Idle -> null

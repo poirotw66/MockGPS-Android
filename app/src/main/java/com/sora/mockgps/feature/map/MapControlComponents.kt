@@ -53,29 +53,42 @@ internal fun JoystickSpeed.labelResource(): Int = when (this) {
 internal fun MapDockButton(
     icon: ImageVector,
     label: Int,
+    selected: Boolean,
     onClick: () -> Unit,
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Surface(
             shape = CircleShape,
-            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
+            color = if (selected) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
+            },
         ) {
             IconButton(onClick = onClick, modifier = Modifier.size(44.dp)) {
                 Icon(
                     imageVector = icon,
                     contentDescription = stringResource(label),
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(21.dp),
+                    tint = if (selected) {
+                        MaterialTheme.colorScheme.onPrimary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    modifier = Modifier.size(20.dp),
                 )
             }
         }
         Text(
             text = stringResource(label),
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (selected) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
             maxLines = 1,
         )
     }
@@ -90,7 +103,7 @@ internal fun RouteEndpointSummary(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
     ) {
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
             Text(label, style = MaterialTheme.typography.labelLarge)
@@ -119,7 +132,7 @@ internal fun RouteProgressSummary(progress: RouteProgress, paused: Boolean) {
     val remainingDuration = if (progress.speedMetersPerSecond > 0.0) {
         (progress.remainingDistanceMeters / progress.speedMetersPerSecond).formatDuration()
     } else {
-        "—"
+        "-"
     }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -160,7 +173,7 @@ internal fun RouteWaypointEditor(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = MaterialTheme.shapes.medium,
-            color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.45f),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),

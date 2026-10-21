@@ -1,6 +1,9 @@
 package com.sora.mockgps.feature.map
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,9 +20,11 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -75,6 +80,10 @@ internal fun MapPicker(
     activeRouteCoordinate: Coordinate?,
     /** Static mock active pin when the pending selection has not been applied yet. */
     pendingApplyActiveCoordinate: Coordinate? = null,
+    /** Replaces the gold selection dot while the joystick is choosing a travel speed. */
+    userMarker: ImageVector? = null,
+    userMarkerDescription: String? = null,
+    userMarkerCoordinate: Coordinate? = null,
     cameraState: CameraState,
     onMapLoaded: () -> Unit,
     onMapLoadFailed: () -> Unit,
@@ -114,7 +123,7 @@ internal fun MapPicker(
             ) {
                 if (routePoints.size >= 2) RouteLine(routePoints)
                 pendingApplyActiveCoordinate?.let { StaticActiveMarker(it) }
-                SelectedLocationMarker(pendingCoordinate)
+                if (userMarker == null) SelectedLocationMarker(pendingCoordinate)
                 activeRouteCoordinate?.let { RouteActiveMarker(it) }
             }
         }
@@ -142,14 +151,14 @@ internal fun MapPicker(
                     .padding(top = 12.dp, start = 16.dp, end = 16.dp)
                     .semantics { contentDescription = pendingHint },
                 shape = MaterialTheme.shapes.large,
-                color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.96f),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
                 shadowElevation = 2.dp,
             ) {
                 Text(
                     text = pendingHint,
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
                     style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
         }
@@ -167,6 +176,17 @@ internal fun MapPicker(
                     text = stringResource(R.string.landmark_selected, name),
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
                     style = MaterialTheme.typography.labelLarge,
+                )
+            }
+        }
+        if (loadingState == MapLoadingState.Ready && userMarker != null && userMarkerCoordinate != null) {
+            cameraState.position
+            cameraState.projection?.let { projection ->
+                val screen = projection.screenLocationFromPosition(userMarkerCoordinate.toPosition())
+                UserTransportMarker(
+                    icon = userMarker,
+                    contentDescription = userMarkerDescription,
+                    modifier = Modifier.offset(x = screen.x - 20.dp, y = screen.y - 20.dp),
                 )
             }
         }
@@ -322,6 +342,30 @@ private fun RouteControlMarker(label: String, color: Color, modifier: Modifier =
 }
 
 @Composable
+private fun UserTransportMarker(
+    icon: ImageVector,
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .background(Color.White)
+            .border(2.dp, BloomWalkCoral, CircleShape)
+            .semantics { if (contentDescription != null) this.contentDescription = contentDescription },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = BloomWalkCoral,
+            modifier = Modifier.size(24.dp),
+        )
+    }
+}
+
+@Composable
 private fun StaticActiveMarker(coordinate: Coordinate) {
     val data = remember(coordinate) { GeoJsonData.JsonString(coordinate.toPointGeoJson()) }
     val source = rememberGeoJsonSource(data)
@@ -361,7 +405,7 @@ private fun SelectedLocationMarker(coordinate: Coordinate) {
         source = source,
         color = const(BloomWalkGold.copy(alpha = 0.30f)),
         radius = const(18.dp),
-        strokeColor = const(Color.Black.copy(alpha = 0.8f)),
+        strokeColor = const(Color.White.copy(alpha = 0.9f)),
         strokeWidth = const(2.dp),
     )
     CircleLayer(
@@ -369,7 +413,7 @@ private fun SelectedLocationMarker(coordinate: Coordinate) {
         source = source,
         color = const(BloomWalkGold),
         radius = const(9.dp),
-        strokeColor = const(Color.Black),
+        strokeColor = const(Color.White),
         strokeWidth = const(3.dp),
     )
 }

@@ -159,7 +159,7 @@ private fun RouteLibraryItem(
     actions: @Composable () -> Unit = {},
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text(name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge)
+        Text(name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
         Text(
             stringResource(R.string.route_library_distance, String.format(Locale.US, "%.2f", distanceMeters / 1_000.0)),
             style = MaterialTheme.typography.bodySmall,
@@ -169,6 +169,6 @@ private fun RouteLibraryItem(
             actions()
             TextButton(onClick = onLoad) { Text(stringResource(R.string.action_load_route)) }
         }
-        HorizontalDivider()
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
     }
 }

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -56,6 +57,8 @@ internal fun AutoJourneyDialog(
                             AutoJourneyRouteStyle.RoadAdapted -> R.string.auto_journey_notice
                         },
                     ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         },
@@ -83,7 +86,11 @@ internal fun ShapeRouteDialog(
         title = { Text(stringResource(R.string.shape_route_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(stringResource(R.string.shape_route_notice))
+                Text(
+                    stringResource(R.string.shape_route_notice),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 ShapeOptionGrid(shape) { shape = it }
             }
         },
@@ -163,7 +170,11 @@ private fun ShapeOptionGrid(selected: RouteShape, onSelected: (RouteShape) -> Un
 
 @Composable
 private fun OptionLabel(resourceId: Int) {
-    Text(stringResource(resourceId))
+    Text(
+        stringResource(resourceId),
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 @Composable

@@ -2,10 +2,13 @@ package com.sora.mockgps.feature.map
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
@@ -79,11 +82,19 @@ internal fun FavoritesDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = onExportBackup, modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.action_export_favorites_backup))
+                    OutlinedButton(
+                        onClick = onExportBackup,
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                        shape = MaterialTheme.shapes.large,
+                    ) {
+                        Text(stringResource(R.string.action_export_favorites_backup), maxLines = 1)
                     }
-                    TextButton(onClick = onImportBackup, modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.action_import_favorites_backup))
+                    OutlinedButton(
+                        onClick = onImportBackup,
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                        shape = MaterialTheme.shapes.large,
+                    ) {
+                        Text(stringResource(R.string.action_import_favorites_backup), maxLines = 1)
                     }
                 }
                 Text(
@@ -103,14 +114,31 @@ internal fun FavoritesDialog(
                         }
                         items(favorites, key = { "favorite-${it.id}" }) { favorite ->
                             Column(modifier = Modifier.fillMaxWidth()) {
-                                TextButton(onClick = { onSelect(favorite) }, modifier = Modifier.fillMaxWidth()) {
+                                TextButton(
+                                    onClick = { onSelect(favorite) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = MaterialTheme.shapes.medium,
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+                                    colors = ButtonDefaults.textButtonColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                                        contentColor = MaterialTheme.colorScheme.onSurface,
+                                    ),
+                                ) {
                                     Column(modifier = Modifier.fillMaxWidth()) {
-                                        Text(favorite.name, style = MaterialTheme.typography.titleSmall)
-                                        Text(
-                                            String.format(Locale.US, "%.6f, %.6f", favorite.latitude, favorite.longitude),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        val coordinateLabel = String.format(
+                                            Locale.US,
+                                            "%.6f, %.6f",
+                                            favorite.latitude,
+                                            favorite.longitude,
                                         )
+                                        Text(favorite.name, style = MaterialTheme.typography.titleSmall)
+                                        if (favorite.name != coordinateLabel) {
+                                            Text(
+                                                coordinateLabel,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
                                     }
                                 }
                                 Row(modifier = Modifier.padding(horizontal = 4.dp)) {
@@ -127,10 +155,19 @@ internal fun FavoritesDialog(
                             item { Text(stringResource(R.string.recent_locations_title), style = MaterialTheme.typography.titleSmall) }
                         }
                         items(recentLocations, key = { "recent-${it.id}" }) { recent ->
-                            TextButton(onClick = { onSelectRecent(recent) }, modifier = Modifier.fillMaxWidth()) {
+                            TextButton(
+                                onClick = { onSelectRecent(recent) },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = MaterialTheme.shapes.medium,
+                                colors = ButtonDefaults.textButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                                    contentColor = MaterialTheme.colorScheme.onSurface,
+                                ),
+                            ) {
                                 Text(
                                     String.format(Locale.US, "%.6f, %.6f", recent.latitude, recent.longitude),
                                     modifier = Modifier.fillMaxWidth(),
+                                    style = MaterialTheme.typography.bodyMedium,
                                 )
                             }
                         }

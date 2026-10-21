@@ -10,6 +10,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -105,6 +108,7 @@ internal fun PlaceSearchContent(
         onClick = { submitSearch() },
         enabled = canSubmit,
         modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
     ) {
         Text(stringResource(R.string.action_search_online))
     }
@@ -220,8 +224,29 @@ private fun PlaceSearchResultButton(
     TextButton(
         onClick = { onPlaceSelected(result) },
         modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+        colors = ButtonDefaults.textButtonColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
     ) {
-        val label = if (result.address.isNullOrBlank()) result.name else "${result.name}\n${result.address}"
-        Text(label, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                result.name,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (!result.address.isNullOrBlank()) {
+                Text(
+                    result.address,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
     }
 }
