@@ -79,6 +79,7 @@ import com.sora.mockgps.monetization.ui.RemoveAdsDialog
 import com.sora.mockgps.feature.favorites.domain.FavoriteLocation
 import com.sora.mockgps.feature.routes.domain.SavedRouteSummary
 import com.sora.mockgps.route.JoystickSpeed
+import com.sora.mockgps.route.RoutePolyline
 import com.sora.mockgps.route.PlannedRoute
 import com.sora.mockgps.service.MockLocationForegroundService
 import com.sora.mockgps.service.MockServiceState
@@ -331,6 +332,15 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     val isMapReady = uiState.loadingState == MapLoadingState.Ready
     val routeProgress = routeState.progressOrNull()
     val activeCoordinate = routeProgress?.coordinate ?: (serviceState as? MockServiceState.Active)?.coordinate
+    val routeGeometry = uiState.plannedRoute?.points ?: uiState.routeWaypoints
+    val routeSplit = if (isRouteSession && routeProgress != null && routeGeometry.size >= 2) {
+        runCatching { RoutePolyline(routeGeometry).splitAt(routeProgress.travelledDistanceMeters) }.getOrNull()
+    } else {
+        null
+    }
+    val routeLineTravelled = routeSplit?.travelled?.takeIf { it.size >= 2 }.orEmpty()
+    val routeLineRemaining = routeSplit?.remaining?.takeIf { it.size >= 2 } ?: routeGeometry
+    val routeMarkerSpeed = JoystickSpeed.closestTo((routeProgress?.speedMetersPerSecond ?: 0.0) * 3.6)
     val favoriteSavedMessage = uiState.favoriteMessage?.let {
         stringResource(R.string.favorite_saved, it)
     }
@@ -365,6 +375,25 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 joystickCameraFramed = false
                 cameraState.animateTo(cameraState.position.copy(padding = PaddingValues(0.dp)))
             }
+        }
+    }
+
+    var routeCameraFramed by remember { mutableStateOf(false) }
+    LaunchedEffect(isRouteRunning, routeProgress?.coordinate) {
+        if (!isRouteRunning) return@LaunchedEffect
+        val coordinate = routeProgress?.coordinate ?: return@LaunchedEffect
+        routeCameraFramed = true
+        cameraState.animateTo(
+            cameraState.position.copy(
+                target = coordinate.toPosition(),
+                padding = RouteFollowPadding,
+            ),
+        )
+    }
+    LaunchedEffect(isRouteSession) {
+        if (!isRouteSession && routeCameraFramed) {
+            routeCameraFramed = false
+            cameraState.animateTo(cameraState.position.copy(padding = PaddingValues(0.dp)))
         }
     }
 
@@ -664,7 +693,8 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             mapRenderKey = uiState.mapRenderKey,
             loadingState = uiState.loadingState,
             pendingCoordinate = uiState.pendingCoordinate,
-            routePoints = uiState.plannedRoute?.points ?: uiState.routeWaypoints,
+            routePoints = routeLineRemaining,
+            routeTravelledPoints = routeLineTravelled,
             routeOrigin = uiState.routeOrigin,
             routeDestination = uiState.routeDestination,
             routeWaypoints = uiState.routeWaypoints,
@@ -675,9 +705,21 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 isActive && !isRouteSession && !uiState.isRoutePlanningMode &&
                     it != uiState.pendingCoordinate
             },
-            userMarker = joystickSpeed.markerIcon.takeIf { showJoystick },
-            userMarkerDescription = if (showJoystick) stringResource(joystickSpeed.labelResource()) else null,
-            userMarkerCoordinate = if (showJoystick) activeCoordinate ?: uiState.pendingCoordinate else null,
+            userMarker = when {
+                showJoystick -> joystickSpeed.markerIcon
+                isRouteSession -> routeMarkerSpeed.markerIcon
+                else -> null
+            },
+            userMarkerDescription = when {
+                showJoystick -> stringResource(joystickSpeed.labelResource())
+                isRouteSession -> stringResource(R.string.route_state_running)
+                else -> null
+            },
+            userMarkerCoordinate = when {
+                showJoystick -> activeCoordinate ?: uiState.pendingCoordinate
+                isRouteSession -> activeCoordinate
+                else -> null
+            },
             cameraState = cameraState,
             onMapLoaded = viewModel::onMapLoaded,
             onMapLoadFailed = viewModel::onMapLoadFailed,
@@ -978,6 +1020,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                             routeOptions,
                             uiState.updateIntervalMillis,
                             uiState.accuracyMeters,
+                            routeName = uiState.activeRouteName,
                         )
                         if (outcome != ForegroundServiceStartOutcome.Started) {
                             pendingRecentRoute = false
@@ -1095,6 +1138,7 @@ private const val ROUTE_START_AFTER_STOP_TIMEOUT_MILLIS = 5_000L
 
 /** Keeps the joystick user marker in the open map, below the speed card and above the dock. */
 private val JoystickCameraPadding = PaddingValues(top = 300.dp, bottom = 200.dp)
+private val RouteFollowPadding = PaddingValues(top = 120.dp, bottom = 340.dp)
 
 private fun RouteServiceState.progressOrNull(): RouteProgress? = when (this) {
     RouteServiceState.Idle -> null

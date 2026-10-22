@@ -14,6 +14,12 @@ enum class JoystickSpeed(val kilometersPerHour: Double) {
     Car(100.0),
     HighSpeedRail(300.0),
     Airplane(1_000.0),
+    ;
+
+    companion object {
+        fun closestTo(kilometersPerHour: Double): JoystickSpeed =
+            entries.minBy { kotlin.math.abs(it.kilometersPerHour - kilometersPerHour) }
+    }
 }
 
 object JoystickMovement {

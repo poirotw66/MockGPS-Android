@@ -763,7 +763,10 @@ internal class MapRoutingCoordinator(
 
 private fun routeDistance(points: List<Coordinate>): Double = RoutePolyline(points).totalDistanceMeters
 
-internal fun routingUserMessageId(failure: Throwable): Int = when (failure) {
+private fun Throwable.routingFailureCause(): Throwable =
+    (this as? RoutingUnavailableException)?.cause ?: this
+
+internal fun routingUserMessageId(failure: Throwable): Int = when (val reported = failure.routingFailureCause()) {
     is RoutingNoRouteException -> R.string.route_error_no_route
     is RoutingTooComplexException -> R.string.route_error_too_complex
     is RoutingOutOfScopeException -> R.string.route_error_out_of_scope

@@ -52,6 +52,7 @@ internal fun Context.startRouteService(
     options: RouteSimulationOptions,
     updateIntervalMillis: Long,
     accuracyMeters: Float,
+    routeName: String? = null,
 ): ForegroundServiceStartOutcome = foregroundServiceStartOutcome {
         startForegroundService(
             MockLocationForegroundService.startRouteIntent(
@@ -63,6 +64,7 @@ internal fun Context.startRouteService(
                 gpsDrift = options.gpsDrift(),
                 updateIntervalMillis = updateIntervalMillis,
                 accuracyMeters = accuracyMeters,
+                routeName = routeName,
             ),
         )
 }

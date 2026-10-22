@@ -86,6 +86,15 @@ class CachingRoutingRepositoryTest {
     }
 
     @Test
+    fun `quota exhaustion stays a quota failure instead of a network outage`() = runBlocking {
+        val delegate = FakeRoutingRepository { _ -> throw RoutingQuotaException("CLIENT_RATE_LIMITED") }
+        val repository = CachingRoutingRepository(delegate)
+        val failure = runCatching { repository.planBicycleRoute(origin, destination) }.exceptionOrNull()
+        assertTrue(failure is RoutingQuotaException)
+        assertEquals("CLIENT_RATE_LIMITED", failure?.message)
+    }
+
+    @Test
     fun `cache key keeps provider revision mode and waypoint order and bounded cache evicts least recently used`() {
         val identity = RoutingCacheIdentity(contractRevision = "v1", providerRevision = "geoapify-v1")
         val otherIdentity = RoutingCacheIdentity(contractRevision = "v1", providerRevision = "other-v1")

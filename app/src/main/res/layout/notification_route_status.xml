@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1">
+
+            <Chronometer
+                android:id="@+id/route_notification_clock"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:countDown="true"
+                android:fontFamily="sans-serif-medium"
+                android:singleLine="true"
+                android:textSize="28sp"
+                android:textStyle="bold"
+                style="@style/TextAppearance.Compat.Notification.Title" />
+
+            <TextView
+                android:id="@+id/route_notification_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:singleLine="true"
+                android:textSize="28sp"
+                android:textStyle="bold"
+                android:visibility="gone"
+                style="@style/TextAppearance.Compat.Notification.Title" />
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/route_notification_percent"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:fontFamily="sans-serif-medium"
+            android:textColor="@color/bloomwalk_coral"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/route_notification_caption"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:ellipsize="end"
+        android:singleLine="true"
+        android:textSize="14sp"
+        style="@style/TextAppearance.Compat.Notification.Info" />
+
+    <ProgressBar
+        android:id="@+id/route_notification_progress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="8dp"
+        android:layout_marginTop="8dp"
+        android:max="100"
+        android:progressDrawable="@drawable/route_notification_progress" />
+</LinearLayout>

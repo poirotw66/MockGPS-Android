@@ -175,6 +175,8 @@ class CachingRoutingRepository(
             planned
         } catch (failure: RoutingNoRouteException) {
             throw failure
+        } catch (failure: RoutingQuotaException) {
+            throw failure
         } catch (failure: RoutingNetworkException) {
             if (cached != null &&
                 cached.providerRevision == identity.providerRevision &&

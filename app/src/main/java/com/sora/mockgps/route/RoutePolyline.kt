@@ -28,6 +28,27 @@ class RoutePolyline(points: List<Coordinate>) {
         require(totalDistanceMeters > 0.0) { "A route must contain at least one non-zero segment" }
     }
 
+    /**
+     * Splits the geometry at [distanceMeters]. Both parts include the point on the route,
+     * so a line can draw the travelled portion and the portion still ahead.
+     */
+    fun splitAt(distanceMeters: Double): RouteLineSplit {
+        val clamped = distanceMeters.coerceIn(0.0, totalDistanceMeters)
+        val segmentIndex = segmentIndexFor(clamped)
+        val cursor = positionAt(clamped).coordinate
+        val travelled = buildList {
+            addAll(points.subList(0, segmentIndex + 1))
+            if (last() != cursor) add(cursor)
+        }
+        val remaining = buildList {
+            add(cursor)
+            for (point in points.subList(segmentIndex + 1, points.size)) {
+                if (point != last()) add(point)
+            }
+        }
+        return RouteLineSplit(travelled = travelled, remaining = remaining)
+    }
+
     /** Returns the route position at [distanceMeters], clamped to the start and end. */
     fun positionAt(distanceMeters: Double): RoutePosition {
         val clampedDistance = distanceMeters.coerceIn(0.0, totalDistanceMeters)
@@ -61,6 +82,11 @@ class RoutePolyline(points: List<Coordinate>) {
         const val MINIMUM_POINT_COUNT = 2
     }
 }
+
+data class RouteLineSplit(
+    val travelled: List<Coordinate>,
+    val remaining: List<Coordinate>,
+)
 
 data class RoutePosition(
     val coordinate: Coordinate,

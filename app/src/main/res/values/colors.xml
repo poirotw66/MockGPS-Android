@@ -1,5 +1,7 @@
 <resources>
     <color name="mock_gps_primary">#B9473F</color>
+    <color name="bloomwalk_coral">#D95C50</color>
+    <color name="bloomwalk_coral_track">#33D95C50</color>
     <color name="mock_gps_surface">#FFF8F1</color>
     <color name="mock_gps_launcher_background">#FFF4E6</color>
 </resources>

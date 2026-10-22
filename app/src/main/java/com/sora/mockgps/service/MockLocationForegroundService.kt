@@ -63,6 +63,7 @@ class MockLocationForegroundService : Service() {
     private var sessionCoordinate: Coordinate? = null
     @Volatile
     private var routeExecution: RouteExecution? = null
+    private var routeDisplayName: String? = null
     @Volatile
     private var joystickVector: JoystickVector? = null
     @Volatile
@@ -93,6 +94,7 @@ class MockLocationForegroundService : Service() {
             )
             ACTION_UPDATE -> updateSession(intent.coordinateOrDefault(), intent.commandToken())
             ACTION_START_ROUTE -> intent.routeRequestOrNull()?.let { request ->
+                routeDisplayName = intent.getStringExtra(EXTRA_ROUTE_NAME)?.trim()?.take(80)?.ifBlank { null }
                 startRouteSession(
                     route = request.route,
                     movementProfile = request.movementProfile,
@@ -139,6 +141,7 @@ class MockLocationForegroundService : Service() {
 
         sessionCoordinate = coordinate
         routeExecution = null
+        routeDisplayName = null
         publishRouteState(RouteServiceState.Idle)
         sessionJob = serviceScope.launch {
             sessionMutex.withLock {
@@ -270,6 +273,7 @@ class MockLocationForegroundService : Service() {
         if (sessionJob?.isActive == true || sessionGate.current() != null) return
         val sessionToken = sessionGate.begin()
         val initialCoordinate = execution.snapshot().reportedCoordinate
+        routeExecution = execution
         try {
             MockLocationNotification.createChannel(this)
             promoteToForeground(
@@ -279,6 +283,8 @@ class MockLocationForegroundService : Service() {
                 forceNotificationUpdate = true,
             )
         } catch (failure: Throwable) {
+            routeExecution = null
+            routeDisplayName = null
             val message = failure.userFacingMessage(getString(R.string.mock_operation_failed))
             publishState(MockServiceState.Error(message))
             publishRouteState(RouteFailed(message, lastProgress = null))
@@ -288,7 +294,6 @@ class MockLocationForegroundService : Service() {
         }
 
         sessionCoordinate = initialCoordinate
-        routeExecution = execution
         publishRouteState(RouteStarting(execution.snapshot().toRouteProgress(), sessionToken))
         sessionJob = serviceScope.launch {
             sessionMutex.withLock {
@@ -304,6 +309,11 @@ class MockLocationForegroundService : Service() {
                     }
                     execution.start(SystemClock.elapsedRealtime())
                     publishRouteState(RouteRunning(execution.snapshot().toRouteProgress(), sessionToken))
+                    promoteToForeground(
+                        coordinate = execution.snapshot().reportedCoordinate,
+                        sessionToken = sessionToken,
+                        forceNotificationUpdate = true,
+                    )
 
                     while (isActive) {
                         val snapshot = execution.advance(SystemClock.elapsedRealtime())
@@ -507,6 +517,7 @@ class MockLocationForegroundService : Service() {
         if (routeExecution === finishingExecution) routeExecution = null
         joystickVector = null
         joystickSpeed = JoystickSpeed.Walk
+        routeDisplayName = null
         sessionCoordinate = null
         lastNotificationUpdateElapsedRealtime = 0L
         lastPublishedRouteAction = null
@@ -538,6 +549,7 @@ class MockLocationForegroundService : Service() {
             coordinate.longitude,
             routeAction,
             sessionToken,
+            routeNotificationStatus(),
         )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
@@ -548,6 +560,37 @@ class MockLocationForegroundService : Service() {
         } else {
             startForeground(MockLocationNotification.NOTIFICATION_ID, notification)
         }
+    }
+
+    private fun routeNotificationStatus(): RouteNotificationStatus? {
+        val execution = routeExecution ?: return null
+        val snapshot = execution.snapshot()
+        if (snapshot.state != RouteExecutionState.READY &&
+            snapshot.state != RouteExecutionState.RUNNING &&
+            snapshot.state != RouteExecutionState.PAUSED
+        ) {
+            return null
+        }
+        val progress = snapshot.toRouteProgress()
+        val percent = ((progress.travelledDistanceMeters / progress.totalDistanceMeters) * 100.0)
+            .toInt()
+            .coerceIn(0, 100)
+        val displaySpeed = when {
+            progress.speedMetersPerSecond > 0.0 -> progress.speedMetersPerSecond
+            snapshot.state == RouteExecutionState.PAUSED -> 0.0
+            else -> execution.movementProfile.metersPerSecond
+        }
+        val remainingSeconds = if (displaySpeed > 0.0) {
+            progress.remainingDistanceMeters / displaySpeed
+        } else {
+            0.0
+        }
+        return RouteNotificationStatus(
+            title = routeDisplayName ?: getString(R.string.route_notification_title),
+            percent = percent,
+            remainingSeconds = remainingSeconds,
+            paused = snapshot.state == RouteExecutionState.PAUSED,
+        )
     }
 
     private fun routeNotificationAction(): RouteNotificationAction? = when (routeExecution?.snapshot()?.state) {
@@ -597,6 +640,7 @@ class MockLocationForegroundService : Service() {
         const val ACTION_SET_JOYSTICK = "com.sora.mockgps.action.SET_JOYSTICK"
         const val EXTRA_LATITUDE = "com.sora.mockgps.extra.LATITUDE"
         const val EXTRA_LONGITUDE = "com.sora.mockgps.extra.LONGITUDE"
+        const val EXTRA_ROUTE_NAME = "com.sora.mockgps.extra.ROUTE_NAME"
         const val EXTRA_ROUTE_LATITUDES = "com.sora.mockgps.extra.ROUTE_LATITUDES"
         const val EXTRA_ROUTE_LONGITUDES = "com.sora.mockgps.extra.ROUTE_LONGITUDES"
         /** Legacy input retained for callers that supplied a raw speed in m/s. */
@@ -693,6 +737,7 @@ class MockLocationForegroundService : Service() {
             gpsDrift: GpsDriftConfiguration = GpsDriftConfiguration(),
             updateIntervalMillis: Long = UPDATE_INTERVAL_MILLIS,
             accuracyMeters: Float = MockPayloadOptions.DEFAULT_ACCURACY_METERS,
+            routeName: String? = null,
         ): Intent {
             require(points.size <= MAX_ROUTE_POINTS) { "Route has too many points" }
             val route = RoutePolyline(points)
@@ -715,6 +760,7 @@ class MockLocationForegroundService : Service() {
                 putExtra(EXTRA_ROUTE_GPS_DRIFT_SEED, gpsDrift.seed)
                 putExtra(EXTRA_UPDATE_INTERVAL_MILLIS, updateIntervalMillis.coerceIn(250L, 60_000L))
                 putExtra(EXTRA_ACCURACY_METERS, accuracyMeters.coerceIn(1f, 100f))
+                routeName?.trim()?.takeIf { it.isNotEmpty() }?.let { putExtra(EXTRA_ROUTE_NAME, it.take(80)) }
             }
         }
 

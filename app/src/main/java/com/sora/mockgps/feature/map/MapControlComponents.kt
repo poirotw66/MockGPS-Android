@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -12,10 +13,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -119,6 +123,80 @@ internal fun RouteEndpointSummary(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+        }
+    }
+}
+
+@Composable
+internal fun RouteTripStrip(
+    progress: RouteProgress,
+    paused: Boolean,
+    routeName: String?,
+    onPauseResume: () -> Unit,
+    onStop: () -> Unit,
+) {
+    val fraction = (progress.travelledDistanceMeters / progress.totalDistanceMeters)
+        .toFloat()
+        .coerceIn(0f, 1f)
+    val remainingSeconds = if (progress.speedMetersPerSecond > 0.0) {
+        progress.remainingDistanceMeters / progress.speedMetersPerSecond
+    } else {
+        0.0
+    }
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        routeName?.let { name ->
+            Text(
+                name,
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            Column {
+                Text(
+                    stringResource(if (paused) R.string.route_state_paused else R.string.route_trip_remaining_label),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    remainingSeconds.formatTripClock(),
+                    style = MaterialTheme.typography.headlineSmall,
+                )
+            }
+            Text(
+                stringResource(R.string.route_progress_percent, (fraction * 100).toInt()),
+                style = MaterialTheme.typography.titleMedium,
+            )
+        }
+        LinearProgressIndicator(
+            progress = { fraction },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlinedButton(
+                onClick = onPauseResume,
+                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+            ) {
+                Text(stringResource(if (paused) R.string.action_resume_route else R.string.action_pause_route))
+            }
+            Button(
+                onClick = onStop,
+                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+            ) {
+                Text(stringResource(R.string.action_stop))
             }
         }
     }

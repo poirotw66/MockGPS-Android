@@ -40,10 +40,12 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.sora.mockgps.R
 import com.sora.mockgps.core.model.Coordinate
 import com.sora.mockgps.route.GeoMath
+import com.sora.mockgps.ui.theme.BloomWalkCocoa
 import com.sora.mockgps.ui.theme.BloomWalkCoral
 import com.sora.mockgps.ui.theme.BloomWalkGold
 import com.sora.mockgps.ui.theme.BloomWalkSage
@@ -72,6 +74,8 @@ internal fun MapPicker(
     loadingState: MapLoadingState,
     pendingCoordinate: Coordinate,
     routePoints: List<Coordinate>,
+    /** When set, the route is drawn as a faded travelled part and a coral part still ahead. */
+    routeTravelledPoints: List<Coordinate> = emptyList(),
     routeOrigin: Coordinate?,
     routeDestination: Coordinate?,
     routeWaypoints: List<Coordinate>,
@@ -121,10 +125,24 @@ internal fun MapPicker(
                     ClickResult.Consume
                 },
             ) {
-                if (routePoints.size >= 2) RouteLine(routePoints)
+                if (routeTravelledPoints.size >= 2) {
+                    RouteLine(
+                        idPrefix = "route-travelled",
+                        points = routeTravelledPoints,
+                        color = BloomWalkCocoa.copy(alpha = 0.45f),
+                        widthDp = 3.dp,
+                        drawCasing = false,
+                    )
+                }
+                if (routePoints.size >= 2) {
+                    RouteLine(
+                        idPrefix = if (routeTravelledPoints.size >= 2) "route-remaining" else "planned-bicycle-route",
+                        points = routePoints,
+                    )
+                }
                 pendingApplyActiveCoordinate?.let { StaticActiveMarker(it) }
                 if (userMarker == null) SelectedLocationMarker(pendingCoordinate)
-                activeRouteCoordinate?.let { RouteActiveMarker(it) }
+                if (userMarker == null) activeRouteCoordinate?.let { RouteActiveMarker(it) }
             }
         }
         if (loadingState == MapLoadingState.Ready && showLandmarks) {
@@ -307,22 +325,30 @@ private const val LANDMARK_DOT_MIN_ZOOM = 7.0
 private const val LANDMARK_LABEL_MIN_ZOOM = 10.5
 
 @Composable
-private fun RouteLine(points: List<Coordinate>) {
+private fun RouteLine(
+    points: List<Coordinate>,
+    idPrefix: String = "planned-bicycle-route",
+    color: Color = BloomWalkCoral,
+    widthDp: Dp = 4.dp,
+    drawCasing: Boolean = true,
+) {
     val geoJson = remember(points) { points.toLineStringGeoJson() }
     val data = remember(geoJson) { GeoJsonData.JsonString(geoJson) }
     val source = rememberGeoJsonSource(data)
     LaunchedEffect(source, data) { source.setData(data) }
+    if (drawCasing) {
+        LineLayer(
+            id = "$idPrefix-casing",
+            source = source,
+            color = const(Color.White),
+            width = const(widthDp + 3.dp),
+        )
+    }
     LineLayer(
-        id = "planned-bicycle-route-casing",
+        id = idPrefix,
         source = source,
-        color = const(Color.White),
-        width = const(7.dp),
-    )
-    LineLayer(
-        id = "planned-bicycle-route",
-        source = source,
-        color = const(BloomWalkCoral),
-        width = const(4.dp),
+        color = const(color),
+        width = const(widthDp),
     )
 }
 

@@ -28,6 +28,22 @@ class RoutePlaybackTest {
         assertEquals(0.0, firstSegment.coordinate.latitude, 0.00001)
         assertTrue(firstSegment.coordinate.longitude in 0.0049..0.0051)
         assertTrue(secondSegment.coordinate.latitude in 0.0049..0.0051)
+
+        val atStart = route.splitAt(0.0)
+        assertEquals(listOf(route.points.first()), atStart.travelled)
+        assertEquals(route.points, atStart.remaining)
+
+        val atEnd = route.splitAt(route.totalDistanceMeters)
+        assertEquals(route.points, atEnd.travelled)
+        assertEquals(listOf(route.points.last()), atEnd.remaining)
+
+        val midway = route.splitAt(route.totalDistanceMeters / 2.0)
+        assertEquals(midway.travelled.last(), midway.remaining.first())
+        assertEquals(route.points.first(), midway.travelled.first())
+        assertEquals(route.points.last(), midway.remaining.last())
+        assertTrue(midway.travelled.size >= 2)
+        assertTrue(midway.remaining.size >= 2)
+        assertTrue(GeoMath.distanceMeters(midway.travelled.last(), route.points[1]) < 5.0)
         assertEquals(0.01, secondSegment.coordinate.longitude, 0.00001)
     }
 

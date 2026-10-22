@@ -36,6 +36,18 @@ internal fun routePointLabel(index: Int): String {
     return ('A'.code + index).toChar().toString()
 }
 internal fun Double.formatCoordinate(): String = String.format(Locale.US, "%.6f", this)
+internal fun Double.formatTripClock(): String {
+    val totalSeconds = toInt().coerceAtLeast(0)
+    val hours = totalSeconds / 3_600
+    val minutes = (totalSeconds % 3_600) / 60
+    val seconds = totalSeconds % 60
+    return if (hours == 0) {
+        "%d:%02d".format(Locale.US, minutes, seconds)
+    } else {
+        "%d:%02d:%02d".format(Locale.US, hours, minutes, seconds)
+    }
+}
+
 internal fun Double.formatDuration(): String {
     val totalMinutes = (this / 60.0).toInt().coerceAtLeast(1)
     val hours = totalMinutes / 60

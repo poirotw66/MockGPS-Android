@@ -7,6 +7,7 @@ import com.sora.mockgps.route.RoutingOutOfScopeException
 import com.sora.mockgps.route.RoutingQuotaException
 import com.sora.mockgps.route.RoutingServiceDisabledException
 import com.sora.mockgps.route.RoutingTooComplexException
+import com.sora.mockgps.route.RoutingUnavailableException
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -17,6 +18,15 @@ class RoutingUserMessageTest {
         assertEquals(R.string.route_error_too_complex, routingUserMessageId(RoutingTooComplexException()))
         assertEquals(R.string.route_error_out_of_scope, routingUserMessageId(RoutingOutOfScopeException()))
         assertEquals(R.string.route_error_quota, routingUserMessageId(RoutingQuotaException("GLOBAL_QUOTA_EXHAUSTED")))
+        assertEquals(
+            R.string.route_error_quota,
+            routingUserMessageId(
+                RoutingUnavailableException(
+                    "Routing is unavailable and no cached route can be used.",
+                    RoutingQuotaException("CLIENT_RATE_LIMITED"),
+                ),
+            ),
+        )
         assertEquals(R.string.route_error_disabled, routingUserMessageId(RoutingServiceDisabledException()))
         assertEquals(R.string.route_error_network, routingUserMessageId(RoutingNetworkException("offline")))
         assertEquals(R.string.route_error_unavailable, routingUserMessageId(IllegalStateException("other")))

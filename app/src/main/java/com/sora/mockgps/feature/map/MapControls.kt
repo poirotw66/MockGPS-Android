@@ -234,6 +234,16 @@ internal fun MapControlPanel(
                     maxLines = 2,
                 )
             }
+            val tripProgress = routeProgress?.takeIf { isRouteSession }
+            if (tripProgress != null) {
+                RouteTripStrip(
+                    progress = tripProgress,
+                    paused = routePaused,
+                    routeName = activeRouteName,
+                    onPauseResume = onPauseResumeRoute,
+                    onStop = onStop,
+                )
+            }
             if (dockActions.showStartRoute) {
                 Button(
                     onClick = onStartRoute,
@@ -246,12 +256,13 @@ internal fun MapControlPanel(
                     Text(stringResource(R.string.action_start_route_simulation), maxLines = 2)
                 }
             }
-            Row(
+            val primary = dockActions.primary
+            val showDockStop = dockActions.showStop && tripProgress == null
+            if (primary != null || showDockStop) Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                val primary = dockActions.primary
                 if (primary != null) {
                     Button(
                         onClick = {
@@ -267,7 +278,7 @@ internal fun MapControlPanel(
                         Text(stringResource(primary.labelRes), maxLines = 1)
                     }
                 }
-                if (dockActions.showStop) {
+                if (showDockStop) {
                     if (primary == null) {
                         Button(
                             onClick = onStop,
