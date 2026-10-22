@@ -100,14 +100,14 @@
     <string name="auto_journey_notice">Each generation picks a famous landmark and sends shape control points to the BloomWalk routing gateway. The result follows real roads, so every shape is naturally different and imperfect. Online routing stays off until the owner cost gate is resolved.</string>
     <string name="auto_journey_notice_perfect_shape">Each generation picks a famous landmark and draws a geometric shape centered on it. The route keeps the full shape without road routing.</string>
     <string name="generated_journey_name">%1$s · %2$s · %3$s journey</string>
-    <string name="generated_current_location_journey_name">Current location · %1$s journey</string>
+    <string name="generated_current_location_journey_name">Selected location · %1$s journey</string>
     <string name="action_generate_journey">Generate</string>
     <string name="action_try_another_landmark">Try another landmark</string>
     <string name="action_try_another_shape">Try another shape</string>
     <string name="auto_journey_route_error">That landmark could not produce a road route. Try another landmark.</string>
     <string name="auto_journey_local_shape_fallback">Online road routing is unavailable, so this journey uses the local shape.</string>
-    <string name="auto_journey_route_error_current_location">Could not build a road route from your current location. Try another shape, or switch to Perfect shape.</string>
-    <string name="region_current_location">Current location</string>
+    <string name="auto_journey_route_error_current_location">Could not build a road route from the selected location. Try another shape, or switch to Perfect shape.</string>
+    <string name="region_current_location">Selected location</string>
     <string name="region_taiwan">Taiwan</string>
     <string name="region_japan">Japan</string>
     <string name="region_south_korea">Korea</string>

@@ -391,7 +391,13 @@ internal class MapRoutingCoordinator(
     }
 
     fun regenerateAutomaticJourney() {
-        automaticJourneyOptions?.let(::generateAutomaticJourney)
+        val options = automaticJourneyOptions ?: return
+        val refreshed = if (options.region == JourneyRegion.CurrentLocation) {
+            options.copy(centerCoordinate = uiState.value.pendingCoordinate)
+        } else {
+            options
+        }
+        generateAutomaticJourney(refreshed)
     }
 
     internal fun generateShapeRoute(center: Coordinate, shape: RouteShape) {

@@ -5,6 +5,7 @@ import com.sora.mockgps.BuildConfig
 import com.sora.mockgps.core.network.GatewayClient
 import com.sora.mockgps.core.network.GatewayClientConfig
 import com.sora.mockgps.core.network.GatewayConfigRepository
+import com.sora.mockgps.core.network.RemoteConfigSource
 import com.sora.mockgps.core.network.InstallIdStore
 import com.sora.mockgps.core.settings.AppSettingsRepository
 import com.sora.mockgps.core.settings.DataStoreAppSettingsRepository
@@ -61,6 +62,11 @@ data class MapDependencies(
                         ),
                     ),
                     routingEnabled = { configRepository.flags.value.routingEnabled },
+                    refreshRoutingAvailability = { configRepository.refreshOnForeground(force = true) },
+                    routingConfirmedDisabled = {
+                        val source = configRepository.flags.value.source
+                        source == RemoteConfigSource.Network || source == RemoteConfigSource.Cache
+                    },
                 ),
                 settingsRepository = DataStoreAppSettingsRepository(application),
                 placeSearchRepository = CachingPlaceSearchRepository(

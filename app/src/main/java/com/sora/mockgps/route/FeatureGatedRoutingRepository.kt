@@ -10,14 +10,22 @@ class RoutingServiceDisabledException(
 class FeatureGatedRoutingRepository(
     private val delegate: RoutingRepository,
     private val routingEnabled: () -> Boolean,
+    private val refreshRoutingAvailability: suspend () -> Unit = {},
+    private val routingConfirmedDisabled: () -> Boolean = { !routingEnabled() },
 ) : RoutingRepository {
     override suspend fun planRoute(
         waypoints: List<Coordinate>,
         transportMode: RouteTransportMode,
     ): PlannedRoute {
         if (!routingEnabled()) {
+            refreshRoutingAvailability()
+        }
+        if (routingEnabled()) {
+            return delegate.planRoute(waypoints, transportMode)
+        }
+        if (routingConfirmedDisabled()) {
             throw RoutingServiceDisabledException()
         }
-        return delegate.planRoute(waypoints, transportMode)
+        throw RoutingNetworkException("Routing configuration is unavailable.")
     }
 }

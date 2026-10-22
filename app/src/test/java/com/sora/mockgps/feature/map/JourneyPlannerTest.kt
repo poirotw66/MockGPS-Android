@@ -86,7 +86,7 @@ class JourneyPlannerTest {
         assertEquals(start, journey.points.first())
         assertEquals(start, journey.points.last())
         assertEquals(start, journey.landmark.coordinate)
-        assertEquals("目前位置", journey.landmark.nameZhTw)
+        assertEquals("選定位置", journey.landmark.nameZhTw)
         assertTrue(journey.startAnchored)
         assertTrue(GeoMath.distanceMeters(journey.center, start) > 50.0)
         assertTrue(journey.points.all { GeoMath.distanceMeters(it, journey.center) < 20_000.0 })

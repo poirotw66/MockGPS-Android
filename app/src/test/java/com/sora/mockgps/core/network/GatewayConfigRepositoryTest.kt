@@ -63,6 +63,32 @@ class GatewayConfigRepositoryTest {
     }
 
     @Test
+    fun `failed config refresh retries after the short backoff and a route request can force it`() = runBlocking {
+        var now = 0L
+        var attempts = 0
+        val repository = GatewayConfigRepository(
+            fetch = {
+                attempts += 1
+                if (attempts == 1) error("offline")
+                capabilities(search = false, routing = true, purchases = false, ads = false, fetchedAt = now)
+            },
+            clock = { now },
+        )
+        repository.refreshOnForeground()
+        assertFalse(repository.flags.value.routingEnabled)
+        assertEquals(RemoteConfigSource.Unavailable, repository.flags.value.source)
+
+        now = GatewayConfigRepository.FAILURE_RETRY_MILLIS - 1
+        repository.refreshOnForeground()
+        assertEquals(1, repository.fetchCount)
+
+        repository.refreshOnForeground(force = true)
+        assertEquals(2, repository.fetchCount)
+        assertTrue(repository.flags.value.routingEnabled)
+        assertEquals(RemoteConfigSource.Network, repository.flags.value.source)
+    }
+
+    @Test
     fun `unavailable config does not invent paid flags`() = runBlocking {
         val repository = GatewayConfigRepository(
             fetch = {

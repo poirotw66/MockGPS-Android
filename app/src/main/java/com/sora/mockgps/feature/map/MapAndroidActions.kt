@@ -1,26 +1,17 @@
 package com.sora.mockgps.feature.map
 
 import android.Manifest
-import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
-import android.location.LocationManager
 import android.net.Uri
 import android.os.Build
 import android.app.ForegroundServiceStartNotAllowedException
 import androidx.core.content.ContextCompat
-import com.google.android.gms.location.LocationServices
-import com.google.android.gms.location.Priority
-import com.google.android.gms.tasks.CancellationTokenSource
 import com.sora.mockgps.core.io.readBoundedUtf8
 import com.sora.mockgps.core.model.Coordinate
 import com.sora.mockgps.route.JoystickSpeed
 import com.sora.mockgps.service.MockLocationForegroundService
 import com.sora.mockgps.service.ServiceSessionToken
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withTimeoutOrNull
 
 internal fun Context.requiredRuntimePermissions(notificationPermissionHandled: Boolean): List<String> = buildList {
     if (!hasLocationPermission()) {
@@ -34,46 +25,6 @@ internal fun Context.requiredRuntimePermissions(notificationPermissionHandled: B
 
 internal fun Context.hasLocationPermission(): Boolean =
     isGranted(Manifest.permission.ACCESS_FINE_LOCATION) || isGranted(Manifest.permission.ACCESS_COARSE_LOCATION)
-
-internal fun Context.lastKnownCoordinate(): Coordinate? {
-    if (!hasLocationPermission()) return null
-    val manager = getSystemService(LocationManager::class.java) ?: return null
-    return selectBestKnownLocation(manager.collectLastKnownLocations())?.toCoordinate()
-}
-
-@SuppressLint("MissingPermission")
-internal suspend fun Context.resolveCurrentCoordinate(
-    timeoutMillis: Long = CURRENT_LOCATION_REQUEST_TIMEOUT_MILLIS,
-): Coordinate? {
-    if (!hasLocationPermission()) return null
-    val manager = getSystemService(LocationManager::class.java) ?: return null
-    val lastKnown = selectBestKnownLocation(manager.collectLastKnownLocations())
-    if (lastKnown != null && lastKnown.isFresh(maxAgeMillis = CURRENT_LOCATION_FRESH_MAX_AGE_MILLIS)) {
-        return lastKnown.toCoordinate()
-    }
-    val appContext = applicationContext
-    val requested = withTimeoutOrNull(timeoutMillis) {
-        runCatching {
-            LocationServices.getFusedLocationProviderClient(appContext)
-                .getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, CancellationTokenSource().token)
-                .awaitLocationTask()
-        }.getOrNull()
-    }
-    return requested?.toCoordinate() ?: lastKnown?.toCoordinate()
-}
-
-private suspend fun <T> com.google.android.gms.tasks.Task<T>.awaitLocationTask(): T =
-    suspendCancellableCoroutine { continuation ->
-        addOnSuccessListener { value ->
-            if (continuation.isActive) continuation.resume(value)
-        }
-        addOnFailureListener { error ->
-            if (continuation.isActive) continuation.resumeWithException(error)
-        }
-        addOnCanceledListener {
-            continuation.cancel()
-        }
-    }
 
 internal fun Context.startMockService(
     coordinate: Coordinate,

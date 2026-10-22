@@ -149,7 +149,6 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     var pendingRouteStart by rememberSaveable { mutableStateOf(false) }
     var routeStartQueued by remember { mutableStateOf(false) }
     var pendingCurrentLocation by rememberSaveable { mutableStateOf(false) }
-    var pendingAutoJourney by remember { mutableStateOf<AutoJourneyOptions?>(null) }
     var isResolvingCurrentLocation by remember { mutableStateOf(false) }
     var routeOptions by rememberSaveable(stateSaver = RouteSimulationOptionsSaver) {
         mutableStateOf(RouteSimulationOptions())
@@ -252,8 +251,11 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
         permissionMessage = null
         isResolvingCurrentLocation = true
         coroutineScope.launch {
-            val coordinate = runCatching { context.resolveCurrentCoordinate() }.getOrNull()
-            isResolvingCurrentLocation = false
+            val coordinate = try {
+                runCatching { context.resolveCurrentCoordinate() }.getOrNull()
+            } finally {
+                isResolvingCurrentLocation = false
+            }
             if (coordinate == null) {
                 permissionMessage = currentLocationUnavailable
             } else {
@@ -274,10 +276,8 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     ) {
         val shouldStartRoute = pendingRouteStart
         val shouldUseCurrentLocation = pendingCurrentLocation
-        val autoJourney = pendingAutoJourney
         pendingRouteStart = false
         pendingCurrentLocation = false
-        pendingAutoJourney = null
         notificationPermissionHandled = true
         if (!context.hasLocationPermission()) {
             permissionMessage = locationPermissionRequired
@@ -286,11 +286,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                 !context.isGranted(Manifest.permission.POST_NOTIFICATIONS)
             ) notificationPermissionDenied else null
-            if (autoJourney != null) {
-                resolveCurrentLocation { coordinate ->
-                    viewModel.generateAutomaticJourney(autoJourney.copy(centerCoordinate = coordinate))
-                }
-            } else if (shouldUseCurrentLocation) {
+            if (shouldUseCurrentLocation) {
                 resolveCurrentLocation { coordinate ->
                     viewModel.selectCoordinate(coordinate)
                     coroutineScope.launch {
@@ -588,18 +584,12 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     com.sora.mockgps.route.RouteTransportMode.Drive -> MovementPreset.Drive
                 },
             )
-            if (options.region != JourneyRegion.CurrentLocation) {
-                viewModel.generateAutomaticJourney(options)
-            } else if (!context.hasLocationPermission()) {
-                pendingAutoJourney = options
-                permissionLauncher.launch(
-                    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
-                )
+            val journey = if (options.region == JourneyRegion.CurrentLocation) {
+                options.copy(centerCoordinate = uiState.pendingCoordinate)
             } else {
-                resolveCurrentLocation { coordinate ->
-                    viewModel.generateAutomaticJourney(options.copy(centerCoordinate = coordinate))
-                }
+                options
             }
+            viewModel.generateAutomaticJourney(journey)
         },
     )
     if (showShapeRoute) ShapeRouteDialog(
@@ -837,41 +827,6 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     ),
             )
         }
-        Surface(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .navigationBarsPadding()
-                .padding(
-                    end = if (compactLayout) (panelMaxWidth + 20.dp) else 16.dp,
-                    bottom = chromeBottomPadding,
-                ),
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
-            tonalElevation = 2.dp,
-            shadowElevation = 4.dp,
-            border = androidx.compose.foundation.BorderStroke(
-                1.dp,
-                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f),
-            ),
-        ) {
-            IconButton(
-                onClick = goToCurrentLocation,
-                enabled = !isResolvingCurrentLocation,
-                modifier = Modifier
-                    .size(48.dp)
-                    .semantics { contentDescription = currentLocationLabel },
-            ) {
-                if (isResolvingCurrentLocation) {
-                    CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-                } else {
-                    Icon(
-                        imageVector = Icons.Filled.LocationOn,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                }
-            }
-        }
         Column(
             modifier = Modifier
                 .align(if (compactLayout) Alignment.CenterEnd else Alignment.BottomCenter)
@@ -1072,6 +1027,41 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             loadToken = bannerLoadToken,
             modifier = Modifier.fillMaxWidth(),
         )
+        }
+        Surface(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .navigationBarsPadding()
+                .padding(
+                    end = if (compactLayout) (panelMaxWidth + 20.dp) else 16.dp,
+                    bottom = chromeBottomPadding,
+                ),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+            tonalElevation = 2.dp,
+            shadowElevation = 4.dp,
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f),
+            ),
+        ) {
+            IconButton(
+                onClick = goToCurrentLocation,
+                enabled = !isResolvingCurrentLocation,
+                modifier = Modifier
+                    .size(48.dp)
+                    .semantics { contentDescription = currentLocationLabel },
+            ) {
+                if (isResolvingCurrentLocation) {
+                    CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(
+                        imageVector = Icons.Filled.LocationOn,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
         }
     }
     if (showRemoveAds && monetization != null) {

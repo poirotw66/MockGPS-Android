@@ -96,14 +96,14 @@
     <string name="auto_journey_notice">每次會挑選著名景點，並將形狀控制點傳送至 BloomWalk 路線閘道。結果會沿著真實道路，因此每次形狀都會自然不同，也不會過度完美。正式道路規劃須待擁有者完成費用門檻後才會開啟。</string>
     <string name="auto_journey_notice_perfect_shape">每次會挑選著名景點，並以該點為中心產生幾何圖形路線。不經道路規劃，形狀會完整保留。</string>
     <string name="generated_journey_name">%1$s · %2$s · %3$s旅程</string>
-    <string name="generated_current_location_journey_name">目前位置 · %1$s旅程</string>
+    <string name="generated_current_location_journey_name">選定位置 · %1$s旅程</string>
     <string name="action_generate_journey">產生旅程</string>
     <string name="action_try_another_landmark">改用其他景點</string>
     <string name="action_try_another_shape">換個形狀</string>
     <string name="auto_journey_route_error">此景點無法產生道路路線。請改用其他景點。</string>
     <string name="auto_journey_local_shape_fallback">線上道路規劃目前不可用，已改用本機圖形。</string>
-    <string name="auto_journey_route_error_current_location">無法在目前位置產生道路路線。請換個形狀，或改選「完美圖形」。</string>
-    <string name="region_current_location">目前位置</string>
+    <string name="auto_journey_route_error_current_location">無法在選定位置產生道路路線。請換個形狀，或改選「完美圖形」。</string>
+    <string name="region_current_location">選定位置</string>
     <string name="region_taiwan">台灣</string>
     <string name="region_japan">日本</string>
     <string name="region_south_korea">韓國</string>

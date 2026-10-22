@@ -307,7 +307,7 @@ internal data class GeneratedJourney(
     val landmark: JourneyLandmark,
     val center: Coordinate,
     val points: List<Coordinate>,
-    /** When true, [points].first() is the fixed start (current location) and must be preserved on resize. */
+    /** When true, [points].first() is the selected map location and must be preserved on resize. */
     val startAnchored: Boolean = false,
     /** Canonical shape-ring index rotated to the start when [startAnchored] is true. */
     val shapeRingIndex: Int = 0,
@@ -330,7 +330,7 @@ internal object JourneyPlanner {
         }
         val landmark = when (options.region) {
             JourneyRegion.CurrentLocation -> currentLocationLandmark(
-                requireNotNull(options.centerCoordinate) { "Current location requires a coordinate." },
+                requireNotNull(options.centerCoordinate) { "Selected location requires a coordinate." },
             )
             else -> randomLandmark(options.region, random, excludedLandmarks)
         }
@@ -338,8 +338,8 @@ internal object JourneyPlanner {
             JourneyRegion.CurrentLocation -> landmark.coordinate
             else -> null
         }
-        // Current location: draft the shape around the user, then shift so the loop
-        // starts at that point instead of treating it as the geometric center.
+        // Selected location: draft the shape around that point, then shift so the loop
+        // starts there instead of treating it as the geometric center.
         val draftCenter = when {
             startAnchor != null -> startAnchor
             else -> randomCenter(landmark, random)
@@ -428,7 +428,7 @@ internal object JourneyPlanner {
     }
 
     private fun currentLocationLandmark(coordinate: Coordinate): JourneyLandmark =
-        JourneyLandmark("Current Location", "目前位置", coordinate)
+        JourneyLandmark("Selected location", "選定位置", coordinate)
 
     private fun randomLandmark(
         region: JourneyRegion,

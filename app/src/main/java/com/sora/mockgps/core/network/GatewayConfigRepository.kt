@@ -47,10 +47,19 @@ class GatewayConfigRepository(
     var fetchCount: Int = 0
         private set
 
-    suspend fun refreshOnForeground() {
+    suspend fun refreshOnForeground(force: Boolean = false) {
         mutex.withLock {
             val now = clock()
-            if (lastAttemptMillis >= 0L && now - lastAttemptMillis < refreshIntervalMillis) {
+            val usableCache = cached != null && now - cached!!.fetchedAtMillis <= maxCacheAgeMillis
+            val successIsFresh = lastSuccessMillis >= 0L &&
+                now - lastSuccessMillis < refreshIntervalMillis
+            if (!force && usableCache && successIsFresh) {
+                publish(now)
+                return
+            }
+            val failedRecently = lastAttemptMillis >= 0L &&
+                now - lastAttemptMillis < FAILURE_RETRY_MILLIS
+            if (!force && !usableCache && failedRecently) {
                 publish(now)
                 return
             }
@@ -102,5 +111,6 @@ class GatewayConfigRepository(
     companion object {
         const val REFRESH_INTERVAL_MILLIS = 6 * 60 * 60 * 1000L
         const val MAX_CACHE_AGE_MILLIS = 24 * 60 * 60 * 1000L
+        const val FAILURE_RETRY_MILLIS = 30_000L
     }
 }
