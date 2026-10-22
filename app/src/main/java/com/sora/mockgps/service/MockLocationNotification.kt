@@ -125,11 +125,17 @@ internal object MockLocationNotification {
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .apply {
                 if (routeStatus != null) {
-                    val collapsed = routeStatusViews(context, R.layout.notification_route_status, routeStatus)
+                    val collapsed = routeStatusViews(
+                        context,
+                        R.layout.notification_route_status,
+                        routeStatus,
+                        showProgress = false,
+                    )
                     val expanded = routeStatusViews(
                         context,
                         R.layout.notification_route_status_expanded,
                         routeStatus,
+                        showProgress = true,
                     )
                     setCustomContentView(collapsed)
                     setCustomBigContentView(expanded)
@@ -168,6 +174,7 @@ private fun routeStatusViews(
     context: Context,
     layoutId: Int,
     status: RouteNotificationStatus,
+    showProgress: Boolean,
 ): RemoteViews {
     val clock = formatTripClock(status.remainingSeconds)
     val caption = context.getString(
@@ -180,9 +187,14 @@ private fun routeStatusViews(
     )
     return RemoteViews(context.packageName, layoutId).apply {
         setTextViewText(R.id.route_notification_time, clock)
-        setTextViewText(R.id.route_notification_percent, context.getString(R.string.route_progress_percent, status.percent))
+        setTextViewText(
+            R.id.route_notification_percent,
+            context.getString(R.string.route_progress_percent, status.percent),
+        )
         setTextViewText(R.id.route_notification_caption, caption)
-        setProgressBar(R.id.route_notification_progress, 100, status.percent, false)
+        if (showProgress) {
+            setProgressBar(R.id.route_notification_progress, 100, status.percent, false)
+        }
         if (status.paused) {
             setViewVisibility(R.id.route_notification_clock, View.GONE)
             setViewVisibility(R.id.route_notification_time, View.VISIBLE)
