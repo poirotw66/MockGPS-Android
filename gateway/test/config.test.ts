@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseBooleanFlag } from "../src/config";
+import { isPrivilegedInstall, parseBooleanFlag } from "../src/config";
 import { SELF } from "cloudflare:test";
 import type { PublicConfig } from "../src/contracts/index";
 import configFixture from "./fixtures/config-success.json";
@@ -11,6 +11,14 @@ describe("feature flags", () => {
     expect(parseBooleanFlag("false")).toBe(false);
     expect(parseBooleanFlag("true")).toBe(true);
     expect(parseBooleanFlag("1")).toBe(true);
+  });
+
+  it("matches only listed install ids", () => {
+    const listed = "11111111-1111-4111-8111-111111111111";
+    expect(isPrivilegedInstall(undefined, listed)).toBe(false);
+    expect(isPrivilegedInstall("", listed)).toBe(false);
+    expect(isPrivilegedInstall(` ${listed} , other-id `, listed)).toBe(true);
+    expect(isPrivilegedInstall(listed, "22222222-2222-4222-8222-222222222222")).toBe(false);
   });
 });
 

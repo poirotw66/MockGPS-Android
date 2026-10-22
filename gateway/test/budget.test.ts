@@ -254,6 +254,69 @@ describe("GeoBudget Durable Object", () => {
     expect(inspect.finalizedCount).toBe(1);
   });
 
+  it("lets a privileged install pass its own route cap without skipping the shared credit budget", async () => {
+    const ledger = `privileged-${uuid()}`;
+    const stub = await initLedger(ledger, {
+      creditBudget24h: 2,
+      globalMinIntervalMs: 0,
+      clientMinIntervalMs: 60_000,
+      clientRouteLimit24h: 1,
+    });
+    const nowMs = Date.UTC(2026, 8, 28, 0, 0, 0);
+    const installId = uuid();
+    const first = await stub.admit(
+      await admitArgs({
+        ledger,
+        nowMs,
+        operation: "route",
+        credits: 1,
+        requestId: uuid(),
+        payload: "first-privileged",
+        installId,
+      }),
+    );
+    expect(first.outcome).toBe("admitted");
+    const capped = await stub.admit({
+      ...(await admitArgs({
+        ledger,
+        nowMs: nowMs + 1_000,
+        operation: "route",
+        credits: 1,
+        requestId: uuid(),
+        payload: "capped",
+        installId,
+      })),
+      exemptClientQuota: false,
+    });
+    expect(capped.outcome).toBe("rate");
+    const privileged = await stub.admit({
+      ...(await admitArgs({
+        ledger,
+        nowMs: nowMs + 1_000,
+        operation: "route",
+        credits: 1,
+        requestId: uuid(),
+        payload: "privileged",
+        installId,
+      })),
+      exemptClientQuota: true,
+    });
+    expect(privileged.outcome).toBe("admitted");
+    const overBudget = await stub.admit({
+      ...(await admitArgs({
+        ledger,
+        nowMs: nowMs + 2_000,
+        operation: "route",
+        credits: 1,
+        requestId: uuid(),
+        payload: "over-budget",
+        installId,
+      })),
+      exemptClientQuota: true,
+    });
+    expect(overBudget.outcome).toBe("quota");
+  });
+
   it("enforces client interval, in-flight, and IP limits with a fake clock", async () => {
     const ledger = `rate-clock-${uuid()}`;
     const stub = await initLedger(ledger, {

@@ -38,6 +38,7 @@ Set via Gradle properties or environment:
 - `RECEIPT_SIGNING_PRIVATE_KEY`
 - `PURCHASE_TOKEN_ENCRYPTION_KEY`
 - `RATE_KEY_HMAC_SECRET`
+- `OWNER_INSTALL_IDS` — comma-separated install ids that skip the per-install 24h route/search count and the per-install minimum interval. The shared 2,700-credit daily budget still applies. Do not commit the ids.
 
 ## Upload builds
 

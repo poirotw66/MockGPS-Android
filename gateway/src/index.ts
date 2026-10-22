@@ -1,5 +1,6 @@
 import {
   CONFIG_CACHE_SECONDS,
+  isPrivilegedInstall,
   parseBillingPolicy,
   parseBooleanFlag,
   publicConfig,
@@ -318,6 +319,7 @@ async function admitInput(
     ipDayHmac: await hmacHex(secret, `ip:${ip}:${dateKey(nowMs)}`),
     ipMinuteHmac: await hmacHex(secret, `ip:${ip}:${minuteKey(nowMs)}`),
     limits: readLimits(env),
+    exemptClientQuota: isPrivilegedInstall(env.OWNER_INSTALL_IDS, context.installId),
   };
 }
 

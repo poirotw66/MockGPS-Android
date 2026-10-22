@@ -37,6 +37,8 @@ export interface AdmitInput {
   ipDayHmac: string;
   ipMinuteHmac: string;
   limits: OperationalLimits;
+  /** Skips this install's own 24h count and minimum interval. Shared budgets still apply. */
+  exemptClientQuota?: boolean;
 }
 
 export type AdmitResult =
@@ -447,41 +449,43 @@ export class GeoBudget extends DurableObject<Env> {
       };
     }
 
-    const clientLimit =
-      input.operation === "search" ? limits.clientSearchLimit24h : limits.clientRouteLimit24h;
-    const clientCount = sqlNumber(
-      this.ctx.storage.sql
+    if (!input.exemptClientQuota) {
+      const clientLimit =
+        input.operation === "search" ? limits.clientSearchLimit24h : limits.clientRouteLimit24h;
+      const clientCount = sqlNumber(
+        this.ctx.storage.sql
+          .exec(
+            "SELECT COUNT(*) AS n FROM reservations WHERE actor_hmac = ? AND operation = ? AND expires_at > ?",
+            input.actorHmac,
+            input.operation,
+            input.nowMs,
+          )
+          .toArray()[0]?.n ?? 0,
+      );
+      if (clientCount >= clientLimit) {
+        return { outcome: "rate", retryAfterSeconds: 60 };
+      }
+
+      const lastClient = this.ctx.storage.sql
         .exec(
-          "SELECT COUNT(*) AS n FROM reservations WHERE actor_hmac = ? AND operation = ? AND expires_at > ?",
+          "SELECT MAX(reserved_at) AS last_at FROM reservations WHERE actor_hmac = ? AND expires_at > ?",
           input.actorHmac,
-          input.operation,
           input.nowMs,
         )
-        .toArray()[0]?.n ?? 0,
-    );
-    if (clientCount >= clientLimit) {
-      return { outcome: "rate", retryAfterSeconds: 60 };
-    }
-
-    const lastClient = this.ctx.storage.sql
-      .exec(
-        "SELECT MAX(reserved_at) AS last_at FROM reservations WHERE actor_hmac = ? AND expires_at > ?",
-        input.actorHmac,
-        input.nowMs,
-      )
-      .toArray();
-    const lastClientAt = lastClient[0]?.last_at;
-    if (
-      typeof lastClientAt === "number" &&
-      input.nowMs - lastClientAt < limits.clientMinIntervalMs
-    ) {
-      return {
-        outcome: "rate",
-        retryAfterSeconds: Math.max(
-          1,
-          Math.ceil((limits.clientMinIntervalMs - (input.nowMs - lastClientAt)) / 1000),
-        ),
-      };
+        .toArray();
+      const lastClientAt = lastClient[0]?.last_at;
+      if (
+        typeof lastClientAt === "number" &&
+        input.nowMs - lastClientAt < limits.clientMinIntervalMs
+      ) {
+        return {
+          outcome: "rate",
+          retryAfterSeconds: Math.max(
+            1,
+            Math.ceil((limits.clientMinIntervalMs - (input.nowMs - lastClientAt)) / 1000),
+          ),
+        };
+      }
     }
 
     const ipCount = sqlNumber(

@@ -40,6 +40,23 @@ export const DEFAULT_LIMITS: OperationalLimits = {
   clockMarginMs: 60_000,
 };
 
+/** Comma-separated install ids. Empty or unset grants privilege to nobody. */
+export function privilegedInstallIds(raw: string | undefined): ReadonlySet<string> {
+  if (raw === undefined || raw.trim() === "") {
+    return new Set();
+  }
+  return new Set(
+    raw
+      .split(",")
+      .map((part) => part.trim())
+      .filter((part) => part.length > 0),
+  );
+}
+
+export function isPrivilegedInstall(raw: string | undefined, installId: string): boolean {
+  return privilegedInstallIds(raw).has(installId);
+}
+
 export function parseBooleanFlag(value: string | undefined, fallback = false): boolean {
   if (value === undefined || value === "") {
     return fallback;

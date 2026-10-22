@@ -36,6 +36,7 @@ declare namespace Cloudflare {
     RECEIPT_VERIFY_PUBLIC_KEYS_JSON?: string;
     PURCHASE_TOKEN_ENCRYPTION_KEY?: string;
     RATE_KEY_HMAC_SECRET?: string;
+    OWNER_INSTALL_IDS?: string;
     GOOGLE_STUB_TOKENS_JSON?: string;
   }
 }
